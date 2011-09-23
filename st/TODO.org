@@ -1,0 +1,17 @@
+DANM TODO list:
+* DONE design statistics [3/3]
+  - [X] wire, bits flops latch statistics
+  - [X] evaluation order statistics
+  - [X] complexity statistics
+* TODO check design [3/4]
+  - [X] check every flop should be quiescent at certain condition
+  - [X] check no input should fanout to any output
+  - [X] check no latch should fanout to another latch
+  - [ ] check logic isolation in certain condition
+* DONE Simulator [4/4]
+  - [X] time series 
+  - [X] dependancy driven simulation
+  - [X] vcd file output
+  - [X] modeled combinator
+
+
