@@ -8,7 +8,7 @@ DANMCurrentDesign comment:
     ''!
 
 DANMBlackBox subclass: #DANMSchematic
-             instanceVariableNames: 'instances wires'
+             instanceVariableNames: 'instances wires userData'
              classVariableNames: ''
              poolDictionaries: ''
              category: 'DANM'!
@@ -65,6 +65,10 @@ instanceByName: iName
 findInstanceByName: iName
     ^instances at: iName ifAbsent: [ nil ]!
 
+clearUserData
+    "userData is for user to stash some data"
+    userData := LookupTable new!
+
 clearInstances
     "instances is a dictionary of instances, keyed by the instance name"
     instances := LookupTable new!
@@ -72,6 +76,15 @@ clearInstances
 instances
     ^instances!
 
+userDataAt: key
+    ^userData at: key!
+
+userDataAt: key ifAbsent: block
+    ^userData at: key ifAbsent: block!
+
+userDataAt: key put: v
+    userData at: key put: v!
+    
 getWire: w
     (w isKindOf: DANMWire) ifTrue: [ ^w ].
     ^self wireByName: w!
@@ -174,6 +187,7 @@ elaborate
                                                          entityName}; nl.
     DANMCurrentDesign use: self during: [
         self
+            clearUserData;
             clearWires;
             clearInstances;
             init;

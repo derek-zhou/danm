@@ -472,6 +472,8 @@ staticValue
     v isNil ifTrue: [ ^nil ].
     1 to: cases size do: [ :i |
         c := cases at: i.
+        (c isKindOf: ASTDefault) ifTrue: [
+            ^(choices at: i) staticValue ].
         vc := c staticValue.
         vc isNil ifTrue: [ ^nil ].
         vc == v ifTrue: [ 

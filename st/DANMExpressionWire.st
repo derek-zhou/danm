@@ -516,7 +516,6 @@ evaluate
     ASTIdentifier useNextValue: true.
     "reset condition"
     reset evaluate == 0 ifTrue: [ 
-        Transcript nextPutAll: 'reset %1' % {reset}; nl.
         self nextValue: resetTo evaluate.
         nextValue ~= value ifTrue: [ ^nextValue ] ifFalse: [ ^nil ]].
     "no reset, so it is just like a regular flop"

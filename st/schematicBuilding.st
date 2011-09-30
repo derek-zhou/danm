@@ -1,4 +1,4 @@
-!DANMSchematic methodsFor: 'connecting'!
+DANMSchematic methodsFor: 'connecting'!
 
 connect: pinNames
     ^self connectPins: (pinNames collect: [ :each|
@@ -116,6 +116,19 @@ let: wName be: exp
     wire expression: e.
     ^wire!
 
+defaultClock: clk
+    self userDataAt: 'defaultClock' put: clk!
+
+defaultClock
+    ^ self userDataAt: 'defaultClock' ifAbsent: [ 
+        self error: 'no default clock defined' ]!
+
+let: wName beClocked: exp
+    ^self let: wName be: exp clockedBy: (self defaultClock)!
+
+let: wName beLatched: exp
+    ^self let: wName be: exp latchedBy: (self defaultClock)!
+
 let: wName be: exp clockedBy: clk
     |wire|
     wire := DANMFlipflop newNamed: wName inContext: self.
@@ -133,6 +146,14 @@ let: wName be: exp latchedBy: clk
 let: wName beIfs: ifs
     ^ self let: wName be: (ASTIfsOp newIfs: ifs)!
 
+let: wName beClockedIfs: ifs
+    ^self let: wName be: (ASTIfsOp newIfs: ifs) 
+          clockedBy: (self defaultClock)!
+    
+let: wName beLatchedIfs: ifs
+    ^self let: wName be: (ASTIfsOp newIfs: ifs) 
+          latchedBy: (self defaultClock)!
+    
 let: wName beIfs: ifs clockedBy: clk
     ^ self let: wName be: (ASTIfsOp newIfs: ifs) clockedBy: clk!
 
@@ -142,6 +163,14 @@ let: wName beIfs: ifs latchedBy: clk
 let: wName beCases: table on: subject
     ^self let: wName be: (ASTCasesOp newCases: table on: subject)!
 
+let: wName beClockedCases: table on: subject
+    ^self let: wName be: (ASTCasesOp newCases: table on: subject)
+          clockedBy: (self defaultClock)!
+
+let: wName beLatchedCases: table on: subject
+    ^self let: wName be: (ASTCasesOp newCases: table on: subject)
+          latchedBy: (self defaultClock)!
+
 let: wName beCases: table on: subject clockedBy: clk
     ^self let: wName be: (ASTCasesOp newCases: table on: subject) 
           clockedBy: clk!
@@ -149,6 +178,18 @@ let: wName beCases: table on: subject clockedBy: clk
 let: wName beCases: table on: subject latchedBy: clk
     ^self let: wName be: (ASTCasesOp newCases: table on: subject) 
           latchedBy: clk!
+
+let: wName beRetimingOf: w by: n 
+    ^(self retime: w by: n) renameTo: wName!
+
+let: wName beRetimingOf: w by: n valid: v
+    ^(self retime: w by: n valid: v) renameTo: wName!
+
+let: wName beRetimingOf: w by: n strobe: s
+    ^(self retime: w by: n strobe: s) renameTo: wName!
+
+let: wName beRetimingOf: w by: n valid: v strobe: s
+    ^(self retime: w by: n valid: v strobe: s) renameTo: wName!
 
 let: wName beRetimingOf: w on: clk by: n 
     ^(self retime: w on: clk by: n) renameTo: wName!
@@ -162,11 +203,14 @@ let: wName beRetimingOf: w on: clk by: n strobe: s
 let: wName beRetimingOf: w on: clk by: n valid: v strobe: s
     ^(self retime: w on: clk by: n valid: v strobe: s) renameTo: wName!
 
+let: wName beFSM: fsm
+    ^self let: wName beFSM: fsm clockedBy: (self defaultClock)!
+
 let: wName beFSM: fsm clockedBy: clk
     |wire width counter cases choices state exp |
     cases := OrderedCollection new.
     choices := OrderedCollection new.
-    width := fsm size ceilingLog: 2.
+    width := (fsm size log: 2) ceiling.
     counter := 0.
     fsm do: [ :each |
         wire := DANMMacro newNamed: each key inContext: self.
@@ -178,13 +222,14 @@ let: wName beFSM: fsm clockedBy: clk
     "must have default, so FSM will not stuck"
     cases add: ASTDefault new.
     choices add: (ASTConstant newConstant: 0 width: width).
-    wire := DANMFlipflop newNamed: wName inContext: self.
-    exp := (ASTCasesOp newSubject: (ASTIdentifier basicNewIdentifier: wire)
+    exp := (ASTCasesOp newSubject: (ASTIdentifier newIdentifier: wName)
                        cases: cases choices: choices).
-    wire expression: exp.
-    wire clock: (ExpressionAST newFrom: clk).
-    ^wire!
+    wire := self let: 'next_',wName be: exp.
+    ^self let: wName be: wire clockedBy: clk!
                      
+retime: w by: n
+    ^self retime: w on: (self defaultClock) by: n!
+
 retime: w on: clk by: n
     |wire name|
     wire := self getWire: w.
@@ -195,6 +240,9 @@ retime: w on: clk by: n
                      clockedBy: clk ].
     ^wire!
     
+retime: w by: n strobe: s
+    ^self retime: w on: (self defaultClock) by: n strobe: s!
+
 retime: w on: clk by: n strobe: s
     |wire name|
     wire := self getWire: w.
@@ -206,6 +254,9 @@ retime: w on: clk by: n strobe: s
                      clockedBy: clk ].
     ^wire!
     
+retime: w on: clk by: n valid: v
+    ^self retime: w on: (self defaultClock) by: n valid: v!
+
 retime: w on: clk by: n valid: v
     |wire name vWire vName|
     wire := self getWire: w.
@@ -221,6 +272,9 @@ retime: w on: clk by: n valid: v
                       be: (ASTIdentifier basicNewIdentifier: vWire) 
                       clockedBy: clk ].
     ^wire!
+
+retime: w on: clk by: n valid: v strobe: s
+    ^self retime: w on: (self defaultClock) by: n valid: v strobe: s!
 
 retime: w on: clk by: n valid: v strobe: s
     |wire name vWire vName|
