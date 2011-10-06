@@ -17,7 +17,7 @@ flip
         "in simulation the design is flattened, so context context is the 
 simulator"
         (context context isKindOf: DANMSimulator) ifTrue: [ 
-            context context stop]]!
+            context context stop: self]]!
 !
 
 !DANMAssertion methodsFor: 'printing'!

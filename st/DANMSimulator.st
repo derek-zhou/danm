@@ -8,7 +8,7 @@ isResumable
 Object subclass: #DANMSimulator
     instanceVariableNames: 
         'sch stimuli evSets changeSet currentTime callbacks 
-stepCount evCount changeCount shouldContinue'
+stepCount evCount changeCount shouldContinue stopper trigger triggeringValue'
     classVariableNames: ''
     poolDictionaries: ''
     category: ''!
@@ -88,6 +88,12 @@ trySettleTo: v
 
 settleTo: v
     ^self!
+
+forceTo: v
+    "force me to some new value and trigger all down stream. 
+     This should only be called inside simulation"
+    value := v.
+    context context addTriggerOn: self!
 !
 
 !DANMExpressionWire methodsFor: 'simulating'!
@@ -129,23 +135,62 @@ through out the schematic"
     changeSet empty.
     self postEvent: #SimulationSettled!
 
+runUntil: w is: v
+    "run until the wire become v"
+    ^self runUntil: w is: v timeout: SmallInteger largest!
+
+runUntil: w is: v timeout: t
+    "run until the wire become v, or timeout"
+    |ret wire|
+    (w isKindOf: DANMWire) 
+        ifTrue: [ wire := w ]
+        ifFalse: [ wire := sch wireByName: w ].
+    trigger := wire.
+    triggeringValue := v.
+    ret := self runUpto: currentTime + t.
+    trigger := nil.
+    triggeringValue := nil.
+    ^ret!
+
+valueOf: w
+    (w isKindOf: DANMWire) 
+        ifTrue: [ ^w currentValue ]
+        ifFalse: [ ^(sch wireByName: w) currentValue ]!
+
+widthOf: w
+    (w isKindOf: DANMWire) 
+        ifTrue: [ ^w width ]
+        ifFalse: [ ^(sch wireByName: w) width ]!
+
+force: w to: v
+    (w isKindOf: DANMWire) 
+        ifTrue: [ w forceTo: v ]
+        ifFalse: [ (sch wireByName: w) forceTo: v ]!
+    
 run
     "run until all stimuli go out"
-    self runUpto: SmallInteger largest!
+    ^self runUpto: SmallInteger largest!
 
-stop
+stop: source
     "stop the simulation from eg. an error condition happened within, 
 at the end of the current timestep"
+    stopper := source.
     shouldContinue := false!
 
 isFinished
     ^shouldContinue!
 
 runUpto: limit
-    "run until all stimuli go out"
+    "run until all stimuli go out, or timeout, return the time
+     * intertupt signal; return the signal
+     * assertion fired, return the assertion
+     * triggering wire triggered. return the wire"
     shouldContinue ifFalse: [
         self postEvent: #SimulationResumed.
-        shouldContinue := true ].
+        stopper := nil.
+        shouldContinue := true.
+        "outside might have changed something"
+        self reEvaluate ].
     [ 
         [(currentTime < limit) & (stimuli size > 0) & 
              shouldContinue ] whileTrue: [ 
@@ -153,24 +198,31 @@ runUpto: limit
                  self heartBeat ]] 
         on: SystemExceptions.UserInterrupt
         do: [ :sig |
-            shouldContinue := false.
+            self stop: sig.
             sig resume ].
+    shouldContinue ifTrue: [ self stop: currentTime ].
     Transcript nextPutAll: 'Simulation stopped at: %1' % {currentTime}; nl.
-    self postEvent: #SimulationEnded!
+    self postEvent: #SimulationEnded.
+    ^stopper!
     
 runOnce 
     "run one time step"
     currentTime := stimuli first fireTime.
     self fireStimuli.
+    self reEvaluate!
+
+reEvaluate
     evSets do: [ :s | self runOneSet: s ].
     changeSet do: [ :w | 
-        w dataRefSet do: [ :each | each setDataDirty ]. 
+        w dataRefSet do: [ :each | each setDataDirty ].
+        (w == trigger and: [ w nextValue == triggeringValue ]) ifTrue: [
+            self stop: w ].
         w flip ].
     changeCount := changeCount + changeSet size.
     stepCount := stepCount + 1.
     self postEvent: #SimulationStepEnded.
     changeSet empty!
-
+    
 heartBeat
     evCount > 100000 ifTrue: [
         Transcript nextPutAll: 'Info: at %1: %2 steps, %3 evaluations and %4 changes since last log' 
