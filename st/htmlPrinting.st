@@ -126,7 +126,7 @@ printHTMLConnectionsOn: aStream
 
 generateHTMLAsTop
     |fs dir|
-    dir := File name: 'html'.
+    dir := File name: '%1_html' % {self referenceName}.
     (dir exists) ifFalse: [
         dir createDirectory ].
     Directory working: dir.

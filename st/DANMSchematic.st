@@ -76,6 +76,9 @@ clearInstances
 instances
     ^instances!
 
+userData
+    ^userData!
+
 userDataAt: key
     ^userData at: key!
 
