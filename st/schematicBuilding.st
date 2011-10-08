@@ -104,6 +104,13 @@ let: wName be: exp resetAfter: delay
     wire delay: delay.
     ^wire!
     
+let: wName be: exp delay: delay
+    |wire e|
+    wire := DANMDelayLine newNamed: wName inContext: self.
+    wire expression: (ExpressionAST newFrom: exp).
+    wire delay: delay.
+    ^wire!
+    
 let: wName be: exp
     |wire e|
     e := ExpressionAST newFrom: exp.

@@ -20,6 +20,7 @@ DANMWire.st \
 DANMExpressionWire.st \
 DANMAssertion.st \
 DANMMonostable.st \
+DANMDelayLine.st \
 DANMSchematic.st \
 DANMSimulator.st \
 DANMVCDDumper.st \
