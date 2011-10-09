@@ -214,7 +214,7 @@ let: wName beFSM: fsm
     ^self let: wName beFSM: fsm clockedBy: (self defaultClock)!
 
 let: wName beFSM: fsm clockedBy: clk
-    |wire width counter cases choices state exp |
+    |wire width counter cases choices state exp|
     cases := OrderedCollection new.
     choices := OrderedCollection new.
     width := (fsm size log: 2) ceiling.
@@ -232,6 +232,7 @@ let: wName beFSM: fsm clockedBy: clk
     exp := (ASTCasesOp newSubject: (ASTIdentifier newIdentifier: wName)
                        cases: cases choices: choices).
     wire := self let: 'next_',wName be: exp.
+    wire := wire defaultTo: (ASTIdentifier newIdentifier: wName).
     ^self let: wName be: wire clockedBy: clk!
                      
 retime: w by: n
@@ -355,6 +356,14 @@ reset: wName byLow: reset to: resetTo
     (self wireByName: wName) resetBy: (ExpressionAST newFrom: reset) 
                              to: (ExpressionAST newFrom: resetTo)!
 
+default: wName to: d
+    |w|
+    w := self wireByName: wName.
+    (w isKindOf: DANMExpressionWire) ifFalse: [
+        self error: 'Only wire with expression can have default. Got: %1' 
+            % {wName} ].
+    (self wireByName: wName) defaultTo: (ExpressionAST newFrom: d)!
+    
 syncReset: wName by: reset to: resetTo
     |w|
     w := self wireByName: wName.

@@ -18,6 +18,7 @@ DANMLibrary.st \
 DANMBlackBox.st \
 DANMWire.st \
 DANMExpressionWire.st \
+DANMFlipflop.st \
 DANMAssertion.st \
 DANMMonostable.st \
 DANMDelayLine.st \

@@ -215,6 +215,7 @@ dependencies
 isCombinatorial
 "return whether the expression is fully dependent on all dependencies"
     |v|
+    choices do: [ :each | each isCombinatorial ifFalse: [ ^false ]].
     v := conditions last staticValue.
     ^v notNil and: [ v > 0]!
 !
@@ -428,6 +429,7 @@ dependencies
 
 isCombinatorial
 "return whether the expression is fully dependent on all dependencies"
+    choices do: [ :each | each isCombinatorial ifFalse: [ ^false ]].
     ^(cases last isKindOf: ASTDefault) | 
         (cases size == (1 bitShift: subject width))!
 !
