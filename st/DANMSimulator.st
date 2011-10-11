@@ -65,6 +65,10 @@ context
 fullPath
     "for reporting"
     ^''!
+finish
+    "shutdown the simulator, cannot resume"
+    self postEvent: #SimulationEnded.
+    Transcript nextPutAll: 'Simulation finished at: %1' % {currentTime}; nl!
 
 setCallbackFrom: obj on: event do: aBlock
     |dic|
@@ -184,9 +188,13 @@ runUpto: limit
     "run until all stimuli go out, or timeout, return the time
      * intertupt signal; return the signal
      * assertion fired, return the assertion
-     * triggering wire triggered. return the wire"
+     * triggering wire triggered. return the wire.
+     in the last case the simulator is expected to resume shortly so
+     some clean up is not done. If you do not want to resume you need to
+     call -finish"
     shouldContinue ifFalse: [
-        self postEvent: #SimulationResumed.
+        (stopper isKindOf: DANMWire) ifFalse: [
+            self postEvent: #SimulationResumed ].
         stopper := nil.
         shouldContinue := true.
         "outside might have changed something"
@@ -201,8 +209,12 @@ runUpto: limit
             self stop: sig.
             sig resume ].
     shouldContinue ifTrue: [ self stop: currentTime ].
-    Transcript nextPutAll: 'Simulation stopped at: %1' % {currentTime}; nl.
-    self postEvent: #SimulationEnded.
+    (stopper isKindOf: DANMWire) ifFalse: [
+        self postEvent: #SimulationEnded.
+        Transcript nextPutAll: 'Simulation stopped at: %1' % {currentTime}; 
+            nl ].
+    (stopper isKindOf: DANMAssertion) ifTrue: [
+        self error: 'assertion triggered, cannot continue' ].
     ^stopper!
     
 runOnce 
