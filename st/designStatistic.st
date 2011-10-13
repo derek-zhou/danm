@@ -61,7 +61,7 @@ leftAdjust: len
 !
 
 Object subclass: #DataPoint
-       instanceVariableNames: 'name value'
+       instanceVariableNames: 'name value weight'
        classVariableNames: ''
        poolDictionaries: ''
        category: ''!
@@ -77,11 +77,17 @@ name
 value 
     ^value!
 
+weight
+    ^weight!
+
 name: n
     name := n!
 
 value: v
     value := v!
+
+weight: w
+    weight := w!
 
 <= anotherData
     ^value <= anotherData value!
@@ -89,10 +95,11 @@ value: v
 
 !DataPoint class methodsFor: 'instance creation'!
 
-newName: n value: v
+newName: n value: v weight: w
     ^self new 
         name: n;
-        value: v!
+        value: v;
+        weight: w!
 !
 
 Object subclass: #DistributionPlot
@@ -129,7 +136,7 @@ test: num
     data := (1 to: num) collect: [ :i |
         |v|
         v := (1 to: 4) inject: 0 into: [ :s :i | s + Random next ].
-        DataPoint newName: 'a' value: v ].
+        DataPoint newName: 'a' value: v weight: 1].
     Transcript nl.
     self plot: data! 
 !
@@ -140,17 +147,19 @@ list
     data := data asSortedCollection.
     lowend := data first value.
     highend := data last value.
-    buckets := Array new: highend - lowend + 1.
-    1 to: highend - lowend + 1 do: [ :i | buckets at: i put: 0 ].
+    buckets := (1 to: highend - lowend + 1) collect: [ :i | 0 ].
     data do: [ :each |
         |index|
         index := each value - lowend + 1.
-        buckets at: index put: (buckets at: index) + 1].
+        buckets at: index put: (buckets at: index) + each weight].
     Transcript nextPutAll: '----------------'; nl.
     lowend to: highend do: [:y |
         Transcript 
             nextPutAll: (y printString leftAdjust: 4);
-            nextPutAll: '| %1' % {buckets at: (y+1-lowend)}; nl]!
+            nextPutAll: '| %1' % {buckets at: (y+1-lowend)}; nl].
+    Transcript
+        nextPutAll: 'Max is %1 at: %2' % 
+        {data last name. data last value}; nl!
 
 plot
     data := data asSortedCollection.
@@ -179,7 +188,7 @@ makeBuckets
     thresholds := {lowend}, 
         ((2 to: width) collect: [ :i | lowend + (i - 1) * step]), 
         {highend}.
-    1 to: width + 2 do: [:i | buckets at: i put: 0]. 
+    buckets := (1 to: width+2) collect: [ :i | 0 ].
     index := 1.
     data do: [ :each |
         each value > highend 
@@ -187,7 +196,7 @@ makeBuckets
             ifFalse: [
                 [ each value > (thresholds at: index) ] whileTrue: [ 
                     index := index + 1 ]].
-        buckets at: index put: (buckets at: index) + 1]!
+        buckets at: index put: (buckets at: index) + each weight]!
 
 printPlot
     | hStep maxNum char |
@@ -231,12 +240,14 @@ reportStatistic
 reportEvaluationOrder
     Transcript nextPutAll: 'evaluation order distribution:'; nl.
     DistributionPlot list: (wires collect: [ :each |
-        DataPoint newName: each name value: each evaluationOrder ])!
+        DataPoint newName: each name value: each evaluationOrder 
+                  weight: each width ])!
 
 reportComplexity
     Transcript nextPutAll: 'complexity distribution:'; nl.
     DistributionPlot list: (wires collect: [ :each |
-        DataPoint newName: each name value: each complexity ])!
+        DataPoint newName: each name value: each complexity 
+                  weight: each width])!
 
 
 reportInstances

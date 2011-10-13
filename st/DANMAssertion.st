@@ -9,6 +9,10 @@ as expected, otherwise simulation will abort'!
 
 !DANMAssertion methodsFor: 'basic'!
 
+isLoaded
+    "supress unloaded warning for assertion"
+    ^true!
+
 flip
     super flip.
     value == 0 ifTrue: [ 

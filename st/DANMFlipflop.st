@@ -300,11 +300,13 @@ evaluate
     ^nil!
 
 staticValue
+    |r|
     ASTIdentifier useNextValue: true.
-    reset staticValue == 0 ifTrue: [ 
-        nextValue isNil ifTrue: [
-            self nextValue: resetTo staticValue ].
+    r := reset staticValue.
+    r == 0 ifTrue: [ 
+        self nextValue: resetTo staticValue.
         nextValue ~= value ifTrue: [ ^nextValue ] ifFalse: [ ^nil ]].
+    r isNil ifTrue: [ ^nil ].
     ^super staticValue!
 
 optimize

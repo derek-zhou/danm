@@ -288,7 +288,7 @@ complexity
     ci := ((fi max: 1) log: 2) ceiling.
     fo := self endingFanouts inject: 0 into: [ :s :each | 
         s + (each width / mw) ceiling ].
-    co := ((fo max: 1) log: 2) ceiling.
+    co := ((fo max: 1) log: 4) ceiling.
     ^ self isSequential 
         ifTrue: [ ci max: co ]
         ifFalse: [ ci + co ]!
