@@ -80,6 +80,7 @@ printBlockVerilogOn: aStream
         nextPutAll: '            %1 <= #%2 0;' % {name. delay} ; nl;
         nextPutAll: '        else'; nl;
         nextPutAll: '            %1 <= %2;' 
-            % {name. expression printStringStyle: #VERILOG. name}; nl.
+            % {name. expression printStringStyle: #VERILOG. name}; nl;
+        nextPutAll: '    initial %1=0;' % {name}; nl.
     expression clearAlias!
 !

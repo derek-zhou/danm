@@ -325,12 +325,16 @@ tryConnect: pName
     width := (pins at: 1) width.
     wire := self findWireByName: pName.
     driverCount := 0.
-    wire notNil ifTrue: [
-        driverCount := wire driverCount ].
+    (wire notNil and: [ wire isDrivenInternally ]) ifTrue: [
+        driverCount := 1 ].
     1 to: pins size do: [ :i |
         pin := pins at: i.
         (pin width == width) ifFalse: [ ^self ].
         pin isOutput ifTrue: [ driverCount := driverCount + 1 ]].
+    "if there is no driver but it is a port, then we can assume the port will
+     drive"
+    driverCount == 0 & (self findPortByName: pName) notNil ifTrue: [
+        driverCount := 1 ].
     driverCount == 1 ifFalse: [ ^self ].
     "All check passed, connect them"
     self connectPins: pins name: pName!
