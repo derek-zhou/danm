@@ -110,11 +110,12 @@ printVerilogOn: aStream
     DANMExpressionWire printDependencies: deps uniquify on: aStream.
     self printCoreVerilogOn: aStream indent: 8 blocking: true!
 
-printCoreVerilogOn: aStream indent: num blocking: blocking
+printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping
     |s w e|
     s := choices size.
     s > 2 ifFalse: [ 
-        ^super printCoreVerilogOn: aStream indent: num blocking: blocking ].
+        ^super printCoreVerilogOn: aStream indent: num 
+               blocking: blocking wrapping: wrapping ].
     w := condition width.
     aStream 
         next: num put: $ ;
@@ -126,7 +127,8 @@ printCoreVerilogOn: aStream indent: num blocking: blocking
             nextPutAll: '%1d%2: ' % {w. i}; nl.
         e := choices at: s - i.
         e alias: alias.
-        e printCoreVerilogOn: aStream indent: num+8 blocking: blocking ].
+        e printCoreVerilogOn: aStream indent: num+8 
+          blocking: blocking wrapping: false ].
     aStream
         next: num put: $ ;
         nextPutAll: 'endcase'; nl!
@@ -302,8 +304,12 @@ printVerilogOn: aStream
     DANMExpressionWire printDependencies: deps uniquify on: aStream.
     self printCoreVerilogOn: aStream indent: 8 blocking: true!
 
-printCoreVerilogOn: aStream indent: num blocking: blocking
+printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping
     |e c v|
+    wrapping ifTrue: [
+        aStream 
+            next: num-2 put: $ ;
+            nextPutAll: 'begin'; nl ].
     1 to: conditions size do: [ :i |
         c := conditions at: i.
         aStream 
@@ -324,8 +330,13 @@ printCoreVerilogOn: aStream indent: num blocking: blocking
                             nl ]].
         e := choices at: i.
         e alias: alias.
-        e printCoreVerilogOn: aStream indent: num+4 blocking: blocking ]!
-
+        e printCoreVerilogOn: aStream indent: num+4 
+          blocking: blocking wrapping: true ].
+    wrapping ifTrue: [
+        aStream 
+            next: num-2 put: $ ;
+            nextPutAll: 'end'; nl ]!
+    
 basicPrintStringStyle: style
     "verilog style is covered in printVerilogOn: so I assume html and none
      style"
@@ -523,7 +534,7 @@ printVerilogOn: aStream
     DANMExpressionWire printDependencies: deps uniquify on: aStream.
     self printCoreVerilogOn: aStream indent: 8 blocking: true!
 
-printCoreVerilogOn: aStream indent: num blocking: blocking
+printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping
     |e|
     aStream 
         next: num put: $ ;
@@ -535,7 +546,8 @@ printCoreVerilogOn: aStream indent: num blocking: blocking
             % {(cases at: i) printStringStyle: #VERILOG}; nl.
         e := choices at: i.
         e alias: alias.
-        e printCoreVerilogOn: aStream indent: num+8 blocking: blocking ].
+        e printCoreVerilogOn: aStream indent: num+8 
+          blocking: blocking wrapping: false ].
     aStream
         next: num put: $ ;
         nextPutAll: 'endcase'; nl!

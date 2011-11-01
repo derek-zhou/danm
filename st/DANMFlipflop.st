@@ -399,7 +399,8 @@ printBlockVerilogOn: aStream
         nl;
         nextPutAll: '        else'; nl.
     expression alias: name.
-    expression printCoreVerilogOn: aStream indent: 12 blocking: false.
+    expression printCoreVerilogOn: aStream indent: 12 
+               blocking: false wrapping: true.
     clock clearAlias.
     expression clearAlias!
 !

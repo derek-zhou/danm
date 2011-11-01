@@ -123,6 +123,10 @@ override this method"
     self printCoreVerilogOn: aStream indent: 0 blocking: true!
 
 printCoreVerilogOn: aStream indent: num blocking: blocking
+    ^self printCoreVerilogOn: aStream indent: num 
+          blocking: blocking wrapping: false!
+
+printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping
     |assign|
     assign := blocking ifTrue: [ '=' ] ifFalse: [ '<=' ].
     aStream 

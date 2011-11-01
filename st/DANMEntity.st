@@ -22,7 +22,7 @@ name that can possibly contain '/'. "
 
 comment
     (self hasAttribute: #COMMENT) ifTrue: [ ^self attribute: #COMMENT ].
-    ^'Description forthcoming.'!
+    ^self class comment!
 
 comment: str
     self setAttribute: #COMMENT to: str!
