@@ -125,15 +125,19 @@ printHTMLConnectionsOn: aStream
 !DANMSchematic methodsFor: 'html-printing'!
 
 generateHTMLAsTop
-    |fs dir|
-    dir := File name: '%1_html' % {self referenceName}.
+    ^self generateHTMLAsTopIn: '%1_html'!
+
+generateHTMLAsTopIn: dirName
+    |fs savedDir dir|
+    dir := File name: dirName.
     (dir exists) ifFalse: [
         dir createDirectory ].
+    savedDir := Directory working.
     Directory working: dir.
     self generateHTML.
     fs := (File name: 'hierarchy.html') writeStream.
     [ self printFullHTMLHierOn: fs ] ensure: [ fs close ].
-    Directory working: '..'!
+    Directory working: savedDir!
 
 printFullHTMLHierOn: aStream
     aStream 
