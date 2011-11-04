@@ -564,7 +564,7 @@ evaluate
 
 printAdditionalVerilogOn: aStream
     "print the wire that identifier points to"
-    identifier printVerilogOn: aStream!
+    identifier printAdditionalVerilogOn: aStream!
 
 basicPrintStringStyle: style
     style == #HTML ifTrue: [ ^'<a href="#WIRE_%1">%1</a>' % 

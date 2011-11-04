@@ -16,8 +16,8 @@ isLoaded
 flip
     super flip.
     value == 0 ifTrue: [ 
-        Transcript nextPutAll: 'Assertion %1 failed!' %
-            {entityName}; nl.
+        Transcript nextPutAll: 'Assertion %1 failed in %2!' %
+            {entityName. self context fullPath}; nl.
         "in simulation the design is flattened, so context context is the 
 simulator"
         (context context isKindOf: DANMSimulator) ifTrue: [ 
@@ -43,5 +43,6 @@ printHTMLHeadOn: aStream
 
 basicPrintVerilogOn: aStream
     super basicPrintVerilogOn: aStream.
-    aStream nextPutAll: '`ASSERT(%1)' % {self verilogName}; nl!
+    aStream nextPutAll: '`ASSERT(%1, %2)' % 
+        {self verilogName. self context fullPath}; nl!
 !

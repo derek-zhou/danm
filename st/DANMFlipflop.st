@@ -125,8 +125,18 @@ printHTMLHeadOn: aStream
             {expression printStringStyle: #HTML};
         nl!
 
+printAdditionalVerilogOn: aStream
+    (self tag notNil) ifFalse: [ ^self ].
+    self tag: nil.
+    self printVerilogRegsOn: aStream!
+
+printVerilogOn: aStream
+    (self tag notNil) ifTrue: [ 
+        self printVerilogRegsOn: aStream ].
+    self tag: nil.
+    self basicPrintVerilogOn: aStream!
+
 basicPrintVerilogOn: aStream
-    self printVerilogRegsOn: aStream.
     clock printAdditionalVerilogOn: aStream.
     clock printVerilogOn: aStream withAlias: 'Clock'.
     expression printAdditionalVerilogOn: aStream!
@@ -227,7 +237,6 @@ printHTMLHeadOn: aStream
         nl!
 
 basicPrintVerilogOn: aStream
-    self printVerilogRegsOn: aStream.
     clock printAdditionalVerilogOn: aStream.
     expression printAdditionalVerilogOn: aStream!
 
@@ -264,6 +273,9 @@ resetTo: newExpr
     reset == newExpr ifTrue: [ ^self ].
     resetTo := newExpr!
 
+directFanins
+    ^super directFanins, reset dependencies, resetTo dependencies!
+    
 dependencies
     ^clock dependencies, reset dependencies!
 !
@@ -377,7 +389,6 @@ printHTMLHeadOn: aStream
         nl!
 
 basicPrintVerilogOn: aStream
-    self printVerilogRegsOn: aStream.
     clock printAdditionalVerilogOn: aStream.
     clock printVerilogOn: aStream withAlias: 'Clock'.
     reset printAdditionalVerilogOn: aStream.

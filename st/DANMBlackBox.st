@@ -53,6 +53,25 @@ topLevel
 context: newContext
     context := newContext!
 
+elaborate
+    "blackbox does not need to elaborate"
+    ^self!
+
+postCopy
+    "ports and parameters need to be copied"
+    |newParam newPorts|
+    self clearConnections.
+    parameters notNil ifTrue: [
+        newParam := LookupTable new.
+        parameters keysAndValuesDo: [ :k :v |
+            newParam at: k put: v deepCopy ].
+        parameters := newParam ].
+    newPorts := LookupTable new.
+    ports keysAndValuesDo: [ :k :v |
+        newPorts at: k put: (v copy context: self) ].
+    ports := newPorts.
+    ^self!
+
 reference
 "return the referenced module"
     ^reference!
@@ -290,6 +309,7 @@ parseOnePort: aTokenizer width: width direction: dir
     port := DANMPort newNamed: token width: width direction: dir.
     port comment: aTokenizer docString.
     ports at: token put: port.
+    port context: self.
     ^aTokenizer nextToken!
     
 tryParseDirection: aTokenizer
@@ -325,6 +345,11 @@ printVerilogOn: aStream
     self printVerilogCoreOn: aStream.
     self printVerilogFooterOn: aStream!
 
+printFullVerilogOn: aStream
+    aStream nl. "make sure there are newlines around"
+    reference printTextOn: aStream.
+    aStream nl!
+ 
 printVerilogCoreOn: aStream
     ^self!
 

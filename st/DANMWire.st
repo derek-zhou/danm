@@ -522,6 +522,9 @@ printOn: aStream
         ifFalse: [
             aStream nextPutAll: ('%1[%2:0]' % {entityName. self width - 1})]!
 
+printAdditionalVerilogOn: aStream
+    ^self printVerilogOn: aStream!
+
 printVerilogOn: aStream
     (self tag notNil) ifFalse: [ ^self ].
     self tag: nil.

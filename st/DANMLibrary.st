@@ -30,13 +30,13 @@ produce
 !
 
 DANMTemplate subclass: #DANMCloningTemplate
-    instanceVariableNames: 'reference'
+    instanceVariableNames: 'reference tag'
     classVariableNames: ''
     poolDictionaries: ''
     category: 'DANM'!
 
 DANMCloningTemplate comment:
-    'I am used to reproduce real module used in a dchematic by cloning a 
+    'I am used to reproduce real module used in a schematic by cloning a 
 reference box'!
 
 !DANMCloningTemplate class methodsFor: 'instance creation'!
@@ -46,6 +46,13 @@ newNamed: n fromPath: p ofReference: r
         srcPath: p;
         reference: r;
         name: r name!
+!
+
+!DANMCloningTemplate class methodsFor: 'tagging'!
+
+clearTag
+    self allInstancesDo: [ :each |
+        each clearTag ]!
 !
 
 !DANMCloningTemplate methodsFor: 'accessing'!
@@ -62,6 +69,19 @@ reference: ref
 
 produce
     ^reference copy!
+!
+
+!DANMCloningTemplate methodsFor: 'printing'!
+
+clearTag
+    tag := nil!
+
+printTextOn: aStream
+    |s|
+    tag notNil ifTrue: [ ^self ].
+    tag := true.
+    s := (File name: srcPath) readStream.
+    [ s nextPutAllOn: aStream ] ensure: [s close ]!
 !
 
 DANMTemplate subclass: #DANMEmptyTemplate

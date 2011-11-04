@@ -149,7 +149,7 @@ maxEvaluationOrder
     ^wires inject: 1 into: [ :s :each | s max: each evaluationOrder + 1 ]!
 
 addInstanceOf: moduleName
-    "make a unique name and ad it"
+    "make a unique name and add it"
     |iName|
     iName := 'u_%1' % {moduleName}.
     iName := instances uniqueKeyLike: iName.
@@ -246,6 +246,7 @@ assignUniqueRefNameAndRecordIn: pastModules
 
 generateFullVerilogTo: fn
     |fs|
+    DANMCloningTemplate clearTag.
     self assignUniqueRefName.
     fs := (File name: fn) writeStream.
     [ 
@@ -256,9 +257,9 @@ printVerilogBoilerplateOn: fs
 "print some boiler headers for verilog. This could be put into a .vh file 
 if it gets longer"
     fs nextPutAll: '
-`define ASSERT(condition) always @(condition) \
+`define ASSERT(condition, hier) always @(condition) \
    if (!condition) begin \
-      $display("Assertion failure: condition"); \
+      $display("Assertion failure: condition in hier"); \
       $finish_and_return(1); \
    end
 '!
@@ -266,8 +267,7 @@ if it gets longer"
 printFullVerilogOn: fs
     self printVerilogOn: fs.
     instances do: [ :i |
-        (i isKindOf: DANMSchematic) ifTrue: [ 
-            i printFullVerilogOn: fs ]]!
+        i printFullVerilogOn: fs ]!
 
 printVerilogCoreOn: aStream
     "print the verilog meat. Only synthesizable code have valid verilog code"

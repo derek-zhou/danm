@@ -26,9 +26,6 @@ context
     ^context!
 
 context: newContext
-    (context == nil) ifFalse: [
-        self error: ('Attempt to change context of %1 from %2') %
-            {self. context} ].
     context := newContext!
 
 widthHTMLString
