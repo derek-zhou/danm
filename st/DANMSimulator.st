@@ -96,7 +96,7 @@ settleTo: v
 forceTo: v
     "force me to some new value and trigger all down stream. 
      This should only be called inside simulation"
-    value := v.
+    self value: v.
     context context addTriggerOn: self!
 !
 
