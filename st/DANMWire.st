@@ -311,7 +311,8 @@ connectPins: pins
         oldWire := each context wireOnPort: each.
         oldWire notNil ifTrue: [
             oldWire isDriven & oldWire isLoaded ifTrue: [
-                self error: 'Instance %1 port %2 is already connected to wire %3' % {each context. each. oldWire} ].
+                self error: 'Instance %1 port %2 is already connected to wire %3' 
+                    % {each context. each. oldWire} ].
             "Undriven or unloaded wire can be safely disconnected"
             oldWire disconnectPort: each.
             each context disconnectPort: each ].
@@ -343,10 +344,18 @@ destroy
 !DANMWire methodsFor: 'transforming'!
 
 expose
-    context addPort: (DANMSchematicPort newFromWire: self)!
+    self shouldConceal ifTrue: [
+        self unsetAttribute: #ShouldConceal ].
+    self isExposed ifFalse: [
+        context addPort: (DANMSchematicPort newFromWire: self) ]!
 
 conceal
-    context removePort: (context portByName: entityName)!
+    self setAttribute: #ShouldConceal to: true.
+    self isExposed ifTrue: [
+        context removePort: (context portByName: entityName) ]!
+
+shouldConceal
+    ^(self attribute: #ShouldConceal) notNil!
 
 pushUpHierarchy
     |upperWire port newName upperContext|

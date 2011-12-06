@@ -93,15 +93,15 @@ destroy
 checkDesign
     clock isNil ifTrue: [
         Transcript nextPutAll: 'Check design error in %1: flop %2 has no clock'
-            % {context name. entityName}; nl.
+            % {context fullPath. entityName}; nl.
         ^false ].
     clock width ~=1 ifTrue: [ 
         Transcript nextPutAll: 'Check design error in %1: flop %2 clock is not single bit'
-            % {context name. entityName}; nl.
+            % {context fullPath. entityName}; nl.
         ^false ].
     (clock isKindOf: ASTIdentifier) ifFalse: [
         Transcript nextPutAll: 'Check design error in %1: flop %2 clock is not a wire'
-            % {context name. entityName}; nl.
+            % {context fullPath. entityName}; nl.
         ^false ].
     ^super checkDesign!
 !
@@ -345,22 +345,22 @@ destroy
 
 checkDesign
     Transcript nextPutAll: 'Check design warning in %1: inferring reset flop %2'
-        % {context name. entityName}; nl.
+        % {context fullPath. entityName}; nl.
     reset isNil ifTrue: [
         Transcript nextPutAll: 'Check design error in %1: reset flop %2 has no reset'
-            % {context name. entityName}; nl.
+            % {context fullPath. entityName}; nl.
         ^false ].
     reset width ~=1 ifTrue: [ 
         Transcript nextPutAll: 'Check design error in %1: flop %2 reset is not single bit'
-            % {context name. entityName}; nl.
+            % {context fullPath. entityName}; nl.
         ^false ].
     (reset isKindOf: ASTIdentifier) ifFalse: [
         Transcript nextPutAll: 'Check design error in %1: reset flop %2 reset is not a wire'
-            % {context name. entityName}; nl.
+            % {context fullPath. entityName}; nl.
         ^false ].
     (resetTo isKindOf: ASTConstant) ifFalse: [
         Transcript nextPutAll: 'Check design error in %1: reset value of %2 has to be a constant, got %3'
-            % {context name. entityName. resetTo}; nl.
+            % {context fullPath. entityName. resetTo}; nl.
         ^false ].
     ^super checkDesign!
 !

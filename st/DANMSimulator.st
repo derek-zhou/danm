@@ -104,6 +104,13 @@ forceTo: v
 
 trySettleTo: v
     ^self!
+
+forceTo: v
+    "force me to some new value and trigger all down stream. 
+     This should only be called inside simulation"
+    self nextValue: v.
+    self flip.
+    context context addTriggerOn: self!
 !
 
 !DANMFlipflop methodsFor: 'simulating'!

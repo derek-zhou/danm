@@ -237,6 +237,8 @@ searchMorePath
     |dir|
     pathIndex < paths size ifFalse: [ ^false ].
     dir := File name: (paths at: pathIndex + 1).
+    (dir exists and: [dir isDirectory]) ifFalse: [
+        self error: 'the dir %1 does not exist!' % {dir}; nl ].
     dir namesDo: [ :name |
         |fullname|
         fullname := FilePath append: name to: dir name.

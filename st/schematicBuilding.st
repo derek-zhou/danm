@@ -352,6 +352,9 @@ tryConnectInputs: pName
 expose: wName
     (self wireByName: wName) expose!
 
+conceal: wName
+    (self wireByName: wName) conceal!
+
 reset: wName byLow: reset to: resetTo
     |w|
     w := self wireByName: wName.
@@ -383,11 +386,11 @@ autoExposeInputs
         (wire isNil or: [wire isDriven not])  ifTrue: [
             self tryConnectInputs: pName ]].
     wires do: [ :wire|
-        (wire isExposed not and: [wire isDriven not]) ifTrue: [
-                wire expose ]]!
+        (wire shouldConceal not & wire isExposed not and: [wire isDriven not]) 
+            ifTrue: [ wire expose ]]!
 
 autoExposeOutputs
     wires do: [ :wire|
-        (wire isExposed not and: [wire isLoaded not]) ifTrue: [
-                wire expose ]]!
+        (wire shouldConceal not & wire isExposed not and: [wire isLoaded not])
+            ifTrue: [ wire expose ]]!
 !
