@@ -415,5 +415,5 @@ printInstanceVerilogOn: aStream
     parameters notNil ifTrue: [
         parameters keys asSortedCollection do: [ :k |
             aStream nextPutAll: '    defparam %1.%2 = %3;' 
-                % {self verilogName. k. self parameter: k}; nl ]]!
+                % {self verilogName. k. self parameterValue: k}; nl ]]!
 !
