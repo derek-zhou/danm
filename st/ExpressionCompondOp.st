@@ -124,7 +124,7 @@ printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping
     0 to: s - 1 do: [ :i |
         aStream 
             next: num + 4 put: $ ;
-            nextPutAll: '%1d%2: ' % {w. i}; nl.
+            nextPutAll: '%1''d%2: ' % {w. i}; nl.
         e := choices at: s - i.
         e alias: alias.
         e printCoreVerilogOn: aStream indent: num+8 
