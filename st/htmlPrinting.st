@@ -31,8 +31,8 @@ printHTMLPortSummaryOn: aStream
 printHTMLHeaderOn: aStream
     aStream 
         nextPutAll: '<html><head><title>'; nl;
-        nextPutAll: ('%1 (%2) Documentation' % 
-                         {self fullPath. self referenceName}); nl;
+        nextPutAll: ('%1 (%2 %3) Documentation' % 
+                         {self fullPath. self type. self referenceName}); nl;
         nextPutAll: '</title></head><body>'; nl;
         nextPutAll: '<p><a href="%1hierarchy.html">Hierarchy</a>'
             % {self topPath}.
@@ -42,8 +42,8 @@ printHTMLHeaderOn: aStream
     aStream 
         nextPutAll: ' | <a href="%1top.html">Top</a></p>' 
                 % {self topPath}; nl;
-        nextPutAll: ('<h1>%1 (%2) Documentation</h1>' % 
-                         {self fullPath. self referenceName});
+        nextPutAll: ('<h1>%1 (%2 %3) Documentation</h1>' % 
+                         {self fullPath. self type. self referenceName});
         nl;
         nextPutAll: ('<p>%1</p>' % {self comment});
         nextPutAll: '<p>Defined in: %1</p><hr/>' % {reference srcPath}; nl!
@@ -152,8 +152,8 @@ printFullHTMLHierOn: aStream
         nl;
         nextPutAll: '<h1>Module Hierarchy</h1>';
         nl;
-        nextPutAll: '<a href="%1.html">%1 (%2)</a>' 
-        % {self name. self referenceName};
+        nextPutAll: '<a href="%1.html">%1 (%2 %3)</a>' 
+        % {self name. self type. self referenceName};
         nl.
     self printHTMLHierOn: aStream.
     aStream
@@ -197,8 +197,8 @@ printHTMLHierOn: aStream
     aStream nextPutAll: '<ul>'; nl.
     instances asSortedCollection do: [ :i |
         aStream 
-            nextPutAll: '<li>%2 (<a href="%1/%2.html">%3</a>, <a href="%1.html#INST_%2">instance</a>)' % 
-            {self fullPath. i name. i type};
+            nextPutAll: '<li><a href="%1/%2.html">%2 (%3 %4)</a>' % 
+            {self fullPath. i name. i type. i referenceName};
             nl.
         i printHTMLHierOn: aStream.
         aStream 

@@ -44,7 +44,13 @@ isFlat
     ^(instances size > 0)!
 
 canBeFlatten
-    "whether I can be flatten. schematic cannot"
+    "whether I can be flatten. schematic can"
+    ^true!
+
+canBePrintedInLine
+    "whether I can be printed as inline verilog. For schematic the printing
+     will be recursive. Any schematic that do not want to be printed inline
+     should override this method."
     ^true!
 
 ports
@@ -267,7 +273,8 @@ if it gets longer"
 printFullVerilogOn: fs
     self printVerilogOn: fs.
     instances do: [ :i |
-        i printFullVerilogOn: fs ]!
+        i canBePrintedInLine ifTrue: [
+            i printFullVerilogOn: fs ]]!
 
 printVerilogCoreOn: aStream
     "print the verilog meat. Only synthesizable code have valid verilog code"

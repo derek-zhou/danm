@@ -38,6 +38,17 @@ canBeFlatten
     "whether I can be flatten. black box cannot"
     ^false!
 
+canBePrintedInLine
+    "whether I can be printed as inline verilog. for now we only inline
+     very short verilog file"
+    reference isNil ifTrue: [ ^false ].
+    reference srcPath isNil ifTrue: [ ^false ].
+    (File name: reference srcPath) size > 4096 ifTrue: [ 
+        Transcript nextPutAll: 'Warning: verilog source %1 for module %2 will not be printed inline because it is big' 
+            % {reference srcPath. entityName}; nl.
+        ^false ].
+    ^true!
+
 topPath
     context isNil ifTrue: [ ^'' ].
     ^context topPath, '../'!
