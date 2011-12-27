@@ -141,22 +141,35 @@ generateHTMLAsTopIn: dirName
 
 printFullHTMLHierOn: aStream
     aStream 
-        nextPutAll: '<html><head><title>';
-        nl;
-        nextPutAll: 'Module Hierachy';
-        nl;
-        nextPutAll: '</title></head><body>';
-        nl;
+        nextPutAll: '<html><head>'; nl;
+        nextPutAll: '<title>Module Hierachy</title>'; nl;
+        nextPutAll: '<script type="text/javascript" src="%1/js/jquery-1.4.2.js"></script>' 
+        % {htmlRoot}; nl;
+        nextPutAll: '<script type="text/javascript" src="%1/js/jquery.jstree.js"></script>' 
+        % {htmlRoot}; nl;
+        nextPutAll: '</head><body>'; nl;
         nextPutAll: '<p><a href="hierarchy.html">Hierarchy</a> | <a href="%1.html">Top</a></p>' 
-        % {self name};
-        nl;
-        nextPutAll: '<h1>Module Hierarchy</h1>';
-        nl;
+        % {self name}; nl;
+        nextPutAll: '<h1>Module Hierarchy</h1>'; nl;
         nextPutAll: '<a href="%1.html">%1 (%2 %3)</a>' 
-        % {self name. self type. self referenceName};
-        nl.
+        % {self name. self type. self referenceName}; nl;
+        nextPutAll: '<div id="tree">'; nl.
     self printHTMLHierOn: aStream.
     aStream
+        nextPutAll: '</div>'; nl;
+        nextPutAll: '<script type="text/javascript" class="source below">'; nl;
+        nextPutAll: '$(function () {'; nl;
+        nextPutAll: '$("#tree").jstree({'; nl;
+        nextPutAll: '"plugins" : ["themes","html_data",],'; nl;
+        nextPutAll: '"themes" : {'; nl;
+        nextPutAll: '"icons" : false,'; nl;
+        nextPutAll: '},'; nl;
+        nextPutAll: '"core" : {'; nl; 
+        nextPutAll: '"html_titles" : true,'; nl;
+        nextPutAll: '}'; nl;
+        nextPutAll: '})'; nl;
+        nextPutAll: '});'; nl;
+        nextPutAll: '</script>'; nl;
         nextPutAll: ('<hr/><p>This document is generated on %1' % {DateTime now});
         nl;
         nextPutAll: '</p></body></html>';
@@ -197,8 +210,8 @@ printHTMLHierOn: aStream
     aStream nextPutAll: '<ul>'; nl.
     instances asSortedCollection do: [ :i |
         aStream 
-            nextPutAll: '<li><a href="%1/%2.html">%2 (%3 %4)</a>' % 
-            {self fullPath. i name. i type. i referenceName};
+            nextPutAll: '<li><a href="%1/%2.html"><img src="%3/img/%4.png">%2 (%5)</a>' % 
+            {self fullPath. i name. htmlRoot. i type. i referenceName};
             nl.
         i printHTMLHierOn: aStream.
         aStream 
