@@ -9,18 +9,21 @@ checkDesign
         |wire|
         wire := self wireOnPort: port.
         wire isNil ifTrue: [
-            port isInput 
-                ifTrue: [
-                    result := false.
-                    Transcript nextPutAll: 'Check design error in %1: input port %2 is dangling on instance %3'
-                        % {context fullPath. port name. entityName}; nl ]
-                ifFalse: [
-                    Transcript nextPutAll: 'Check design warning in %1: port %2 is dangling on instance %3'
-                        % {context fullPath. port name. entityName}; nl ]]].
+            port isInput ifTrue: [
+                result := false.
+                Transcript nextPutAll: 'Check design error in %1: input port %2 is dangling on instance %3'
+                    % {context fullPath. port name. entityName}; nl ].
+            context subpressDangleCheck ifFalse: [
+                Transcript nextPutAll: 'Check design warning in %1: port %2 is dangling on instance %3'
+                    % {context fullPath. port name. entityName}; nl ]]].
     ^result!
 !
 
 !DANMSchematic methodsFor: 'check design'!
+
+subpressDangleCheck
+    "do not print warning for unloaded but driven wires/pins"
+    ^false!
 
 checkDesign
     |result|
@@ -116,7 +119,7 @@ checkDesign
      * width match all pin width"
     |result dc width|
     result := true.
-    self isLoaded ifFalse: [
+    self isLoaded | context subpressDangleCheck ifFalse: [
         Transcript nextPutAll: 'Check design warning in %1: wire %2 is unloaded'
             % {context fullPath. entityName}; nl ].
     dc := self driverCount.

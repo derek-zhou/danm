@@ -100,9 +100,15 @@ skipWhiteSpace
     ^self!
 
 skipComment
-    "skip over comment"
-    self peek = $/ ifFalse: [ ^false ].
-    ^ self skipLineComment or: [self skipBlockComment]!
+    "skip over comment or tick line, which is from verilog pre-processor"
+    |r|
+    r := false.
+    self peek = $/ ifTrue: [
+        r := self skipLineComment or: [self skipBlockComment]].
+    self peek = $` ifTrue: [
+        r := true.
+        self nextLine ].
+    ^r!
 
 skipLineComment
     "skip a line comment, return true if I did"

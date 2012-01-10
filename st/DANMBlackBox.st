@@ -16,6 +16,9 @@ uniquifiedRefName
     ^self referenceName!
 
 uniquifiedRefName: n
+    "only assign once"
+    (self hasAttribute: n) ifTrue: [
+        ^self ].
     n = self referenceName ifTrue: [ ^self ].
     self setAttribute: #UNIQUIFIED_REF_NAME to: n!
 
