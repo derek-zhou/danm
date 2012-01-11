@@ -9,7 +9,7 @@ DANMCurrentDesign comment:
 
 DANMBlackBox subclass: #DANMSchematic
              instanceVariableNames: 'instances wires userData'
-             classVariableNames: 'htmlRoot'
+             classVariableNames: 'htmlRoot blackboxUninlinedModule'
              poolDictionaries: ''
              category: 'DANM'!
 
@@ -23,6 +23,13 @@ htmlRoot
 
 htmlRoot: str
     htmlRoot := str!
+
+blackboxUninlinedModule
+    blackboxUninlinedModule isNil ifTrue: [ ^false ].
+    ^blackboxUninlinedModule!
+
+blackboxUninlinedModule: bool
+    blackboxUninlinedModule := bool!
 
 emptySchematic
     ^DANMEmptyTemplate factory produce!
@@ -281,8 +288,12 @@ if it gets longer"
 printFullVerilogOn: fs
     self printVerilogOn: fs.
     instances do: [ :i |
-        i canBePrintedInLine ifTrue: [
-            i printFullVerilogOn: fs ]]!
+        i canBePrintedInLine 
+            ifTrue: [ i printFullVerilogOn: fs ]
+            ifFalse: [ 
+                self class blackboxUninlinedModule & 
+                    i isUniquified not ifTrue: [
+                        i printBlackBoxVerilogOn: fs ]]]!
 
 printVerilogCoreOn: aStream
     "print the verilog meat. Only synthesizable code have valid verilog code"

@@ -15,6 +15,14 @@ uniquifiedRefName
     n notNil ifTrue: [ ^n ].
     ^self referenceName!
 
+isUniquified
+    ^self uniquifiedRefName ~= self referenceName!
+
+referencePrintName
+    "do not uniqify if not printed inline"
+    self canBePrintedInLine ifFalse: [ ^self referenceName ].
+    ^self uniquifiedRefName!
+
 uniquifiedRefName: n
     "only assign once"
     (self hasAttribute: n) ifTrue: [
@@ -359,6 +367,10 @@ printVerilogOn: aStream
     self printVerilogCoreOn: aStream.
     self printVerilogFooterOn: aStream!
 
+printBlackBoxVerilogOn: aStream
+    self printVerilogHeaderOn: aStream.
+    self printVerilogFooterOn: aStream!
+
 printFullVerilogOn: aStream
     aStream nl. "make sure there are newlines around"
     reference printTextOn: aStream.
@@ -381,7 +393,7 @@ printVerilogHeaderOn: aStream
         nextPutAll: '/**'; nl;
         nextPutAll: self comment; nl;
         nextPutAll: '*/'; nl;
-        nextPutAll: 'module %1 (' % {self uniquifiedRefName}; nl.
+        nextPutAll: 'module %1 (' % {self referencePrintName}; nl.
     sortedPorts do: [ :port |
         port == lastPort 
             ifFalse: [ aStream nextPutAll: '    %1,' % {port name}; nl ]
@@ -407,7 +419,7 @@ printInstanceVerilogOn: aStream
         nl;
         nextPutAll: '// instance of %1 (%2)' % {entityName. 
                                                 self type}; nl;
-        nextPutAll: '    %1 %2 (' % {self uniquifiedRefName. 
+        nextPutAll: '    %1 %2 (' % {self referencePrintName. 
                                      self verilogName}; nl.
     sortedPorts do: [ :port |
         |w pw ww ws|

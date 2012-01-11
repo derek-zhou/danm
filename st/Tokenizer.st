@@ -11,6 +11,7 @@ c style comments'!
 !Tokenizer methodsFor: 'accessing'!
 
 docString
+    docString isNil ifTrue: [ ^'' ].
     ^docString!
 
 clearDocString
