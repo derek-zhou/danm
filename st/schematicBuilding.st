@@ -133,11 +133,6 @@ let: wName be: exp delay: delay
 let: wName be: exp
     |wire e|
     e := ExpressionAST newFrom: exp.
-    ((e isKindOf: ASTIdentifier) and: 
-         [ e identifier isPort not ]) ifTrue: [
-             "a = b while b is not exposed, so just rename b to a"
-             e destroy.
-             ^e identifier renameTo: wName ].
     wire := DANMExpressionWire newNamed: wName inContext: self.
     wire expression: e.
     ^wire!
