@@ -41,6 +41,10 @@ isDrivenInternally
 isSequential
     ^false!
 
+isSystemNamed
+    "whether the name come from the system or the user"
+    ^context containsGeneratedName: self name!
+    
 driverCount
     "How many driver exist"
     |port result|

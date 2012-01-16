@@ -38,7 +38,7 @@ connectPins: pins to: expression
     pins size > 0 ifFalse: [ 
         self error: 'No pin to connect' ].
     wName := (pins at: 1) name.
-    wName := wires uniqueKeyLike: wName.
+    wName := self uniqueWireNameLike: wName.
     ^self connectPins: pins to: expression name: wName!
 
 connect: pinNames to: expression name: wName
@@ -51,7 +51,7 @@ connectPins: pins
     pins size > 0 ifFalse: [ 
         self error: 'No pin to connect' ].
     wName := (pins at: 1) name.
-    wName := wires uniqueKeyLike: wName.
+    wName := self uniqueWireNameLike: wName.
     ^self connectPins: pins name: wName!
 
 connectPins: pins name: wName
@@ -93,7 +93,7 @@ connectInstance: module port: port to: exp
             wire := exp identifier.
             exp destroy ]
         ifFalse: [
-            wName := wires uniqueKeyLike: module name, '/', port name.
+            wName := self uniqueWireNameLike: module name, '/', port name.
             wire := DANMExpressionWire newNamed: wName inContext: self.
             wire expression: exp ].
     wire connectPort: port.
@@ -104,8 +104,7 @@ assert: exp
     e := ExpressionAST newFrom: exp.
     (e isKindOf: ASTIdentifier) 
         ifTrue: [ wName := 'ASSERT_' , e identifier name ]
-        ifFalse: [ wName := DANMCurrentDesign value wires 
-                       uniqueKeyLike: 'ASSERT'].
+        ifFalse: [ wName := self uniqueWireNameLike: 'ASSERT'].
     wire := DANMAssertion newNamed: wName inContext: self.
     wire expression: e.
     ^wire!
@@ -133,6 +132,11 @@ let: wName be: exp delay: delay
 let: wName be: exp
     |wire e|
     e := ExpressionAST newFrom: exp.
+    ((e isKindOf: ASTIdentifier) and: [
+        e identifier isPort not & e identifier isSystemNamed ]) ifTrue: [
+             "a = b while b is not exposed, so just rename b to a"
+             e destroy.
+             ^e identifier renameTo: wName ].
     wire := DANMExpressionWire newNamed: wName inContext: self.
     wire expression: e.
     ^wire!

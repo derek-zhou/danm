@@ -27,7 +27,7 @@ DANMCurrentDesign comment:
     ''!
 
 DANMBlackBox subclass: #DANMSchematic
-             instanceVariableNames: 'instances wires userData'
+             instanceVariableNames: 'instances wires userData generatedNames'
              classVariableNames: 'htmlRoot blackboxUninlinedModule'
              poolDictionaries: ''
              category: 'DANM'!
@@ -69,6 +69,18 @@ hierNamePrefix
      and slash should be used; however wrappers are invisible"
     (reference isKindOf: DANMEmptyTemplate) ifFalse: [ ^entityName, '/' ].
     ^''!
+
+uniqueWireNameLike: wName
+    |salt newName|
+    generatedNames isNil ifTrue: [
+        generatedNames := LookupTable new ].
+    newName := wires uniqueKeyLike: wName.
+    generatedNames at: newName put: 1.
+    ^newName!
+
+containsGeneratedName: wName
+    generatedNames isNil ifTrue: [ ^false ].
+    ^generatedNames includesKey: wName!
 
 isFlat
     "a flat schematic does not contains any instance"

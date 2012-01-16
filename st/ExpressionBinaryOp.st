@@ -690,7 +690,7 @@ newBetween: data and: clock
 "I am instanciate an identifier instead, which point to a latch I made here"
     |name latch sch|
     sch := DANMCurrentDesign value.
-    name := sch wires uniqueKeyLike: 'latch'.
+    name := sch uniqueWireNameLike: 'latch'.
     latch := (DANMLatch newNamed: name inContext: sch)
         expression: data;
         clock: clock.
@@ -720,7 +720,7 @@ newBetween: data and: clock
 "I am instanciate an identifier instead, which point to a flop I made here"
     |name flop sch|
     sch := DANMCurrentDesign value.
-    name := sch wires uniqueKeyLike: 'flop'.
+    name := sch uniqueWireNameLike: 'flop'.
     flop := (DANMFlipflop newNamed: name inContext: sch)
         expression: data;
         clock: clock.
