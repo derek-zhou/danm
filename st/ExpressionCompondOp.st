@@ -102,9 +102,7 @@ optimize
         1 to: choices size do: [ :i |
             r := choices at: i.
             i == (choices size - v) 
-                ifTrue: [
-                    r width == 0 ifTrue: [ r width: self width ].
-                    result := r ]
+                ifTrue: [ result := r ]
                 ifFalse: [ r destroy ]].
         result notNil ifTrue: [ ^result ]]!
 !
@@ -296,12 +294,11 @@ optimize
     choices := choices select: [ :each | each notNil ].
     conditions := conditions select: [ :each | each notNil ].
     choices size == 0 ifTrue: [
-        Transcript nextPutAll: 'Error: %1 is optimized to nil' % {text}; nl ].
+        Transcript nextPutAll: 'Warning: %1 is optimized to nil' % {text}; nl ].
     choices size == 1 ifTrue: [ 
         v := (conditions at: 1) staticValue.
         (v notNil and: [ v > 0 ]) ifTrue: [ 
             ch := choices at: 1.
-            ch width == 0 ifTrue: [ ch width: w ].
             ^ch ]]!
 !
 
@@ -529,7 +526,6 @@ optimize
             ch destroy ].
         c staticValue = v ifTrue: [ 
             result := ch.
-            result width == 0 ifTrue: [ result width: w ].
             last := true ]].
     result notNil ifTrue: [ ^ result ]!
 !
