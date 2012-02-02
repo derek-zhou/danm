@@ -142,6 +142,9 @@ flip
 optimize
     |e|
     e := expression optimize.
+    e isNil ifTrue: [ 
+        self destroy.
+        ^nil ].
     (e isKindOf: ASTConstant) ifTrue: [ 
         self value: e evaluate ].  
     self expression: e!

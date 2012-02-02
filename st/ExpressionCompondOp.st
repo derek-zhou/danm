@@ -293,8 +293,7 @@ optimize
         (v notNil and: [ v > 0 ]) ifTrue: [ last := true ]].
     choices := choices select: [ :each | each notNil ].
     conditions := conditions select: [ :each | each notNil ].
-    choices size == 0 ifTrue: [
-        Transcript nextPutAll: 'Warning: %1 is optimized to nil' % {text}; nl ].
+    choices size == 0 ifTrue: [ ^nil ].
     choices size == 1 ifTrue: [ 
         v := (conditions at: 1) staticValue.
         (v notNil and: [ v > 0 ]) ifTrue: [ 
@@ -511,20 +510,29 @@ staticValue
 
 optimize
     |v w last result c ch|
+    w := self width.
     subject := subject optimize.
     v := subject staticValue.
     last := false.
-    choices := choices collect: [ :each | each optimize ].
-    cases := cases collect: [ :each | each optimize ].
+    "it is possible that some choice is optimized to nil"
+    1 to: cases size do: [ :i |
+        c := (cases at: i) optimize.
+        ch := (choices at: i) optimize.
+        cases at: i put: c.
+        choices at: i put: ch.
+        ch isNil ifTrue: [
+            cases at: i put: nil ]].
+    choices := choices select: [ :each | each notNil ].
+    cases := cases select: [ :each | each notNil ].
+    cases size == 0 ifTrue: [ ^nil ].
     v isNil ifTrue: [ ^self ].
-    w := self width.
     1 to: cases size do: [ :i |
         c := cases at: i.
         ch := choices at: i.
         last ifTrue: [
             c destroy.
             ch destroy ].
-        c staticValue = v ifTrue: [ 
+        (c isKindOf: ASTDefault) | (c staticValue = v) ifTrue: [ 
             result := ch.
             last := true ]].
     result notNil ifTrue: [ ^ result ]!

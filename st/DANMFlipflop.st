@@ -90,6 +90,9 @@ staticValue
 optimize
     |e|
     e := expression optimize.
+    e isNil ifTrue: [ 
+        self destroy.
+        ^nil ].
     (e isKindOf: ASTConstant) ifTrue: [
         clock destroy.
         ^(DANMExpressionWire newReplacementNamed: entityName 
@@ -228,6 +231,9 @@ staticValue
 optimize
     |e|
     e := expression optimize.
+    e isNil ifTrue: [ 
+        self destroy.
+        ^nil ].
     (e isKindOf: ASTConstant) ifTrue: [
         clock destroy.
         ^(DANMExpressionWire newReplacementNamed: entityName 
@@ -339,8 +345,11 @@ staticValue
 optimize
     |e|
     e := reset optimize.
+    e isNil ifTrue: [ 
+        self destroy.
+        ^nil ].
     (e isKindOf: ASTConstant) ifTrue: [
-        e evaluate ~~ 0 
+        e evaluate ~= 0 
             ifTrue: [
                 e destroy.
                 resetTo destroy.

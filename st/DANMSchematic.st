@@ -523,8 +523,8 @@ propagateConstantInSet: aSet
     aSet do: [ :each |
         |newWire|
         newWire := each optimize.
-        (newWire expression isKindOf: ASTConstant) ifTrue: [ 
-            newSet add: newWire ]].
+        (newWire notNil and: [ newWire expression isKindOf: ASTConstant ]) 
+            ifTrue: [ newSet add: newWire ]].
     ^newSet!
 
 trimDangle: eos
