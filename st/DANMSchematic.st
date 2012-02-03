@@ -70,6 +70,15 @@ hierNamePrefix
     (reference isKindOf: DANMEmptyTemplate) ifFalse: [ ^entityName, '/' ].
     ^''!
 
+referencePrintName
+    |prefix|
+    "do not uniqify if not printed inline"
+    self canBePrintedInLine ifFalse: [ ^self referenceName ].
+    self context isNil ifTrue: [ ^self uniquifiedRefName ].
+    prefix := Smalltalk getenv: 'MODULE_PREFIX'.
+    prefix isNil ifTrue: [ ^self uniquifiedRefName ].
+    ^prefix, self uniquifiedRefName!
+
 uniqueWireNameLike: wName
     |salt newName|
     generatedNames isNil ifTrue: [

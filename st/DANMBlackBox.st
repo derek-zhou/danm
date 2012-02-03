@@ -38,13 +38,11 @@ isUniquified
     ^self uniquifiedRefName ~= self referenceName!
 
 referencePrintName
-    "do not uniqify if not printed inline"
-    self canBePrintedInLine ifFalse: [ ^self referenceName ].
-    ^self uniquifiedRefName!
+    ^self referenceName!
 
 uniquifiedRefName: n
     "only assign once"
-    (self hasAttribute: n) ifTrue: [
+    (self hasAttribute: #UNIQUIFIED_REF_NAME) ifTrue: [
         ^self ].
     n = self referenceName ifTrue: [ ^self ].
     self setAttribute: #UNIQUIFIED_REF_NAME to: n!
