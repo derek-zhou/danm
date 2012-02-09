@@ -95,6 +95,9 @@ produce
 clearTag
     tag := nil!
 
+tag
+    ^tag!
+
 printTextOn: aStream
     |s|
     tag notNil ifTrue: [ ^self ].

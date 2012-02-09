@@ -395,6 +395,7 @@ printFullVerilogOn: aStream
  
 printFullVerilogToDir: dirName
     |fs|
+    reference tag notNil ifTrue: [ ^self ].
     fs := (File name: dirName, '/', self referencePrintName, '.v') 
         writeStream.
     [ self printFullVerilogOn: fs ] 
