@@ -304,6 +304,7 @@ assignUniqueRefNameAndRecordIn: pastModules
             i assignUniqueRefNameAndRecordIn: pastModules ]]!
 
 generateFullVerilogTo: fn
+    "print all verilog in one file"
     |fs|
     DANMCloningTemplate clearTag.
     self assignUniqueRefName.
@@ -311,6 +312,16 @@ generateFullVerilogTo: fn
     [ 
         self printVerilogBoilerplateOn: fs.
         self printFullVerilogOn: fs ] ensure: [ fs close ]!
+
+generateFullVerilogsToDir: dirName
+    "print all verilog in one dir, one module per file"
+    |dir|
+    DANMCloningTemplate clearTag.
+    self assignUniqueRefName.
+    dir := File name: dirName.
+    (dir exists) ifFalse: [
+        dir createDirectory ].
+    ^self printFullVerilogToDir: dirName!
 
 printVerilogBoilerplateOn: fs
 "print some boiler headers for verilog. This could be put into a .vh file 
@@ -334,6 +345,16 @@ printFullVerilogOn: fs
                 self class blackboxUninlinedModule & 
                     i isUniquified not ifTrue: [
                         i printBlackBoxVerilogOn: fs ]]]!
+
+printFullVerilogToDir: dirName
+    |fs|
+    fs := (File name: dirName, '/', self referencePrintName, '.v') 
+        writeStream.
+    [ self printVerilogBoilerplateOn: fs.
+      self printVerilogOn: fs ] 
+        ensure: [ fs close ].
+    instances do: [ :i |
+        i canBePrintedInLine ifTrue: [ i printFullVerilogToDir: dirName ]]!
 
 printVerilogCoreOn: aStream
     "print the verilog meat. Only synthesizable code have valid verilog code"

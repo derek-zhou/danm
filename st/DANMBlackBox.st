@@ -393,6 +393,13 @@ printFullVerilogOn: aStream
     reference printTextOn: aStream.
     aStream nl!
  
+printFullVerilogToDir: dirName
+    |fs|
+    fs := (File name: dirName, '/', self referencePrintName, '.v') 
+        writeStream.
+    [ self printFullVerilogOn: fs ] 
+        ensure: [ fs close ]!
+
 printVerilogCoreOn: aStream
     ^self!
 
