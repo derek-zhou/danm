@@ -141,11 +141,11 @@ checkDesign
     self isLoaded | context subpressDangleCheck ifFalse: [
         Transcript nextPutAll: 'Check design warning in %1: wire %2 is unloaded'
             % {context fullPath. entityName}; nl ].
-    dc := self driverCount.
-    dc == 0 ifTrue: [
+    self isDriven ifFalse: [
         result := false.
         Transcript nextPutAll: 'Check design error in %1: wire %2 is undriven'
             % {context fullPath. entityName}; nl ].
+    dc := self driverCount.
     dc > 1 ifTrue: [ 
         result := false.
         Transcript nextPutAll: 'Check design error in %1: wire %2 is driven by %3 drivers'

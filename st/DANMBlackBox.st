@@ -356,7 +356,7 @@ tryParseDirection: aTokenizer
     token := aTokenizer nextToken.
     (token isMemberOf: String) ifFalse: [
         aTokenizer parseError: 'Expecting port direction' ].
-    (token = 'input' or: [token = 'output']) ifFalse: [
+    ((token = 'input') | (token = 'output') | (token = 'inout')) ifFalse: [
         aTokenizer pushBackLastToken.
         ^nil ].
     ^token asSymbol!

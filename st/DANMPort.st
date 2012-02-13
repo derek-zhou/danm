@@ -31,7 +31,7 @@ initialize
     ValidDirections := IdentitySet new
         add: #input;
         add: #output;
-        add: #unknown;
+        add: #inout;
         yourself.
     ^self!
 !
@@ -74,6 +74,9 @@ isInput
 
 isOutput
     ^(self direction == #output)!
+
+isInout
+    ^(self direction == #inout)!    
 
 width: newWidth
     self setAttribute: #WIDTH to: newWidth!
@@ -174,7 +177,7 @@ basicWidth
     ^wire width!
 
 direction
-    wire isDrivenInternally
-        ifTrue: [ ^#output ]
-        ifFalse: [ ^#input ]!
+    wire isDrivenInternally ifTrue: [ ^#output ].
+    wire isTriState ifTrue: [ ^#inout ].
+    ^#input!
 !

@@ -27,7 +27,7 @@ clockRefSet dataRefSet directRefSet'
 !DANMWire methodsFor: 'testing'!
 isDriven
     "whether the wire is driven"
-    ^self isDrivenInternally or: [
+    ^self isDrivenInternally | self isTriState or: [
         |port|
         port := context findPortByName: entityName.
         port isNil
@@ -37,6 +37,10 @@ isDriven
 isDrivenInternally
     ^self connections inject: false into: [ :result :each |
         result | each isOutput ]!
+
+isTriState
+    ^self connections inject: false into: [ :result :each |
+        result | each isInout ]!
 
 isSequential
     ^false!
@@ -76,7 +80,7 @@ isLoaded
         r | each isInput].
     result ifTrue: [ ^true ].
     port := context findPortByName: entityName.
-    ^port notNil and: [port isOutput]!
+    ^port notNil and: [port isOutput | port isInout]!
 
 isDangle
     "no driver, no load"
