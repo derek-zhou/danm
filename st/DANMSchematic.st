@@ -332,6 +332,7 @@ if it gets longer"
 `define ASSERT(condition, hier) always @(condition) \
    if (!condition) begin \
       $display("Assertion failure: condition in hier"); \
+      #100; \
       $finish; \
    end
 ' % {DateTime now}!
