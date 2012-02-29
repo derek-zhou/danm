@@ -104,6 +104,7 @@ canBePrintedInLine
     "whether I can be printed as inline verilog. For schematic the printing
      will be recursive. Any schematic that do not want to be printed inline
      should override this method."
+    (self hasParameter: 'opaque') ifTrue: [ ^false ]. 
     ^true!
 
 ports
@@ -493,8 +494,8 @@ repairConnection
      * if a wire is only used in either low or high level, it will be move 
      there. 
      * if a wire is used in both levels it will be splited"
-    wires do: [ :w | w repairHierarchy: self ].
-    context wires do: [ :w | w repairHierarchy: self ]!
+    wires asArray do: [ :w | w repairHierarchy: self ].
+    context wires asArray do: [ :w | w repairHierarchy: self ]!
 
 optimize
     |eos|
