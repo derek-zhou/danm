@@ -340,12 +340,14 @@ if it gets longer"
 printFullVerilogOn: fs
     self printVerilogOn: fs.
     instances do: [ :i |
-        i canBePrintedInLine 
-            ifTrue: [ i printFullVerilogOn: fs ]
-            ifFalse: [ 
-                self class blackboxUninlinedModule & 
-                    i isUniquified not ifTrue: [
-                        i printBlackBoxVerilogOn: fs ]]]!
+        "do not print if there is an parameter called omit"
+        (i hasParameter: 'omit') ifFalse: [
+            i canBePrintedInLine 
+                ifTrue: [ i printFullVerilogOn: fs ]
+                ifFalse: [ 
+                    self class blackboxUninlinedModule & 
+                        i isUniquified not ifTrue: [
+                            i printBlackBoxVerilogOn: fs ]]]]!
 
 printFullVerilogToDir: dirName
     |fs|
