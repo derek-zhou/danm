@@ -464,8 +464,9 @@ printInstanceVerilogOn: aStream
                         % {port name. ws} ]]].
     aStream
         nextPutAll: ');'; nl.
-    "do not print parameter if there is an parameter called omit"
+    "do not print parameter if there is an parameter called omit or opaque"
     (self hasParameter: 'omit') ifTrue: [ ^self ]. 
+    (self hasParameter: 'opaque') ifTrue: [ ^self ]. 
     parameters notNil ifTrue: [
         parameters keys asSortedCollection do: [ :k |
             aStream nextPutAll: '    defparam %1.%2 = %3;' 
