@@ -104,6 +104,7 @@ canBePrintedInLine
     "whether I can be printed as inline verilog. For schematic the printing
      will be recursive. Any schematic that do not want to be printed inline
      should override this method."
+    (self hasParameter: 'omit') ifTrue: [ ^false ]. 
     (self hasParameter: 'opaque') ifTrue: [ ^false ]. 
     ^true!
 
