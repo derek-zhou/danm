@@ -314,8 +314,13 @@ parseStatement: aTokenizer
         self parseParameter: aTokenizer ]!
 
 parseParameter: aTokenizer
-    |token value|
+    |token value width|
     (aTokenizer testNext: 'parameter') ifFalse: [ ^false ].
+    width := self tryParseWidth: aTokenizer.
+    width notNil ifTrue: [ 
+        "ignore parameter with width for now"
+        [ aTokenizer nextToken = $; ] whileFalse.
+        ^true ].
     token := aTokenizer nextToken.
     (token isMemberOf: String) ifFalse: [
         aTokenizer parseError: 'Expecting parameter name' ].

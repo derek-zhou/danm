@@ -338,8 +338,8 @@ connectPins: pins
         oldWire := each context wireOnPort: each.
         oldWire notNil ifTrue: [
             oldWire isDriven & oldWire isLoaded ifTrue: [
-                self error: 'Instance %1 port %2 is already connected to wire %3' 
-                    % {each context. each. oldWire} ].
+                Transcript nextPutAll: 'Instance %1 port %2 is already connected to wire %3' 
+                    % {each context. each. oldWire}; nl ].
             "Undriven or unloaded wire can be safely disconnected"
             oldWire disconnectPort: each.
             each context disconnectPort: each ].
