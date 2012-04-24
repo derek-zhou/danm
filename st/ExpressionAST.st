@@ -407,7 +407,7 @@ context: c type: t
 checkDesign
     subject checkDesign ifFalse: [ ^false ].
     step > 0 ifTrue: [ ^ (msb >= 0) & (lsb >= msb) & (lsb < subject width) ].
-    step < 0 ifTrue: [ ^ (lsb >= 0) & (msb >= lsb) & (msb < subJect width) ].
+    step < 0 ifTrue: [ ^ (lsb >= 0) & (msb >= lsb) & (msb < subject width) ].
     ^false!
 
 destroy
