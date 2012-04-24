@@ -406,8 +406,8 @@ context: c type: t
 
 checkDesign
     subject checkDesign ifFalse: [ ^false ].
-    step > 0 ifTrue: [ ^ (msb >= 0) & (lsb >= msb) ].
-    step < 0 ifTrue: [ ^ (lsb >= 0) & (msb >= lsb) ].
+    step > 0 ifTrue: [ ^ (msb >= 0) & (lsb >= msb) & (lsb < subject width) ].
+    step < 0 ifTrue: [ ^ (lsb >= 0) & (msb >= lsb) & (msb < subJect width) ].
     ^false!
 
 destroy
@@ -442,6 +442,7 @@ basicPrintStringStyle: style
     style == #VERILOG ifFalse: [ 
         ^'%1[%2:%3:%4]' % 
             {subject printStringStyle: style. msb. lsb. step abs}].
+    subject width == 1 ifTrue: [ ^subject printStringStyle: style ].
     aStream := WriteStream on: String new.
     aStream nextPut: ${.
     msb to: lsb by: step do: [ :i |
@@ -481,6 +482,7 @@ staticValue
 !ASTSimpleExtractor methodsFor: 'printing'!
 
 basicPrintStringStyle: style
+    subject width == 1 ifTrue: [ ^subject printStringStyle: style ].
     msb ~= lsb 
         ifTrue: [^'%1[%2:%3]' % {subject printStringStyle: style. msb. lsb}]
         ifFalse: [^'%1[%2]' % {subject printStringStyle: style. msb}]!
