@@ -127,7 +127,7 @@ skipComment
         r := self skipLineComment or: [self skipBlockComment]].
     self peek = $` ifTrue: [
         r := true.
-        self nextLine ].
+        [ self nextLine last = $\ ] whileTrue ].
     ^r!
 
 skipLineComment
