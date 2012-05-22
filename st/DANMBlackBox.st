@@ -481,8 +481,7 @@ printInstanceVerilogOn: aStream
                         % {port name. ws} ]]].
     aStream
         nextPutAll: ');'; nl.
-    "do not print parameter if I am not printing the full verilog"
-    self shouldBlackBox ifTrue: [ ^self ]. 
+    "do not print parameter if I am not printing the verilog"
     self shouldNotPrint ifTrue: [ ^self ]. 
     parameters notNil ifTrue: [
         parameters keys asSortedCollection do: [ :k |
