@@ -28,7 +28,7 @@ DANMCurrentDesign comment:
 
 DANMBlackBox subclass: #DANMSchematic
              instanceVariableNames: 'instances wires userData generatedNames'
-             classVariableNames: 'htmlRoot blackboxUninlinedModule'
+             classVariableNames: 'htmlRoot'
              poolDictionaries: ''
              category: 'DANM'!
 
@@ -42,13 +42,6 @@ htmlRoot
 
 htmlRoot: str
     htmlRoot := str!
-
-blackboxUninlinedModule
-    blackboxUninlinedModule isNil ifTrue: [ ^false ].
-    ^blackboxUninlinedModule!
-
-blackboxUninlinedModule: bool
-    blackboxUninlinedModule := bool!
 
 emptySchematic
     ^DANMEmptyTemplate factory produce!
@@ -79,6 +72,9 @@ referencePrintName
     prefix isNil ifTrue: [ ^self uniquifiedRefName ].
     ^prefix, self uniquifiedRefName!
 
+isUniquified
+    ^self uniquifiedRefName ~= self referenceName!
+
 uniqueWireNameLike: wName
     |salt newName|
     generatedNames isNil ifTrue: [
@@ -104,8 +100,8 @@ canBePrintedInLine
     "whether I can be printed as inline verilog. For schematic the printing
      will be recursive. Any schematic that do not want to be printed inline
      should override this method."
-    (self hasParameter: 'omit') ifTrue: [ ^false ]. 
-    (self hasParameter: 'opaque') ifTrue: [ ^false ]. 
+    self shouldBlackBox ifTrue: [ ^false ]. 
+    self shouldNotPrint ifTrue: [ ^false ]. 
     ^true!
 
 ports
@@ -342,14 +338,12 @@ if it gets longer"
 printFullVerilogOn: fs
     self printVerilogOn: fs.
     instances do: [ :i |
-        "do not print if there is an parameter called omit"
-        (i hasParameter: 'omit') ifFalse: [
-            i canBePrintedInLine 
-                ifTrue: [ i printFullVerilogOn: fs ]
-                ifFalse: [ 
-                    self class blackboxUninlinedModule & 
-                        i isUniquified not ifTrue: [
-                            i printBlackBoxVerilogOn: fs ]]]]!
+        i canBePrintedInLine 
+            ifTrue: [ i printFullVerilogOn: fs ]
+            ifFalse: [ 
+                i shouldBlackBox & 
+                    i isUniquified not ifTrue: [
+                        i printBlackBoxVerilogOn: fs ]]]!
 
 printFullVerilogToDir: dirName
     |fs|

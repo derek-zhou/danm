@@ -35,7 +35,7 @@ uniquifiedRefName
     ^self referenceName!
 
 isUniquified
-    ^self uniquifiedRefName ~= self referenceName!
+    ^self reference returnThenSetTag notNil!
 
 referencePrintName
     ^self referenceName!
@@ -71,12 +71,19 @@ canBePrintedInLine
      very short verilog file"
     reference isNil ifTrue: [ ^false ].
     reference srcPath isNil ifTrue: [ ^false ].
-    (self hasParameter: 'opaque') ifTrue: [ ^false ]. 
+    self shouldBlackBox ifTrue: [ ^false ]. 
+    self shouldNotPrint ifTrue: [ ^false ]. 
     (File name: reference srcPath) size > 4096 ifTrue: [ 
         Transcript nextPutAll: 'Warning: verilog source %1 for module %2 will not be printed inline because it is big' 
             % {reference srcPath. entityName}; nl.
         ^false ].
     ^true!
+
+shouldBlackBox
+    ^((self hasParameter: 'opaque') and: [ (self parameterValue: 'opaque') = 1 ])! 
+
+shouldNotPrint
+    ^((self hasParameter: 'omit') and: [ (self parameterValue: 'omit') = 1 ])! 
 
 topPath
     context isNil ifTrue: [ ^'' ].
@@ -392,6 +399,10 @@ printVerilogOn: aStream
     self printVerilogFooterOn: aStream!
 
 printBlackBoxVerilogOn: aStream
+    aStream 
+        nl; 
+        nextPutAll: '// this is a blackbox for %1 as a placeholder for synthesis' 
+        % {self referencePrintName}; nl.
     self printVerilogHeaderOn: aStream.
     self printVerilogFooterOn: aStream!
 
@@ -470,9 +481,9 @@ printInstanceVerilogOn: aStream
                         % {port name. ws} ]]].
     aStream
         nextPutAll: ');'; nl.
-    "do not print parameter if there is an parameter called omit or opaque"
-    (self hasParameter: 'omit') ifTrue: [ ^self ]. 
-    (self hasParameter: 'opaque') ifTrue: [ ^self ]. 
+    "do not print parameter if I am not printing the full verilog"
+    self shouldBlackBox ifTrue: [ ^self ]. 
+    self shouldNotPrint ifTrue: [ ^self ]. 
     parameters notNil ifTrue: [
         parameters keys asSortedCollection do: [ :k |
             aStream nextPutAll: '    defparam %1.%2 = %3;' 

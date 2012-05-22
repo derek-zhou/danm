@@ -95,13 +95,16 @@ produce
 clearTag
     tag := nil!
 
-tag
-    ^tag!
+returnThenSetTag
+    "se the tag then return old tag"
+    |t| 
+    t := tag.
+    tag := true.
+    ^t!
 
 printTextOn: aStream
     |s|
-    tag notNil ifTrue: [ ^self ].
-    tag := true.
+    self returnThenSetTag notNil ifTrue: [ ^self ].
     s := (File name: srcPath) readStream.
     [ s nextPutAllOn: aStream ] ensure: [s close ]!
 !
