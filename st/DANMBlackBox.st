@@ -360,8 +360,9 @@ parseOnePort: aTokenizer width: width direction: dir
 tryParseDirection: aTokenizer
     |token|
     token := aTokenizer nextToken.
-    (token isMemberOf: String) ifFalse: [
-        aTokenizer parseError: 'Expecting port direction' ].
+    (token isMemberOf: String) ifFalse: [ 
+        aTokenizer pushBackLastToken.
+        ^nil ].
     ((token = 'input') | (token = 'output') | (token = 'inout')) ifFalse: [
         aTokenizer pushBackLastToken.
         ^nil ].
