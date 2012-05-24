@@ -49,7 +49,7 @@ produce
 !
 
 DANMTemplate subclass: #DANMCloningTemplate
-    instanceVariableNames: 'reference tag'
+    instanceVariableNames: 'reference'
     classVariableNames: ''
     poolDictionaries: ''
     category: 'DANM'!
