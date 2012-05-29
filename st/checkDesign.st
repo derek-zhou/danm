@@ -138,7 +138,7 @@ checkDesign
      * width match all pin width"
     |result dc width|
     result := true.
-    self isLoaded | context subpressDangleCheck ifFalse: [
+    self isLoaded | context subpressDangleCheck | self shouldConceal ifFalse: [
         Transcript nextPutAll: 'Check design warning in %1: wire %2 is unloaded'
             % {context fullPath. entityName}; nl ].
     self isDriven ifFalse: [
