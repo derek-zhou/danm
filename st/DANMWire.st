@@ -438,12 +438,12 @@ splitDownHierarchy: lower
         lower addWire: newWire ].
     (lower findPortByName: entityName) isNil ifTrue: [
         newWire expose ].
+    self splitTo: newWire.  
     subPort := lower portByName: entityName.
     (lower wireOnPort: subPort) notNil ifTrue: [
         self error: 'port %1 is already connected' % {subPort}; nl ].
     lower connectWire: self toPort: subPort.
-    self connectPort: subPort.
-    self splitTo: newWire!
+    self connectPort: subPort!
 
 splitUpHierarchy
     "Expose myself and create a higher wire of the same name
@@ -514,13 +514,13 @@ mergeWith: anotherWire
 
 splitTo: anotherWire
     "push foreign connections and references to anotherWire"
-    self connections do: [ :pin |
-        pin context context == context ifFalse: [
+    self connections copy do: [ :pin |
+        pin context context == anotherWire context ifTrue: [
             self disconnectPort: pin.
             anotherWire connectPort: pin.
             pin context basicConnectWire: anotherWire toPort: pin ]].
-    self refs do: [ :ref |
-        ref context context == context ifFalse: [
+    self refs copy do: [ :ref |
+        ref context context == anotherWire context ifTrue: [
             self removeRef: ref.
             anotherWire addRef: ref.
             ref identifier: anotherWire ]]!

@@ -253,6 +253,10 @@ elaborate
             init;
             elaborateAll ]!
 
+postProcess
+    "give each instance a chance to run something after elaborate"
+    instances do: [ :each | each postProcess ]!
+
 pinFromString: pinString
 "pin string is like instanceName/portName, return {instance. port}"
     pinString =~ '^([\w/]+)/(\w+)$$'
@@ -521,7 +525,7 @@ sweepGarbage
     |toBeDestroyed|
     toBeDestroyed := OrderedCollection new.
     wires do: [ :w |
-        (w tag notNil) ifFalse: [ toBeDestroyed add: w ]].
+        (w tag isNil) & w isExposed not ifTrue: [ toBeDestroyed add: w ]].
     instances do: [ :i |
         (i tag notNil) ifFalse: [ toBeDestroyed add: i ]].
     toBeDestroyed do: [ :each | each destroy ]!

@@ -104,6 +104,10 @@ elaborate
     "blackbox does not need to elaborate"
     ^self!
 
+postProcess
+    "nothing to do for post-process"
+    ^self!
+
 postCopy
     "ports and parameters need to be copied"
     |newParam newPorts|
