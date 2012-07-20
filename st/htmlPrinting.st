@@ -271,6 +271,7 @@ printHTMLWiresOn: aStream
 
 topName
     |upperWire port s|
+    context isNil ifTrue: [ self error: 'I ,%1, have no context!' % {self}; nl ].
     port := context findPortByName: (entityName).
     port notNil ifTrue: [ upperWire := context wireOnPort: port ].
     upperWire notNil ifTrue: [ ^upperWire topName ].
