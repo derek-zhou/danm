@@ -268,9 +268,11 @@ searchMorePath
         |fullname|
         fullname := FilePath append: name to: dir name.
         name =~ '^(\w+)\.st$$' ifMatched: [ :result |
-            stFiles at: (result at: 1) put: fullname ].
+            (stFiles includesKey: (result at: 1)) ifFalse: [
+            stFiles at: (result at: 1) put: fullname ]].
         name =~ '^(\w+)\.v$$' ifMatched: [ :result |
-            vFiles at: (result at: 1) put: fullname ].
+            (vFiles includesKey: (result at: 1)) ifFalse: [
+            vFiles at: (result at: 1) put: fullname ]].
         ].
     pathIndex := pathIndex + 1.
     ^true!
