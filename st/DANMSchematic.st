@@ -325,6 +325,18 @@ generateFullVerilogsToDir: dirName
         dir createDirectory ].
     ^self printFullVerilogToDir: dirName!
 
+generateSubModuleFullVerilogToDir: dirName
+    instances do: [ :i |
+        (i isKindOf: DANMSchematic) & i isUniquified not ifTrue: [
+            i shouldBlackBox
+                ifTrue: [
+                    |fs|
+                    fs := (File name: dirName, '/', i referencePrintName, '.v')
+                        writeStream.
+                    [ i printFullVerilogOn: fs ] ensure: [ fs close ]] 
+                ifFalse: [ 
+                    i generateSubModuleFullVerilogToDir: dirName ]]]!
+
 printVerilogBoilerplateOn: fs
 "print some boiler headers for verilog. This could be put into a .vh file 
 if it gets longer"
