@@ -355,7 +355,9 @@ printFullVerilogOn: fs
     self printVerilogOn: fs.
     instances do: [ :i |
         i canBePrintedInLine 
-            ifTrue: [ i printFullVerilogOn: fs ]
+            ifTrue: [
+                i printVerilogBoilerplateOn: fs.
+                i printFullVerilogOn: fs ]
             ifFalse: [ 
                 i shouldBlackBox & 
                     i isUniquified not ifTrue: [
