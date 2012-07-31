@@ -330,12 +330,7 @@ generateSubModuleFullVerilogToDir: dirName
         (i isKindOf: DANMSchematic) & i isUniquified not ifTrue: [
             i shouldBlackBox
                 ifTrue: [
-                    |fs|
-                    fs := (File name: dirName, '/', i referencePrintName, '.v')
-                        writeStream.
-                    [ 
-                        i printVerilogBoilerplateOn: fs.
-                        i printFullVerilogOn: fs ] ensure: [ fs close ]] 
+                    i generateFullVerilogTo: dirName, '/', i referencePrintName, '.v' ]
                 ifFalse: [ 
                     i generateSubModuleFullVerilogToDir: dirName ]]]!
 
