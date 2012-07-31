@@ -333,7 +333,9 @@ generateSubModuleFullVerilogToDir: dirName
                     |fs|
                     fs := (File name: dirName, '/', i referencePrintName, '.v')
                         writeStream.
-                    [ i printFullVerilogOn: fs ] ensure: [ fs close ]] 
+                    [ 
+                        i printVerilogBoilerplateOn: fs.
+                        i printFullVerilogOn: fs ] ensure: [ fs close ]] 
                 ifFalse: [ 
                     i generateSubModuleFullVerilogToDir: dirName ]]]!
 
@@ -355,9 +357,7 @@ printFullVerilogOn: fs
     self printVerilogOn: fs.
     instances do: [ :i |
         i canBePrintedInLine 
-            ifTrue: [
-                i printVerilogBoilerplateOn: fs.
-                i printFullVerilogOn: fs ]
+            ifTrue: [ i printFullVerilogOn: fs ]
             ifFalse: [ 
                 i shouldBlackBox & 
                     i isUniquified not ifTrue: [
