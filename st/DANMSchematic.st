@@ -465,8 +465,7 @@ wrapAll
     self addInstance: wrapper byName: self referenceName, '_wrapper'.
     self wrapInstancesSatisfy: [ :i | true ] in: wrapper.
     self wrapWiresSatisfy: [ :w | true ] in: wrapper.
-    "this is a specail case in tat everything is wrapped, so there is no need 
-     to repair"
+    wrapper repairConnection.
     ^wrapper!
  
 wrapInstancesSatisfy: testBlock in: wrapper
@@ -488,9 +487,8 @@ wrapWiresSatisfy: testBlock in: wrapper
     toBeRemoved := OrderedCollection new.
     wires copy do: [ :w |
         (testBlock value: w) ifTrue: [
-            "Ports cannot be removed in wrapping"
-            w isPort ifFalse: [ toBeRemoved add: w name ]. 
-            w pushDownHierarchy: wrapper ]].
+            toBeRemoved add: w name.
+            wrapper addWire: w]].
     toBeRemoved do: [ :each | wires removeKey: each ].
     ^wrapper!
 

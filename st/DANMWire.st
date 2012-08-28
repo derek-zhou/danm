@@ -413,22 +413,6 @@ pushUpHierarchy
     "internal wire, just rename and add"
     context context addWire: self byName: newName!
 
-pushDownHierarchy: lower
-    |higher newWire subPort hiPort|
-    higher := context.
-    lower addWire: self.
-    hiPort := higher findPortByName: entityName.
-    hiPort notNil ifTrue: [ 
-        newWire := DANMWire new
-            name: entityName;
-            width: self width.
-        higher addWire: newWire.
-        hiPort wire: newWire.
-        self expose.
-        subPort := lower portByName: entityName.
-        lower connectWire: newWire toPort: subPort.
-        newWire connectPort: subPort ]!
-
 splitDownHierarchy: lower
     "Create a lower wire of the same name and expose it, connect it to me"
     |newWire subPort|
@@ -480,14 +464,17 @@ repairHierarchy: lower
             usage == 3 ifTrue: [ self splitDownHierarchy: lower ].
             usage == 1 ifTrue: [ 
                 context removeWireByName: entityName.
-                self pushDownHierarchy: lower ]]!
+                lower addWire: self ]]!
 
 realUsage: lower
     "return 1 if the wire is only driven/loaded in lower. 2 if only 
      driven/loaded in higher. 3 both, 0 neither"
-    |result|
+    |result higher|
     result := 0.
-    (self context findPortByName: entityName) notNil ifTrue: [ 
+    lower == self context 
+        ifTrue: [ higher := self context context ]
+        ifFalse: [ higher := self context ].
+    (higher findPortByName: entityName) notNil ifTrue: [ 
         result := result bitOr: 2 ].
     self connections do: [ :each |
         each context context == lower 
