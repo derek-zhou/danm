@@ -486,7 +486,7 @@ wrapWiresSatisfy: testBlock in: wrapper
      The connectivity likely need to be repaired"
     |toBeRemoved|
     toBeRemoved := OrderedCollection new.
-    wires do: [ :w |
+    wires copy do: [ :w |
         (testBlock value: w) ifTrue: [
             "Ports cannot be removed in wrapping"
             w isPort ifFalse: [ toBeRemoved add: w name ]. 

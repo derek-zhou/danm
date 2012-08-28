@@ -274,6 +274,8 @@ topName
     context isNil ifTrue: [ self error: 'I ,%1, have no context!' % {self}; nl ].
     port := context findPortByName: (entityName).
     port notNil ifTrue: [ upperWire := context wireOnPort: port ].
+    upperWire = self ifTrue: [ 
+        self error: 'hier violation on %1' % {entityName} ].
     upperWire notNil ifTrue: [ ^upperWire topName ].
     s := context fullPath, '/', entityName.
     ^ s copyFrom: (s indexOf: $/) + 1!

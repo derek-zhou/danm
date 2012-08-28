@@ -414,17 +414,19 @@ pushUpHierarchy
     context context addWire: self byName: newName!
 
 pushDownHierarchy: lower
-    |higher newWire subPort|
+    |higher newWire subPort hiPort|
     higher := context.
     lower addWire: self.
-    (context context findPortByName: entityName) notNil ifTrue: [ 
+    hiPort := higher findPortByName: entityName.
+    hiPort notNil ifTrue: [ 
         newWire := DANMWire new
             name: entityName;
             width: self width.
         higher addWire: newWire.
+        hiPort wire: newWire.
         self expose.
         subPort := lower portByName: entityName.
-        higher connectWire: newWire toPort: subPort.
+        lower connectWire: newWire toPort: subPort.
         newWire connectPort: subPort ]!
 
 splitDownHierarchy: lower
