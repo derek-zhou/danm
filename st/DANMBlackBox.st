@@ -485,10 +485,10 @@ printInstanceVerilogOn: aStream
                         % {port name. ws} ]]].
     aStream
         nextPutAll: ');'; nl.
-    "do not print parameter if I am not printing the verilog"
-    self shouldNotPrint ifTrue: [ ^self ]. 
     parameters notNil ifTrue: [
         parameters keys asSortedCollection do: [ :k |
+            "those 2 parameters are used for controlling printing only"
+            (k = 'omit') | (k = 'opaque') ifFalse: [ 
             aStream nextPutAll: '    defparam %1.%2 = %3;' 
-                % {self verilogName. k. self parameterValue: k}; nl ]]!
+                % {self verilogName. k. self parameterValue: k}; nl ]]]!
 !
