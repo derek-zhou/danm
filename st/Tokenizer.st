@@ -54,6 +54,11 @@ expect: aToken
 expectKind: aClass
     |token|
     token := self nextToken.
+    (aClass = Integer) & (token = $-) ifTrue: [
+        "special case, negative number"
+        token := self nextToken.
+        (token isKindOf: Integer) ifTrue: [
+            token := 0 - token ]].
     (token isKindOf: aClass) ifFalse: [
         self parseError: 'Expecting %1, but get %2' 
         % {aClass. token} ].

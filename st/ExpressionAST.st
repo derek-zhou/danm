@@ -393,7 +393,7 @@ step
     ^step!
 
 step: st
-    step:= st!
+    step := st!
 
 dependencies
     ^subject dependencies!
