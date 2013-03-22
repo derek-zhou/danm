@@ -109,7 +109,7 @@ parseModTerm
     (stream testNext: $[) ifTrue: [
         msb := stream expectKind: Integer.
         lsb := msb.
-        step := 1.
+        step := -1.
         (stream testNext: $:) ifTrue: [
             lsb := stream expectKind: Integer ].
         (stream testNext: $:) ifTrue: [

@@ -346,10 +346,7 @@ ASTExtractor comment:
 !ASTExtractor class methodsFor: 'instance creation'!
 
 newExtractorOn: s from: m to: l step: st
-    |step|
-    m == l ifTrue: [ step := -1 ].
-    m > l ifTrue: [ step := 0 - st ].
-    step == -1 ifTrue: [
+    st == -1 ifTrue: [
         ^ ASTSimpleExtractor new
             subject: s;
             msb: m;
@@ -359,7 +356,7 @@ newExtractorOn: s from: m to: l step: st
         subject: s;
         msb: m;
         lsb: l;
-        step: step!
+        step: st!
 !
 
 !ASTExtractor methodsFor: 'accessing'!
