@@ -672,3 +672,80 @@ type
 canBeSynthesized
     ^false! 
 !
+
+DANMSchematic subclass: #DANMReplicatedSchematic
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: ''!
+
+DANMReplicatedSchematic comment:
+    'I am a schematic that is instantiated several times with all instances replicated'!
+
+!DANMReplicatedSchematic class methodsFor: 'primary accessing'!
+
+primary
+    ^self subclassResponsibility!
+
+primary: p
+    ^self subclassResponsibility!
+!
+
+!DANMReplicatedSchematic methodsFor: 'accessing'!
+
+isPrimary
+    ^self = self class primary!
+
+referencePrintName
+    "not uniqified"
+    ^self referenceName!
+
+isUniquified
+    ^(self = self class primary) not!
+
+canBeFlatten
+    ^false!
+
+elaborate
+    wires notNil ifTrue: [ ^self ].
+    self class primary isNil ifTrue: [
+	super elaborate.
+	self class primary: self.
+	^self ].
+    Transcript 
+        nextPutAll: 'Copying schematic %1 for %2' % {self referenceName.
+                                                         entityName}; nl.    
+    self
+	clearUserData;
+	clearWires;
+	clearInstances;
+	copyFrom: self class primary!
+!
+
+!DANMReplicatedSchematic methodsFor: 'printing'!
+
+generateFullVerilogTo: fn
+    "only primt primary one"
+    self isPrimary ifTrue: [ super generateFullVerilogTo: fn ].
+    ^self!
+
+generateFullVerilogsToDir: dirName
+    "only primt primary one"
+    self isPrimary ifTrue: [ super generateFullVerilogsToDir: dirName ].
+    ^self!
+
+printFullVerilogOn: fs
+    "only primt primary one"
+    self isPrimary ifTrue: [ super printFullVerilogOn: fs ].
+    ^self!
+
+printFullVerilogToDir: dirName
+    "only primt primary one"
+    self isPrimary ifTrue: [ super printFullVerilogToDir: dirName ].
+    ^self!
+
+generateSubModuleFullVerilogToDir: dirName
+    "only primt primary one"
+    self isPrimary ifTrue: [ super generateSubModuleFullVerilogToDir: dirName ].
+    ^self!
+!

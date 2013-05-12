@@ -127,6 +127,13 @@ populateQuiescentState: eos
     ^changeSet size!
 !
 
+!DANMReplicatedSchematic methodsFor: 'check design'!
+
+checkDesign
+    self isPrimary ifTrue: [ ^super checkDesign ].
+    ^true!
+!
+
 !DANMWire methodsFor: 'check design'!
 
 checkDesign

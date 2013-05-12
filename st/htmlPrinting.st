@@ -197,6 +197,7 @@ printFullHTMLHierOn: aStream
 generateHTML
     |dir|
     super generateHTML.
+    instances size = 0 ifTrue: [ ^self ].
     dir := File name: entityName.
     dir exists ifFalse: [
         dir createDirectory ].

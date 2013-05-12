@@ -123,6 +123,11 @@ postCopy
     ports := newPorts.
     ^self!
 
+copyFrom: anotherOne
+    parameters := anotherOne parameters.
+    ports := anotherOne ports.
+    self postCopy!
+
 reference
 "return the referenced module"
     ^reference!
@@ -207,6 +212,9 @@ hasParameter: pName
 parameter: pName
     parameters isNil ifTrue: [ parameters := LookupTable new ].    
     ^parameters at: pName ifAbsent: [ nil ]!
+
+parameters
+    ^parameters!
 
 parameterValue: pName
     |p|

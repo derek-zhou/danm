@@ -180,4 +180,12 @@ direction
     wire isDrivenInternally ifTrue: [ ^#output ].
     wire isTriState ifTrue: [ ^#inout ].
     ^#input!
+
+copy
+    "copy into a vanila port"
+    |clone|
+    clone := DANMPort newNamed: self name.
+    clone width: self width.
+    clone direction: self direction.
+    ^clone!
 !
