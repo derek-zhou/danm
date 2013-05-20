@@ -77,17 +77,6 @@ evaluate
             self nextValue: self shiftValue.
             nextValue ~= value ifTrue: [ ^nextValue ]].
     ^nil!
-
-checkDesign
-    expression isNil ifTrue: [
-        Transcript nextPutAll: 'Check design error in %1: delayline %2 has no input'
-            % {context name. entityName}; nl.
-        ^false ].
-    delay > 0 ifFalse: [ 
-        Transcript nextPutAll: 'Check design error in %1: delayline %2 has invalid delay'
-            % {context name. entityName}; nl.
-        ^false ].
-    ^super checkDesign!
 !
 
 !DANMDelayLine methodsFor: 'printing'!

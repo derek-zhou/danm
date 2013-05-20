@@ -332,16 +332,3 @@ basicPrintVerilogOn: aStream
     expression clearAlias.
     aStream nextPutAll: '    end'; nl!
 !
-
-!DANMDefaultWire methodsFor: 'check design'!
-
-checkDesign 
-    |result|
-    result := self basicCheckDesign.
-    (default isNil or: 
-         [ default isCombinatorial not ]) ifTrue: [
-        result := false.
-        Transcript nextPutAll: 'Check design error in %1: ExpressionWire %2 has non-combinatorial default'
-            % {context fullPath. entityName}; nl ].
-    ^result!
-!

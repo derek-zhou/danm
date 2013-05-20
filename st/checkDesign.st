@@ -17,9 +17,57 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
+DynamicVariable subclass: #DANMStatistic
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: ''!
+
+DANMStatistic comment:
+    ''!
+
+Object subclass: #DANMCheckDesignStatistic
+    instanceVariableNames: 'warningCount errorCount'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: ''!
+
+!DANMCheckDesignStatistic class methodsFor: 'instance creation'!
+
+new
+    ^super new clear!
+!
+
+!DANMCheckDesignStatistic methodsFor: 'accessing'!
+
+warningCount
+    ^warningCount!
+
+errorCount
+    ^errorCount!
+
+clear
+    warningCount := 0.
+    errorCount := 0!
+
+incWarning
+   warningCount := warningCount + 1!
+
+incError
+    errorCount := errorCount + 1!
+!
+
 !DANMBlackBox methodsFor: 'check design'!
 
 checkDesign
+    |s r|
+    s := DANMCheckDesignStatistic new.
+    DANMStatistic use: s during: [ r := self recursiveCheckDesign ].
+    Transcript nextPutAll: 'Check design finished for %1: %2 errors and %3 warning found' %
+	{ self referenceName. s errorCount. s warningCount }; nl. 
+    ^r!
+
+recursiveCheckDesign
     "check to make sure all port are connected"
     |result|
     context isNil ifTrue: [ ^true ].
@@ -30,9 +78,11 @@ checkDesign
         wire isNil ifTrue: [
             port isInput ifTrue: [
                 result := false.
+		DANMStatistic value incError.
                 Transcript nextPutAll: 'Check design error in %1: input port %2 is dangling on instance %3'
                     % {context fullPath. port name. entityName}; nl ].
             context subpressDangleCheck ifFalse: [
+		DANMStatistic value incWarning.
                 Transcript nextPutAll: 'Check design warning in %1: port %2 is dangling on instance %3'
                     % {context fullPath. port name. entityName}; nl ]]].
     ^result!
@@ -44,11 +94,11 @@ subpressDangleCheck
     "do not print warning for unloaded but driven wires/pins"
     ^false!
 
-checkDesign
+recursiveCheckDesign
     |result|
-    result := super checkDesign.
+    result := super recursiveCheckDesign.
     result := instances inject: result into: [ :past :inst |
-        past & inst checkDesign ]. 
+        past & inst recursiveCheckDesign ]. 
     result := wires inject: result into: [ :past :wire | 
         past & wire checkDesign ]. 
     ^result!
@@ -80,6 +130,7 @@ checkFeedThrough
             port wire fanoutTreeInject: true into: [ :past :fanout |
                 ((fanout isKindOf: DANMPort) and: [ fanout isOutput ]) 
                     ifTrue: [
+			DANMStatistic value incError.
                         Transcript nextPutAll: 'Check design error in %1: input port %2 fanout to output port %3'
                             % {self referenceName. port name. fanout name}; nl.
                         false ]
@@ -95,6 +146,7 @@ checkCascadingLatch
         (w isKindOf: DANMLatch) ifTrue: [
             w fanoutTreeInject: true into: [ :past :fanout |
                 (fanout isKindOf: DANMLatch) ifTrue: [
+		    DANMStatistic value incError.
                     Transcript nextPutAll: 'Check design error in %1: latch %2 fanout to latch %3'
                         % {self referenceName. w name. fanout name}; nl.
                     false ]
@@ -146,20 +198,24 @@ checkDesign
     |result dc width|
     result := true.
     self isLoaded | context subpressDangleCheck | self shouldConceal ifFalse: [
+	DANMStatistic value incWarning.
         Transcript nextPutAll: 'Check design warning in %1: wire %2 is unloaded'
             % {context fullPath. entityName}; nl ].
     self isDriven ifFalse: [
         result := false.
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: wire %2 is undriven'
             % {context fullPath. entityName}; nl ].
     dc := self driverCount.
     dc > 1 ifTrue: [ 
         result := false.
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: wire %2 is driven by %3 drivers'
             % {context fullPath. entityName. dc}; nl ].
     width := self width.
     width == 0 ifTrue: [      
         result := false.
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: width of wire %2 cannot be deduced'
             % {context fullPath. entityName}; nl ].
     self connections do: [ :pin |
@@ -169,11 +225,13 @@ checkDesign
             pin isOutput 
                 ifTrue: [
                     result := false.
+		    DANMStatistic value incError.
                     Transcript nextPutAll: 'Check design error in %1: wire %2 (width is %3) is driven by unmatched pin %4/%5 (width is %6)'
                         % {context fullPath. entityName. width.
                            pin context name. pin name. pw}; 
                         nl ]
                 ifFalse: [
+		    DANMStatistic value incWarning.
                     Transcript nextPutAll: 'Check design warning in %1: wire %2 (width is %3) is loaded by unmatched pin %4/%5 (width is %6)'
                         % {context fullPath. entityName. width.
                            pin context name. pin name. pw}; 
@@ -189,23 +247,27 @@ basicCheckDesign
     expression isNil 
         ifTrue: [
             result := false.
+	    DANMStatistic value incError.
             Transcript nextPutAll: 'Check design error in %1: ExpressionWire %2 has no expression'
                 % {context fullPath. entityName}; nl ]
         ifFalse: [ 
             expression checkDesign ifFalse: [ 
-                result := false.
-                Transcript nextPutAll: 'Check design error in %1: ExpressionWire %2 has bad expression %3'
+		result := false.
+		DANMStatistic value incError.
+		Transcript nextPutAll: 'Check design error in %1: ExpressionWire %2 has bad expression %3'
                 % {context fullPath. entityName. expression}; nl ]].
     w := self width.
     ew := self minWidth.
     (ew > 0) & (w ~= ew) ifTrue: [
         result := false.
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: ExpressionWire %2 (width is %3) is driven by unmatched expression %4 (width is %5)'
             % {context fullPath. entityName. w. expression. ew}; nl ].
     o := self evaluationOrder.
     eo := self basicEvaluationOrder.
     o ~= eo ifTrue: [ 
         result := false.
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: ExpressionWire %2 is part of a dependency loop.'
             % {context fullPath. entityName}; nl ].
     ^result!
@@ -216,23 +278,29 @@ checkDesign
     (expression notNil and: 
          [ expression isCombinatorial not ]) ifTrue: [
         result := false.
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: ExpressionWire %2 has non-combinatorial expression'
             % {context fullPath. entityName}; nl ].
     ^result!
 !
 
 !DANMFlipflop methodsFor: 'check design'!
+
 checkDesign 
     |result|
     result := self basicCheckDesign.
     clock isNil ifTrue: [
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: Flipflop %2 has no clock'
             % {context fullPath. entityName}; nl.
         ^false ].
     (clock isKindOf: ASTIdentifier) ifFalse: [
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: Flipflop %2 has clock that is not existing wire: %3'
-            % {context fullPath. entityName. clock}; nl ].
+            % {context fullPath. entityName. clock}; nl.
+	^false ].
     clock width ~= 1 ifTrue: [
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: Flipflop %2 ''s clock %3 is not one bit wide'
             % {context fullPath. entityName. clock}; nl.
         ^false ].
@@ -240,24 +308,109 @@ checkDesign
 !
 
 !DANMLatch methodsFor: 'check design'!
+
 checkDesign 
     |result|
     result := self basicCheckDesign.
     clock isNil ifTrue: [
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: Latch %2 has no clock'
             % {context fullPath. entityName}; nl.
         ^false ].
     (clock isKindOf: ASTIdentifier) ifFalse: [
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: Latch %2 has clock that is not existing wire: %3'
             % {context fullPath. entityName. clock}; nl ].
     clock width ~= 1 ifTrue: [
+	DANMStatistic value incError.
         Transcript nextPutAll: 'Check design error in %1: Latch %2 ''s clock %3 is not one bit wide'
             % {context fullPath. entityName. clock}; nl.
         ^false ].
     (expression notNil and: [ expression isCombinatorial not ]) 
         ifTrue: [
+	DANMStatistic value incError.
             Transcript nextPutAll: 'Check design error in %1: Latch %2 has non-combinatorial input'
                 % {context fullPath. entityName}; nl.
             ^false ].
     ^result!
+!
+
+!DANMResetFlop methodsFor: 'check design'!
+
+checkDesign
+    DANMStatistic value incWarning.
+    Transcript nextPutAll: 'Check design warning in %1: inferring reset flop %2'
+        % {context fullPath. entityName}; nl.
+    reset isNil ifTrue: [
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: reset flop %2 has no reset'
+            % {context fullPath. entityName}; nl.
+        ^false ].
+    reset width ~=1 ifTrue: [ 
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: flop %2 reset is not single bit'
+            % {context fullPath. entityName}; nl.
+        ^false ].
+    (reset isKindOf: ASTIdentifier) ifFalse: [
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: reset flop %2 reset is not a wire'
+            % {context fullPath. entityName}; nl.
+        ^false ].
+    (resetTo isKindOf: ASTConstant) ifFalse: [
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: reset value of %2 has to be a constant, got %3'
+            % {context fullPath. entityName. resetTo}; nl.
+        ^false ].
+    ^super checkDesign!
+!
+
+!DANMDefaultWire methodsFor: 'check design'!
+
+checkDesign 
+    |result|
+    result := self basicCheckDesign.
+    (default isNil or: 
+         [ default isCombinatorial not ]) ifTrue: [
+        result := false.
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: ExpressionWire %2 has non-combinatorial default'
+            % {context fullPath. entityName}; nl ].
+    ^result!
+!
+
+!DANMDelayLine methodsFor: 'check design'!
+
+checkDesign
+    expression isNil ifTrue: [
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: delayline %2 has no input'
+            % {context name. entityName}; nl.
+        ^false ].
+    delay > 0 ifFalse: [ 
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: delayline %2 has invalid delay'
+            % {context name. entityName}; nl.
+        ^false ].
+    ^super checkDesign!
+!
+
+!DANMMonostable methodsFor: 'check design'!
+
+checkDesign
+    expression isNil ifTrue: [
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: monostable %2 has no input'
+            % {context name. entityName}; nl.
+        ^false ].
+    expression width ~=1 ifTrue: [ 
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: monostable %2 input is not single bit'
+            % {context name. entityName}; nl.
+        ^false ].
+    (expression isKindOf: ASTIdentifier) ifFalse: [
+	DANMStatistic value incError.
+        Transcript nextPutAll: 'Check design error in %1: monostable %2 input is not a wire'
+            % {context name. entityName}; nl.
+        ^false ].
+    ^super checkDesign!
 !

@@ -61,21 +61,6 @@ flip
         stimuli context: self type: #DIRECT.
         context context addStimuli: stimuli ].
     ^super flip!
-
-checkDesign
-    expression isNil ifTrue: [
-        Transcript nextPutAll: 'Check design error in %1: monostable %2 has no input'
-            % {context name. entityName}; nl.
-        ^false ].
-    expression width ~=1 ifTrue: [ 
-        Transcript nextPutAll: 'Check design error in %1: monostable %2 input is not single bit'
-            % {context name. entityName}; nl.
-        ^false ].
-    (expression isKindOf: ASTIdentifier) ifFalse: [
-        Transcript nextPutAll: 'Check design error in %1: monostable %2 input is not a wire'
-            % {context name. entityName}; nl.
-        ^false ].
-    ^super checkDesign!
 !
 
 !DANMMonostable methodsFor: 'printing'!
