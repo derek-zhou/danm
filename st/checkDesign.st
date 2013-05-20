@@ -63,7 +63,7 @@ checkDesign
     |s r|
     s := DANMCheckDesignStatistic new.
     DANMStatistic use: s during: [ r := self recursiveCheckDesign ].
-    Transcript nextPutAll: 'Check design finished for %1: %2 errors and %3 warning found' %
+    Transcript nextPutAll: 'Check design finished for %1: %2 errors and %3 warnings found' %
 	{ self referenceName. s errorCount. s warningCount }; nl. 
     ^r!
 
