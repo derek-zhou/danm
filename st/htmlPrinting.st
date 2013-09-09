@@ -20,7 +20,11 @@
 !DANMBlackBox methodsFor: 'html-printing'!
 
 generateHTML
-    |fs|
+    |fs dir|
+    "entity name may contain /, create all the dir"
+    dir := entityName copyUpToLast: $/.
+    dir = entityName ifFalse: [
+        (File name: dir) createDirectories ].
     fs := (File name: '%1.html' % {entityName}) writeStream.
     [ self printHTMLOn: fs ] ensure: [ fs close ]!
 
