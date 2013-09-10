@@ -451,8 +451,8 @@ printVerilogHeaderOn: aStream
         nextPutAll: 'module %1 (' % {self referencePrintName}; nl.
     sortedPorts do: [ :port |
         port == lastPort 
-            ifFalse: [ aStream nextPutAll: '    %1,' % {port name}; nl ]
-            ifTrue:  [ aStream nextPutAll: '    %1' % {port name} ]].
+            ifFalse: [ aStream nextPutAll: '    %1,' % {port verilogName}; nl ]
+            ifTrue:  [ aStream nextPutAll: '    %1' % {port verilogName} ]].
     aStream
         nextPutAll: ');'; nl.
     ports asSortedCollection do: [ :port |

@@ -142,10 +142,10 @@ printVerilogOn: aStream
     self width == 1 
         ifTrue: [ 
             aStream nextPutAll: '    %1 %2;' 
-                % {self direction asString. entityName}; nl]
+                % {self direction asString. self verilogName}; nl]
         ifFalse: [ 
             aStream nextPutAll: '    %1 [%2:0] %3;' 
-                % {self direction asString. w - 1. entityName}; nl]!
+                % {self direction asString. w - 1. self verilogName}; nl]!
 !
 
 DANMPort subclass: #DANMSchematicPort
