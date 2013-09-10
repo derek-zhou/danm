@@ -487,10 +487,10 @@ printInstanceVerilogOn: aStream
             port == lastPort 
                 ifFalse: [ 
                     aStream nextPutAll: '        .%1(%2),' 
-                        % {port name. ws}; nl ]
+                        % {port verilogName. ws}; nl ]
                 ifTrue: [ 
                     aStream nextPutAll: '        .%1(%2)' 
-                        % {port name. ws} ]]].
+                        % {port verilogName. ws} ]]].
     aStream
         nextPutAll: ');'; nl.
     parameters notNil ifTrue: [
