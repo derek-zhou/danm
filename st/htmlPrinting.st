@@ -69,7 +69,7 @@ printHTMLHeaderOn: aStream
                          {self fullPath. self type. self referenceName});
         nl;
         nextPutAll: ('<p>%1</p>' % {self comment});
-        nextPutAll: '<p>Defined in: %1</p><hr/>' % {reference srcPath}; nl!
+        nextPutAll: '<p>Defined in: %1</p><hr/>' % {self referencePath}; nl!
 
 printHTMLFooterOn: aStream
     aStream
@@ -114,7 +114,7 @@ printInstanceHTMLOn: aStream
     aStream 
         nextPutAll: '<h3>Instance <a name="INST_%1">%1</a>(%2) <a href="%3/%1.html">%4</a></h3>' 
         % {entityName. self referenceName. context name. self type}; nl;
-        nextPutAll: '<ul><li>Defined in: %1</li>' % {reference srcPath}; nl.
+        nextPutAll: '<ul><li>Defined in: %1</li>' % {self referencePath}; nl.
     connections size > 0 ifTrue: [ self printHTMLConnectionsOn: aStream ].
     parameters notNil ifTrue: [ self printHTMLParametersOn: aStream ].
     aStream

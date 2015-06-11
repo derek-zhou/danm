@@ -51,6 +51,9 @@ referenceName
     reference name notNil ifTrue: [ ^reference name ].
     ^entityName!
 
+referencePath
+    ^reference srcPath!
+
 type
     ^'blackbox'!
 
@@ -242,6 +245,16 @@ destroy
 
 !DANMBlackBox methodsFor: 'connecting'!
 
+renameTo: newName
+    |oldName oldContext anotherInst|
+    anotherInst := context findInstanceByName: newName.
+    anotherInst notNil ifTrue: [ 
+	self error: 'Instance by the name of %1 already exists!' % newName ].
+    oldName := entityName.
+    oldContext := context.
+    oldContext removeInstanceByName: oldName.
+    oldContext addInstance: self byName: newName!
+     
 connectWire: aWire toPort: port
     |portName|
     portName := port name.

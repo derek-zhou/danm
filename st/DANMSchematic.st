@@ -44,7 +44,7 @@ htmlRoot: str
     htmlRoot := str!
 
 emptySchematic
-    ^DANMEmptyTemplate factory produce!
+    ^DANMClasslessSchematic new elaborate!
 !
 
 !DANMSchematic methodsFor: 'init'!
@@ -60,7 +60,7 @@ init
 hierNamePrefix
     "return the name prefix when hier is flattened. In most cases the name 
      and slash should be used; however wrappers are invisible"
-    (reference isKindOf: DANMEmptyTemplate) ifFalse: [ ^entityName, '/' ].
+    (self reference isNil) ifFalse: [ ^entityName, '/' ].
     ^''!
 
 referencePrintName
@@ -74,6 +74,12 @@ referencePrintName
 
 isUniquified
     ^self uniquifiedRefName ~= self referenceName!
+
+mayMunge
+    ^true!
+
+shouldMunge
+    ^self mayMunge & ((Smalltalk getenv: 'MUNGE') = '1')!
 
 uniqueWireNameLike: wName
     |salt newName|
@@ -94,7 +100,9 @@ isFlat
 
 canBeFlatten
     "whether I can be flatten. schematic can"
-    ^true!
+    self shouldBlackBox ifFalse: [ ^true ].
+    self isUniquified ifTrue: [ ^true ].
+    ^false!
 
 canBePrintedInLine
     "whether I can be printed as inline verilog. For schematic the printing
@@ -329,6 +337,7 @@ generateSubModuleFullVerilogToDir: dirName
     instances do: [ :i |
         (i isKindOf: DANMSchematic) & i isUniquified not ifTrue: [
             i shouldBlackBox ifTrue: [
+		i shouldMunge ifTrue: [ i munge ].
 		i generateFullVerilogTo: dirName, '/', i referencePrintName, '.v' ].
 	    i generateSubModuleFullVerilogToDir: dirName ]]!
 
@@ -404,6 +413,28 @@ clearDerivedData
  to clear all that because structural change that make them stale"
     instances do: [ :i | i clearDerivedData ].
     wires do: [ :w | w clearDerivedData ]!
+
+munge
+    Transcript 
+        nextPutAll: 'Munging schematic %1 for %2' % {self referenceName.
+                                                         entityName}; nl.    
+    self 
+	flattenAll;
+	optimize;
+	obfuscate!
+
+obfuscate
+"rename all instance and wires to uninteresting name"
+    |salt|
+    salt := 0.
+    instances copy do: [ :i |
+	i renameTo: 'auto_inst_%1' % {salt}.
+	salt := salt + 1 ].
+    salt := 0.
+    wires copy do: [ :w |
+	w isPort ifFalse: [
+	    w renameTo: 'auto_wire_%1' % {salt}.
+	    salt := salt + 1 ]]!
 
 flattenAll
     self flattenAllSatisfy: [ :i | i canBeFlatten ]!
@@ -669,6 +700,37 @@ type
 
 canBeSynthesized
     ^false! 
+!
+
+DANMSchematic subclass: #DANMClasslessSchematic
+    instanceVariableNames: 'referenceName'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: ''!
+
+DANMClasslessSchematic comment:
+    'I am a schematic that has no class, but built on the fly'!
+
+!DANMClasslessSchematic methodsFor: 'accessing'!
+
+reference
+    ^nil!
+
+referenceName
+    ^referenceName!
+
+referencePath
+    ^nil!
+
+name: n
+    super name: n.
+    referenceName isNil ifTrue: [
+	referenceName := n ]!
+
+elaborate
+    self
+	clearInstances;
+	clearWires!
 !
 
 DANMSchematic subclass: #DANMReplicatedSchematic

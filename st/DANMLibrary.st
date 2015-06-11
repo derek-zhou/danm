@@ -109,32 +109,6 @@ printTextOn: aStream
     [ s nextPutAllOn: aStream ] ensure: [s close ]!
 !
 
-DANMTemplate subclass: #DANMEmptyTemplate
-    instanceVariableNames: ''
-    classVariableNames: 'factory'
-    poolDictionaries: ''
-    category: ''!
-
-DANMEmptyTemplate comment:
-    'I am used to reproduce a empty schematic'!
-
-!DANMEmptyTemplate class methodsFor: 'accessing'!
-
-factory
-    factory isNil ifTrue: [ factory := self new ].
-    ^factory!
-!
-
-!DANMEmptyTemplate methodsFor: 'producing'!
-
-produce
-    ^DANMSchematic new 
-        reference: self;
-        clearInstances;
-        clearWires;
-        yourself!
-!
-
 DANMTemplate subclass: #DANMClassicTemplate
     instanceVariableNames: ''
     classVariableNames: ''
