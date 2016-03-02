@@ -65,6 +65,10 @@ canBeSynthesized
     "whether I can be synthesized. Modeled Expression cannot"
     ^true!
 
+hasAssertion
+    "Whether I have assertion"
+    ^false!
+
 canBeFlatten
     "whether I can be flatten. black box cannot"
     ^false!
