@@ -81,7 +81,7 @@ hasAssertion
 	(each isKindOf: DANMAssertion) ifTrue: [ ^true ]].
     instances do: [ :each |
 	each hasAssertion ifTrue: [ ^true ]].
-    ^f!
+    ^false!
 
 mayMunge
     ^true!
