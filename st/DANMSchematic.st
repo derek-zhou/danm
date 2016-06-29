@@ -89,6 +89,12 @@ mayMunge
 shouldMunge
     ^self mayMunge & ((Smalltalk getenv: 'MUNGE') = '1')!
 
+shouldObfuscate
+    ^(Smalltalk getenv: 'OBFUSCATE') = '1'!
+
+skipBlackBox
+    ^(Smalltalk getenv: 'SKIPBLACKBOX') = '1'!
+
 uniqueWireNameLike: wName
     |salt newName|
     generatedNames isNil ifTrue: [
@@ -371,7 +377,7 @@ printFullVerilogOn: fs
         i canBePrintedInLine 
             ifTrue: [ i printFullVerilogOn: fs ]
             ifFalse: [ 
-                i shouldBlackBox & 
+                self skipBlackBox not & i shouldBlackBox & 
                     i isUniquified not ifTrue: [
                         i printBlackBoxVerilogOn: fs ]]]!
 
@@ -430,8 +436,9 @@ munge
                                                          entityName}; nl.    
     self 
 	flattenAll;
-	optimize;
-	obfuscate!
+	optimize.
+    self shouldObfuscate ifTrue: [
+	self obfuscate ]!
 
 obfuscate
 "rename all instance and wires to uninteresting name"
