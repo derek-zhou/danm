@@ -80,6 +80,7 @@ canBePrintedInLine
     reference srcPath isNil ifTrue: [ ^false ].
     self shouldBlackBox ifTrue: [ ^false ]. 
     self shouldNotPrint ifTrue: [ ^false ]. 
+    (Smalltalk getenv: 'SKIPBLACKBOX') = '1' ifTrue: [ ^false ].
     (File name: reference srcPath) size > 8192 ifTrue: [ 
         Transcript nextPutAll: 'Warning: verilog source %1 for module %2 will not be printed inline because it is big' 
             % {reference srcPath. entityName}; nl.
