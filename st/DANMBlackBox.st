@@ -93,6 +93,9 @@ shouldBlackBox
 shouldNotPrint
     ^((self hasParameter: 'omit') and: [ (self parameterValue: 'omit') = 1 ])! 
 
+shouldPrintParameterInVerilog
+    ^true!
+
 topPath
     context isNil ifTrue: [ ^'' ].
     ^context topPath, '../'!
@@ -475,7 +478,7 @@ printVerilogHeaderOn: aStream
         nextPutAll: ');'; nl.
     ports asSortedCollection do: [ :port |
         port printVerilogOn: aStream ].
-    parameters notNil ifTrue: [
+    self shouldPrintParameterInVerilog & parameters notNil ifTrue: [
         parameters keys asSortedCollection do: [ :k |
             aStream nextPutAll: '    parameter %1 = %2;' 
                 % {k. self parameter: k}; nl ]]!
@@ -511,7 +514,7 @@ printInstanceVerilogOn: aStream
                         % {port verilogName. ws} ]]].
     aStream
         nextPutAll: ');'; nl.
-    parameters notNil ifTrue: [
+    self shouldPrintParameterInVerilog & parameters notNil ifTrue: [
         parameters keys asSortedCollection do: [ :k |
             "those 2 parameters are used for controlling printing only"
             (k = 'omit') | (k = 'opaque') ifFalse: [ 

@@ -95,6 +95,10 @@ shouldObfuscate
 skipBlackBox
     ^(Smalltalk getenv: 'SKIPBLACKBOX') = '1'!
 
+"st module has all parameter passed down and expanded, no need to print again"
+shouldPrintParameterInVerilog
+    ^false!
+
 uniqueWireNameLike: wName
     |salt newName|
     generatedNames isNil ifTrue: [
