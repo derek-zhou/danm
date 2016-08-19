@@ -367,9 +367,9 @@ if it gets longer"
 ' % {DateTime now}.
     self hasAssertion ifTrue: [
     fs nextPutAll: '
-`define ASSERT(condition, hier) always @(condition) \
+`define ASSERT(condition) always @(condition) \
    if (!condition) begin \
-      $display("Assertion failure: condition in hier"); \
+      $display("Assertion failure: condition in %m"); \
       #100; \
       $finish; \
    end

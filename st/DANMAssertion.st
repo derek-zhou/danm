@@ -62,6 +62,5 @@ printHTMLHeadOn: aStream
 
 basicPrintVerilogOn: aStream
     super basicPrintVerilogOn: aStream.
-    aStream nextPutAll: '`ASSERT(%1, %2)' % 
-        {self verilogName. self context fullPath}; nl!
+    aStream nextPutAll: '`ASSERT(%1)' % {self verilogName}; nl!
 !
