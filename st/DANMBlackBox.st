@@ -94,6 +94,7 @@ shouldNotPrint
     ^((self hasParameter: 'omit') and: [ (self parameterValue: 'omit') = 1 ])! 
 
 shouldPrintParameterInVerilog
+    self shouldBlackBox ifTrue: [ ^false ].
     ^true!
 
 topPath
