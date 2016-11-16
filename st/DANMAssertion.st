@@ -62,5 +62,8 @@ printHTMLHeadOn: aStream
 
 basicPrintVerilogOn: aStream
     super basicPrintVerilogOn: aStream.
-    aStream nextPutAll: '`ASSERT(%1)' % {self verilogName}; nl!
+    aStream
+	nextPutAll: '// synopsys translate_off'; nl;
+	nextPutAll: '`ASSERT(%1)' % {self verilogName}; nl;
+	nextPutAll: '// synopsys translate_on'; nl!
 !
