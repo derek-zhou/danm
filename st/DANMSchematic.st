@@ -368,7 +368,7 @@ if it gets longer"
     self hasAssertion ifTrue: [
     fs nextPutAll: '
 `define ASSERT(condition) always @(condition) \
-   if (($stime > 0)&&((condition===1''b0)||(condition===1''bx))) begin \
+   if (($stime > 100)&&((condition===1''b0)||(condition===1''bx))) begin \
       $display("Assertion failure at %d: condition in %m", $stime); \
       $finish; \
    end
