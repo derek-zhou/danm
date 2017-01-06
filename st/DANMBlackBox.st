@@ -467,9 +467,6 @@ printVerilogHeaderOn: aStream
         lastPort := sortedPorts last ].
     aStream 
         nl;
-        nextPutAll: '/**'; nl;
-        nextPutAll: self comment; nl;
-        nextPutAll: '*/'; nl;
         nextPutAll: 'module %1 (' % {self referencePrintName}; nl.
     sortedPorts do: [ :port |
         port == lastPort 
