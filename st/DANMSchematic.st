@@ -28,7 +28,7 @@ DANMCurrentDesign comment:
 
 DANMBlackBox subclass: #DANMSchematic
              instanceVariableNames: 'instances wires userData generatedNames'
-             classVariableNames: 'htmlRoot'
+             classVariableNames: ''
              poolDictionaries: ''
              category: 'DANM'!
 
@@ -36,12 +36,6 @@ DANMSchematic comment: 'I am a module that is modeled by a schematic
 containing instances of modules and the wires among them.'!
 
 !DANMSchematic class methodsFor: 'accessing'!
-
-htmlRoot
-    ^htmlRoot!
-
-htmlRoot: str
-    htmlRoot := str!
 
 emptySchematic
     ^DANMClasslessSchematic new elaborate!
