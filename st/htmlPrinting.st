@@ -166,10 +166,6 @@ printFullHTMLHierOn: aStream
     aStream 
         nextPutAll: '<html><head>'; nl;
         nextPutAll: '<title>Module Hierachy</title>'; nl;
-        nextPutAll: '<script type="text/javascript" src="%1/js/jquery-1.4.2.js"></script>' 
-        % {htmlRoot}; nl;
-        nextPutAll: '<script type="text/javascript" src="%1/js/jquery.jstree.js"></script>' 
-        % {htmlRoot}; nl;
         nextPutAll: '</head><body>'; nl;
         nextPutAll: '<p><a href="hierarchy.html">Hierarchy</a> | <a href="%1.html">Top</a></p>' 
         % {self name}; nl;
@@ -231,11 +227,11 @@ printHTMLInstanceSummaryOn: aStream
         nl!
 
 printHTMLHierOn: aStream
+    instances size = 0 ifTrue: [ ^self ].
     aStream nextPutAll: '<ul>'; nl.
     instances asSortedCollection do: [ :i |
-        aStream 
-            nextPutAll: '<li><a href="%1/%2.html"><img src="%3/img/%4.png">%2 (%5)</a>' % 
-            {self fullPath. i name. htmlRoot. i type. i referenceName};
+	aStream
+	    nextPutAll: '<li><a href="%1/%2.html">%2 (%3)</a>' % {self fullPath. i name. i referenceName};
             nl.
         i printHTMLHierOn: aStream.
         aStream 
