@@ -17,398 +17,502 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-DANMSchematic methodsFor: 'connecting'!
+DANMSchematic extend [
 
-connect: pinNames
-    ^self connectPins: (pinNames collect: [ :each|
-        self pinFromString: each ])!
+    connect: pinNames [
+	<category: 'connecting'>
+	^self connectPins: (pinNames collect: [:each | self pinFromString: each])
+    ]
 
-connect: pinNames name: wName
-    ^self connectPins: (pinNames collect: [ :each|
-        self pinFromString: each ])
-         name: wName!
+    connect: pinNames name: wName [
+	<category: 'connecting'>
+	^self connectPins: (pinNames collect: [:each | self pinFromString: each])
+	      name: wName
+    ]
 
-connect: pinNames to: expression
-    ^self connectPins: (pinNames collect: [ :each|
-        self pinFromString: each ])
-          to: expression!
-    
-connectPins: pins to: expression
-    |wName|
-    pins size > 0 ifFalse: [ 
-        self error: 'No pin to connect' ].
-    wName := (pins at: 1) name.
-    wName := self uniqueWireNameLike: wName.
-    ^self connectPins: pins to: expression name: wName!
+    connect: pinNames to: expression [
+	<category: 'connecting'>
+	^self connectPins: (pinNames collect: [:each | self pinFromString: each])
+	      to: expression
+    ]
 
-connect: pinNames to: expression name: wName
-    ^self connectPins: (pinNames collect: [ :each|
-        self pinFromString: each ])
-          to: expression name: wName!
+    connectPins: pins to: expression [
+	<category: 'connecting'>
+	| wName |
+	pins size > 0 ifFalse: [self error: 'No pin to connect'].
+	wName := (pins at: 1) name.
+	wName := self uniqueWireNameLike: wName.
+	^self connectPins: pins
+	      to: expression
+	      name: wName
+    ]
 
-connectPins: pins
-    |wName|
-    pins size > 0 ifFalse: [ 
-        self error: 'No pin to connect' ].
-    wName := (pins at: 1) name.
-    wName := self uniqueWireNameLike: wName.
-    ^self connectPins: pins name: wName!
+    connect: pinNames to: expression name: wName [
+	<category: 'connecting'>
+	^self connectPins: (pinNames collect: [:each | self pinFromString: each])
+	      to: expression
+	      name: wName
+    ]
 
-connectPins: pins name: wName
-    |wire|
-    wire := DANMWire newNamed: wName inContext: self.
-    wire connectPins: pins.
-    ^wire!
+    connectPins: pins [
+	<category: 'connecting'>
+	| wName |
+	pins size > 0 ifFalse: [self error: 'No pin to connect'].
+	wName := (pins at: 1) name.
+	wName := self uniqueWireNameLike: wName.
+	^self connectPins: pins name: wName
+    ]
 
-connectPins: pins to: exp name: wName
-    |wire|
-    wire := self let: wName be: exp.
-    wire connectPins: pins.
-    ^wire!
+    connectPins: pins name: wName [
+	<category: 'connecting'>
+	| wire |
+	wire := DANMWire newNamed: wName inContext: self.
+	wire connectPins: pins.
+	^wire
+    ]
 
-let: wName be: mName on: conns
-    self let: wName be: mName on: conns with: #()!
+    connectPins: pins to: exp name: wName [
+	<category: 'connecting'>
+	| wire |
+	wire := self let: wName be: exp.
+	wire connectPins: pins.
+	^wire
+    ]
 
-let: wName be: mName on: conns with: params
-    |module oPort wire|
-    module := self addInstanceOf: mName.
-    module setParameters: params.
-    oPort := module getOutputPort.
-    wire := DANMWire newNamed: wName inContext: self.
-    wire connectPort: oPort.
-    module connectWire: wire toPort: oPort.
-    "connect all inputs"
-    conns do: [ :each |
-        | port exp|
-        port := module portByName: each key.
-        exp := (ExpressionAST newFrom: each value).
-        self connectInstance: module port: port to: exp ].
-    "connect all unconnected inputs"
-    self autoConnect: module!
-    
-connectInstance: module port: port to: exp
-    |wire wName|
-    (exp isKindOf: ASTIdentifier) 
-        ifTrue: [
-            wire := exp identifier.
-            exp destroy ]
-        ifFalse: [
-            wName := self uniqueWireNameLike: module name, '/', port name.
-            wire := DANMExpressionWire newNamed: wName inContext: self.
-            wire expression: exp ].
-    wire connectPort: port.
-    module connectWire: wire toPort: port!
+    let: wName be: mName on: conns [
+	<category: 'connecting'>
+	self let: wName
+	     be: mName
+	     on: conns
+	     with: #()
+    ]
 
-assert: exp
-    |wire e wName|
-    e := ExpressionAST newFrom: exp.
-    (e isKindOf: ASTIdentifier) 
-        ifTrue: [ wName := 'ASSERT_' , e identifier name ]
-        ifFalse: [ wName := self uniqueWireNameLike: 'ASSERT'].
-    wire := DANMAssertion newNamed: wName inContext: self.
-    wire expression: e.
-    ^wire!
-    
-let: wName beAssertion: exp
-    |wire e|
-    wire := DANMAssertion newNamed: wName inContext: self.
-    wire expression: (ExpressionAST newFrom: exp).
-    ^wire!
+    let: wName be: mName on: conns with: params [
+	<category: 'connecting'>
+	| module oPort wire |
+	module := self addInstanceOf: mName.
+	module setParameters: params.
+	oPort := module getOutputPort.
+	wire := DANMWire newNamed: wName inContext: self.
+	wire connectPort: oPort.
+	module connectWire: wire toPort: oPort.
+	"connect all inputs"
+	conns do: [ :each | 
+	    | port exp |
+	    port := module portByName: each key.
+	    exp := ExpressionAST newFrom: each value.
+	    self connectInstance: module
+		 port: port
+		 to: exp].
+	"connect all unconnected inputs"
+	self autoConnect: module
+    ]
 
-let: wName be: exp resetAfter: delay
-    |wire e|
-    wire := DANMMonostable newNamed: wName inContext: self.
-    wire expression: (ExpressionAST newFrom: exp).
-    wire delay: delay.
-    ^wire!
-    
-let: wName be: exp delay: delay
-    |wire e|
-    wire := DANMDelayLine newNamed: wName inContext: self.
-    wire expression: (ExpressionAST newFrom: exp).
-    wire delay: delay.
-    ^wire!
-    
-let: wName be: exp
-    |wire e|
-    e := ExpressionAST newFrom: exp.
-    ((e isKindOf: ASTIdentifier) and: [
-        e identifier isPort not & e identifier isSystemNamed ]) ifTrue: [
-             "a = b while b is not exposed, so just rename b to a"
-             e destroy.
-             ^e identifier renameTo: wName ].
-    wire := DANMExpressionWire newNamed: wName inContext: self.
-    wire expression: e.
-    ^wire!
+    connectInstance: module port: port to: exp [
+	<category: 'connecting'>
+	| wire wName |
+	(exp isKindOf: ASTIdentifier)
+	    ifTrue: [
+		wire := exp identifier.
+		exp destroy]
+	    ifFalse: [
+		wName := self uniqueWireNameLike: module name , '/' , port name.
+		wire := DANMExpressionWire newNamed: wName inContext: self.
+		wire expression: exp].
+	wire connectPort: port.
+	module connectWire: wire toPort: port
+    ]
 
-defaultClock: clk
-    self userDataAt: 'defaultClock' put: clk!
+    assert: exp [
+	<category: 'connecting'>
+	| wire e wName |
+	e := ExpressionAST newFrom: exp.
+	(e isKindOf: ASTIdentifier) 
+	    ifTrue: [wName := 'ASSERT_' , e identifier name]
+	    ifFalse: [wName := self uniqueWireNameLike: 'ASSERT'].
+	wire := DANMAssertion newNamed: wName inContext: self.
+	wire expression: e.
+	^wire
+    ]
 
-defaultClock
-    ^ self userDataAt: 'defaultClock' ifAbsent: [ 
-        self error: 'no default clock defined' ]!
+    let: wName beAssertion: exp [
+	<category: 'connecting'>
+	| wire e |
+	wire := DANMAssertion newNamed: wName inContext: self.
+	wire expression: (ExpressionAST newFrom: exp).
+	^wire
+    ]
 
-let: wName beClocked: exp
-    ^self let: wName be: exp clockedBy: (self defaultClock)!
+    let: wName be: exp resetAfter: delay [
+	<category: 'connecting'>
+	| wire e |
+	wire := DANMMonostable newNamed: wName inContext: self.
+	wire expression: (ExpressionAST newFrom: exp).
+	wire delay: delay.
+	^wire
+    ]
 
-let: wName beLatched: exp
-    ^self let: wName be: exp latchedBy: (self defaultClock)!
+    let: wName be: exp delay: delay [
+	<category: 'connecting'>
+	| wire e |
+	wire := DANMDelayLine newNamed: wName inContext: self.
+	wire expression: (ExpressionAST newFrom: exp).
+	wire delay: delay.
+	^wire
+    ]
 
-let: wName be: exp clockedBy: clk
-    |wire|
-    wire := DANMFlipflop newNamed: wName inContext: self.
-    wire expression: (ExpressionAST newFrom: exp).
-    wire clock: (ExpressionAST newFrom: clk).
-    ^wire!
+    let: wName be: exp [
+	<category: 'connecting'>
+	| wire e |
+	e := ExpressionAST newFrom: exp.
+	((e isKindOf: ASTIdentifier) and: [e identifier isPort not & e identifier isSystemNamed]) 
+	    ifTrue: [
+		"a = b while b is not exposed, so just rename b to a"
+		e destroy.
+		^e identifier renameTo: wName].
+	wire := DANMExpressionWire newNamed: wName inContext: self.
+	wire expression: e.
+	^wire
+    ]
 
-let: wName be: exp latchedBy: clk
-    |wire|
-    wire := DANMLatch newNamed: wName inContext: self.
-    wire expression: (ExpressionAST newFrom: exp).
-    wire clock: (ExpressionAST newFrom: clk).
-    ^wire!
+    defaultClock: clk [
+	<category: 'connecting'>
+	self userDataAt: 'defaultClock' put: clk
+    ]
 
-let: wName beIfs: ifs
-    ^ self let: wName be: (ASTIfsOp newIfs: ifs)!
+    defaultClock [
+	<category: 'connecting'>
+	^self userDataAt: 'defaultClock' ifAbsent: [
+	    self error: 'no default clock defined']
+    ]
 
-let: wName beClockedIfs: ifs
-    ^self let: wName be: (ASTIfsOp newIfs: ifs) 
-          clockedBy: (self defaultClock)!
-    
-let: wName beLatchedIfs: ifs
-    ^self let: wName be: (ASTIfsOp newIfs: ifs) 
-          latchedBy: (self defaultClock)!
-    
-let: wName beIfs: ifs clockedBy: clk
-    ^ self let: wName be: (ASTIfsOp newIfs: ifs) clockedBy: clk!
+    let: wName beClocked: exp [
+	<category: 'connecting'>
+	^self let: wName
+	      be: exp
+	      clockedBy: self defaultClock
+    ]
 
-let: wName beIfs: ifs latchedBy: clk
-    ^ self let: wName be: (ASTIfsOp newIfs: ifs) latchedBy: clk!
+    let: wName beLatched: exp [
+	<category: 'connecting'>
+	^self let: wName
+	      be: exp
+	      latchedBy: self defaultClock
+    ]
 
-let: wName beCases: table on: subject
-    ^self let: wName be: (ASTCasesOp newCases: table on: subject)!
+    let: wName be: exp clockedBy: clk [
+	<category: 'connecting'>
+	| wire |
+	wire := DANMFlipflop newNamed: wName inContext: self.
+	wire expression: (ExpressionAST newFrom: exp).
+	wire clock: (ExpressionAST newFrom: clk).
+	^wire
+    ]
 
-let: wName beClockedCases: table on: subject
-    ^self let: wName be: (ASTCasesOp newCases: table on: subject)
-          clockedBy: (self defaultClock)!
+    let: wName be: exp latchedBy: clk [
+	<category: 'connecting'>
+	| wire |
+	wire := DANMLatch newNamed: wName inContext: self.
+	wire expression: (ExpressionAST newFrom: exp).
+	wire clock: (ExpressionAST newFrom: clk).
+	^wire
+    ]
 
-let: wName beLatchedCases: table on: subject
-    ^self let: wName be: (ASTCasesOp newCases: table on: subject)
-          latchedBy: (self defaultClock)!
+    let: wName beIfs: ifs [
+	<category: 'connecting'>
+	^self let: wName be: (ASTIfsOp newIfs: ifs)
+    ]
 
-let: wName beCases: table on: subject clockedBy: clk
-    ^self let: wName be: (ASTCasesOp newCases: table on: subject) 
-          clockedBy: clk!
+    let: wName beClockedIfs: ifs [
+	<category: 'connecting'>
+	^self let: wName be: (ASTIfsOp newIfs: ifs) clockedBy: self defaultClock
+    ]
 
-let: wName beCases: table on: subject latchedBy: clk
-    ^self let: wName be: (ASTCasesOp newCases: table on: subject) 
-          latchedBy: clk!
+    let: wName beLatchedIfs: ifs [
+	<category: 'connecting'>
+	^self let: wName be: (ASTIfsOp newIfs: ifs) latchedBy: self defaultClock
+    ]
 
-let: wName beRetimingOf: w by: n 
-    ^(self retime: w by: n) renameTo: wName!
+    let: wName beIfs: ifs clockedBy: clk [
+	<category: 'connecting'>
+	^self let: wName be: (ASTIfsOp newIfs: ifs) clockedBy: clk
+    ]
 
-let: wName beRetimingOf: w by: n valid: v
-    ^(self retime: w by: n valid: v) renameTo: wName!
+    let: wName beIfs: ifs latchedBy: clk [
+	<category: 'connecting'>
+	^self let: wName be: (ASTIfsOp newIfs: ifs) latchedBy: clk
+    ]
 
-let: wName beRetimingOf: w by: n strobe: s
-    ^(self retime: w by: n strobe: s) renameTo: wName!
+    let: wName beCases: table on: subject [
+	<category: 'connecting'>
+	^self let: wName be: (ASTCasesOp newCases: table on: subject)
+    ]
 
-let: wName beRetimingOf: w by: n valid: v strobe: s
-    ^(self retime: w by: n valid: v strobe: s) renameTo: wName!
+    let: wName beClockedCases: table on: subject [
+	<category: 'connecting'>
+	^self let: wName be: (ASTCasesOp newCases: table on: subject) clockedBy: self defaultClock
+    ]
 
-let: wName beRetimingOf: w on: clk by: n 
-    ^(self retime: w on: clk by: n) renameTo: wName!
+    let: wName beLatchedCases: table on: subject [
+	<category: 'connecting'>
+	^self let: wName be: (ASTCasesOp newCases: table on: subject) latchedBy: self defaultClock
+    ]
 
-let: wName beRetimingOf: w on: clk by: n valid: v
-    ^(self retime: w on: clk by: n valid: v) renameTo: wName!
+    let: wName beCases: table on: subject clockedBy: clk [
+	<category: 'connecting'>
+	^self let: wName be: (ASTCasesOp newCases: table on: subject) clockedBy: clk
+    ]
 
-let: wName beRetimingOf: w on: clk by: n strobe: s
-    ^(self retime: w on: clk by: n strobe: s) renameTo: wName!
+    let: wName beCases: table on: subject latchedBy: clk [
+	<category: 'connecting'>
+	^self let: wName be: (ASTCasesOp newCases: table on: subject) latchedBy: clk
+    ]
 
-let: wName beRetimingOf: w on: clk by: n valid: v strobe: s
-    ^(self retime: w on: clk by: n valid: v strobe: s) renameTo: wName!
+    let: wName beRetimingOf: w by: n [
+	<category: 'connecting'>
+	^(self retime: w by: n) renameTo: wName
+    ]
 
-let: wName beFSM: fsm
-    ^self let: wName beFSM: fsm clockedBy: (self defaultClock)!
+    let: wName beRetimingOf: w by: n valid: v [
+	<category: 'connecting'>
+	^(self retime: w by: n valid: v) renameTo: wName
+    ]
 
-let: wName beFSM: fsm clockedBy: clk
-    |wire width counter cases choices state exp|
-    cases := OrderedCollection new.
-    choices := OrderedCollection new.
-    width := (fsm size log: 2) ceiling.
-    counter := 0.
-    fsm do: [ :each |
-        wire := DANMMacro newNamed: each key inContext: self.
-        state := (ASTConstant newConstant: counter width: width).
-        wire expression: state.
-        counter := counter + 1.
-        cases add: (ASTIdentifier basicNewIdentifier: wire).
-        choices add: (ExpressionAST newFrom: each value) ].
-    "must have default, so FSM will not stuck"
-    cases add: ASTDefault new.
-    choices add: (ASTConstant newConstant: 0 width: width).
-    exp := (ASTCasesOp newSubject: (ASTIdentifier newIdentifier: wName)
-                       cases: cases choices: choices).
-    wire := self let: 'next_',wName be: exp.
-    wire := wire defaultTo: (ASTIdentifier newIdentifier: wName).
-    ^self let: wName be: wire clockedBy: clk!
-                     
-retime: w by: n
-    ^self retime: w on: (self defaultClock) by: n!
+    let: wName beRetimingOf: w by: n strobe: s [
+	<category: 'connecting'>
+	^(self retime: w by: n strobe: s) renameTo: wName
+    ]
 
-retime: w on: clk by: n
-    |wire name|
-    wire := self getWire: w.
-    name := wire name.
-    1 to: n do: [ :i |
-        wire := self let: ('%1_rt%2' % {name. i}) 
-                     be: (ASTIdentifier basicNewIdentifier: wire) 
-                     clockedBy: clk ].
-    ^wire!
-    
-retime: w by: n strobe: s
-    ^self retime: w on: (self defaultClock) by: n strobe: s!
+    let: wName beRetimingOf: w by: n valid: v strobe: s [
+	<category: 'connecting'>
+	^(self retime: w by: n valid: v strobe: s) renameTo: wName
+    ]
 
-retime: w on: clk by: n strobe: s
-    |wire name|
-    wire := self getWire: w.
-    name := wire name.
-    1 to: n do: [ :i |
-        wire := self let: ('%1_rt%2' % {name. i}) 
-                     beIfs: {s -> (ASTIdentifier 
-                                       basicNewIdentifier: wire)} 
-                     clockedBy: clk ].
-    ^wire!
-    
-retime: w on: clk by: n valid: v
-    ^self retime: w on: (self defaultClock) by: n valid: v!
+    let: wName beRetimingOf: w on: clk by: n [
+	<category: 'connecting'>
+	^(self retime: w on: clk by: n) renameTo: wName
+    ]
 
-retime: w on: clk by: n valid: v
-    |wire name vWire vName|
-    wire := self getWire: w.
-    vWire := self getWire: v.
-    name := wire name.
-    vName := vWire name.
-    1 to: n do: [ :i |
-        wire := self let: ('%1_rt%2' % {name. i}) 
-                     beIfs: {vWire name -> 
-                                 (ASTIdentifier basicNewIdentifier: wire)}
-                     clockedBy: clk.
-        vWire := self let: ('%1_rt%2' % {vName. i}) 
-                      be: (ASTIdentifier basicNewIdentifier: vWire) 
-                      clockedBy: clk ].
-    ^wire!
+    let: wName beRetimingOf: w on: clk by: n valid: v [
+	<category: 'connecting'>
+	^(self retime: w on: clk by: n valid: v) renameTo: wName
+    ]
 
-retime: w on: clk by: n valid: v strobe: s
-    ^self retime: w on: (self defaultClock) by: n valid: v strobe: s!
+    let: wName beRetimingOf: w on: clk by: n strobe: s [
+	<category: 'connecting'>
+	^(self retime: w on: clk by: n strobe: s) renameTo: wName
+    ]
 
-retime: w on: clk by: n valid: v strobe: s
-    |wire name vWire vName|
-    wire := self getWire: w.
-    vWire := self getWire: v.
-    name := wire name.
-    vName := vWire name.
-    1 to: n do: [ :i |
-        wire := self let: ('%1_rt%2' % {name. i}) 
-                     beIfs: {'%1&(%2)' %{vWire name. s} -> 
-                                 (ASTIdentifier basicNewIdentifier: wire)}
-                     clockedBy: clk.
-        vWire := self let: ('%1_rt%2' % {vName. i}) 
-                      beIfs: {s -> (ASTIdentifier 
-                                        basicNewIdentifier: vWire)} 
-                      clockedBy: clk ].
-    ^wire!
-    
-"connect all unconnected input port"
-autoConnect: mod
-    mod ports keys do: [ :pName |
-        |port wire |
-        port := mod portByName: pName.
-        (port isInput and: [(mod wireOnPort: port) isNil]) ifTrue: [
-            wire := self findWireByName: pName.
-            (wire notNil and: [wire width == port width]) ifTrue: [
-                wire connectPort: port.
-                mod connectWire: wire toPort: port ]]]!
+    let: wName beRetimingOf: w on: clk by: n valid: v strobe: s [
+	<category: 'connecting'>
+	^(self retime: w on: clk by: n valid: v strobe: s) renameTo: wName
+    ]
 
-autoConnect
-    |allPinNames|
-    allPinNames := self allPinNames.
-    allPinNames do: [ :pName|
-        self tryConnect: pName ]!
+    let: wName beFSM: fsm [
+	<category: 'connecting'>
+	^self let: wName beFSM: fsm clockedBy: self defaultClock
+    ]
 
-tryConnect: pName
-    |pins width driverCount wire pin|
-    pins := self allUnconnectedPinsWithName: pName.
-    pins size == 0 ifTrue: [ ^self ].
-    width := (pins at: 1) width.
-    wire := self findWireByName: pName.
-    driverCount := 0.
-    (wire notNil and: [ wire isDrivenInternally ]) ifTrue: [
-        driverCount := 1 ].
-    1 to: pins size do: [ :i |
-        pin := pins at: i.
-        (pin width == width) ifFalse: [ ^self ].
-        pin isOutput ifTrue: [ driverCount := driverCount + 1 ]].
-    "if there is no driver but it is a port, then we can assume the port will
-     drive"
-    driverCount == 0 & (self findPortByName: pName) notNil ifTrue: [
-        driverCount := 1 ].
-    driverCount == 1 ifFalse: [ ^self ].
-    "All check passed, connect them"
-    self connectPins: pins name: pName!
+    let: wName beFSM: fsm clockedBy: clk [
+	<category: 'connecting'>
+	| wire width counter cases choices state exp |
+	cases := OrderedCollection new.
+	choices := OrderedCollection new.
+	width := (fsm size log: 2) ceiling.
+	counter := 0.
+	fsm do: [ :each | 
+	    wire := DANMMacro newNamed: each key inContext: self.
+	    state := ASTConstant newConstant: counter width: width.
+	    wire expression: state.
+	    counter := counter + 1.
+	    cases add: (ASTIdentifier basicNewIdentifier: wire).
+	    choices add: (ExpressionAST newFrom: each value)].
+	"must have default, so FSM will not stuck"
+	cases add: ASTDefault new.
+	choices add: (ASTConstant newConstant: 0 width: width).
+	exp := ASTCasesOp newSubject: (ASTIdentifier newIdentifier: wName) cases: cases choices: choices.
+	wire := self let: 'next_' , wName be: exp.
+	wire := wire defaultTo: (ASTIdentifier newIdentifier: wName).
+	^self let: wName be: wire clockedBy: clk
+    ]
 
-tryConnectInputs: pName
-    |pins width|
-    pins := self allUnconnectedInputPinsWithName: pName.
-    pins size == 0 ifTrue: [ ^self ].
-    width := (pins at: 1) width.
-    pins do: [ :each |
-        (each width == width) ifFalse: [ ^self ]].
-    "All check passed, connect them"
-    self connectPins: pins name: pName!
+    retime: w by: n [
+	<category: 'connecting'>
+	^self retime: w on: self defaultClock by: n
+    ]
 
-expose: wName
-    (self wireByName: wName) expose!
+    retime: w on: clk by: n [
+	<category: 'connecting'>
+	| wire name |
+	wire := self getWire: w.
+	name := wire name.
+	1 to: n do: [:i | 
+	    wire := self let: '%1_rt%2' % {name. i}
+			 be: (ASTIdentifier basicNewIdentifier: wire)
+			 clockedBy: clk].
+	^wire
+    ]
 
-conceal: wName
-    (self wireByName: wName) conceal!
+    retime: w by: n strobe: s [
+	<category: 'connecting'>
+	^self retime: w on: self defaultClock by: n strobe: s
+    ]
 
-reset: wName byLow: reset to: resetTo
-    |w|
-    w := self wireByName: wName.
-    (w isKindOf: DANMFlipflop) ifFalse: [
-        self error: 'Only flop is resettable. Got: %1' % {wName} ].
-    (self wireByName: wName) resetBy: (ExpressionAST newFrom: reset) 
-                             to: (ExpressionAST newFrom: resetTo)!
+    retime: w on: clk by: n strobe: s [
+	<category: 'connecting'>
+	| wire name |
+	wire := self getWire: w.
+	name := wire name.
+	1 to: n do: [:i | 
+	    wire := self let: '%1_rt%2' % {name. i}
+			 beIfs: {s -> (ASTIdentifier basicNewIdentifier: wire)}
+			 clockedBy: clk].
+	^wire
+    ]
 
-default: wName to: d
-    |w|
-    w := self wireByName: wName.
-    (w isKindOf: DANMExpressionWire) ifFalse: [
-        self error: 'Only wire with expression can have default. Got: %1' 
-            % {wName} ].
-    (self wireByName: wName) defaultTo: (ExpressionAST newFrom: d)!
-    
-syncReset: wName by: reset to: resetTo
-    |w|
-    w := self wireByName: wName.
-    w expression: (ASTIfsOp newIfs: {reset -> resetTo.
-                                     1 -> w expression})!
+    retime: w on: clk by: n valid: v [
+	<category: 'connecting'>
+	| wire name vWire vName |
+	wire := self getWire: w.
+	vWire := self getWire: v.
+	name := wire name.
+	vName := vWire name.
+	1 to: n do: [:i | 
+	    wire := self let: '%1_rt%2' % {name. i}
+			 beIfs: {vWire name -> (ASTIdentifier basicNewIdentifier: wire)}
+			 clockedBy: clk.
+	    vWire := self let: '%1_rt%2' % {vName. i}
+			  be: (ASTIdentifier basicNewIdentifier: vWire)
+			  clockedBy: clk].
+	^wire
+    ]
 
-autoExposeInputs
-    |allPinNames|
-    allPinNames := self allPinNames.
-    allPinNames do: [ :pName|
-        |wire|
-        wire := self findWireByName: pName.
-        (wire isNil or: [wire isDriven not])  ifTrue: [
-            self tryConnectInputs: pName ]].
-    wires do: [ :wire|
-        (wire shouldConceal not & wire isExposed not and: [wire isDriven not]) 
-            ifTrue: [ wire expose ]]!
+    retime: w on: clk by: n valid: v strobe: s [
+	<category: 'connecting'>
+	| wire name vWire vName |
+	wire := self getWire: w.
+	vWire := self getWire: v.
+	name := wire name.
+	vName := vWire name.
+	1 to: n do: [ :i | 
+	    wire := self let: '%1_rt%2' % {name. i}
+			 beIfs: {'%1&(%2)' % {vWire name. s} ->
+				     (ASTIdentifier basicNewIdentifier: wire)}
+			 clockedBy: clk.
+		vWire := self let: '%1_rt%2' % {vName. i}
+			      beIfs: {s -> (ASTIdentifier basicNewIdentifier: vWire)}
+			      clockedBy: clk].
+	^wire
+    ]
 
-autoExposeOutputs
-    wires do: [ :wire|
-        (wire shouldConceal not & wire isExposed not and: [wire isLoaded not])
-            ifTrue: [ wire expose ]]!
-!
+    autoConnect: mod [
+	<category: 'connecting'>
+	mod ports keys do: [ :pName | 
+	    | port wire |
+	    port := mod portByName: pName.
+	    (port isInput and: [(mod wireOnPort: port) isNil]) ifTrue: [
+		wire := self findWireByName: pName.
+		(wire notNil and: [wire width == port width]) ifTrue: [
+		    wire connectPort: port.
+		    mod connectWire: wire toPort: port]]]
+    ]
+
+    autoConnect [
+	<category: 'connecting'>
+	| allPinNames |
+	allPinNames := self allPinNames.
+	allPinNames do: [:pName | self tryConnect: pName]
+    ]
+
+    tryConnect: pName [
+	<category: 'connecting'>
+	| pins width driverCount wire pin |
+	pins := self allUnconnectedPinsWithName: pName.
+	pins size == 0 ifTrue: [^self].
+	width := (pins at: 1) width.
+	wire := self findWireByName: pName.
+	driverCount := 0.
+	(wire notNil and: [wire isDrivenInternally]) ifTrue: [driverCount := 1].
+	1 to: pins size do: [ :i | 
+	    pin := pins at: i.
+	    pin width == width ifFalse: [^self].
+	    pin isOutput ifTrue: [driverCount := driverCount + 1]].
+	"if there is no driver but it is a port, then we can assume the port will
+	 drive"
+	driverCount == 0 & (self findPortByName: pName) notNil ifTrue: [
+	    driverCount := 1].
+	driverCount == 1 ifFalse: [^self].
+	"All check passed, connect them"
+	self connectPins: pins name: pName
+    ]
+
+    tryConnectInputs: pName [
+	<category: 'connecting'>
+	| pins width |
+	pins := self allUnconnectedInputPinsWithName: pName.
+	pins size == 0 ifTrue: [^self].
+	width := (pins at: 1) width.
+	pins do: [:each | each width == width ifFalse: [^self]].
+	"All check passed, connect them"
+	self connectPins: pins name: pName
+    ]
+
+    expose: wName [
+	<category: 'connecting'>
+	(self wireByName: wName) expose
+    ]
+
+    conceal: wName [
+	<category: 'connecting'>
+	(self wireByName: wName) conceal
+    ]
+
+    reset: wName byLow: reset to: resetTo [
+	<category: 'connecting'>
+	| w |
+	w := self wireByName: wName.
+	(w isKindOf: DANMFlipflop) ifFalse: [
+	    self error: 'Only flop is resettable. Got: %1' % {wName}].
+	(self wireByName: wName) resetBy: (ExpressionAST newFrom: reset)
+	    to: (ExpressionAST newFrom: resetTo)
+    ]
+
+    default: wName to: d [
+	<category: 'connecting'>
+	| w |
+	w := self wireByName: wName.
+	(w isKindOf: DANMExpressionWire) ifFalse: [
+	    self error: 'Only wire with expression can have default. Got: %1' % {wName}].
+	(self wireByName: wName) defaultTo: (ExpressionAST newFrom: d)
+    ]
+
+    syncReset: wName by: reset to: resetTo [
+	<category: 'connecting'>
+	| w |
+	w := self wireByName: wName.
+	w expression: (ASTIfsOp newIfs: {reset -> resetTo.
+					 1 -> w expression})
+    ]
+
+    autoExposeInputs [
+	<category: 'connecting'>
+	| allPinNames |
+	allPinNames := self allPinNames.
+	allPinNames do: [ :pName | 
+	    | wire |
+	    wire := self findWireByName: pName.
+	    (wire isNil or: [wire isDriven not]) ifTrue: [
+		self tryConnectInputs: pName]].
+	wires do: [ :wire | 
+	    (wire shouldConceal not & wire isExposed not and: [wire isDriven not]) ifTrue: [
+		wire expose]]
+    ]
+
+    autoExposeOutputs [
+	<category: 'connecting'>
+	wires do: [:wire | 
+	    (wire shouldConceal not & wire isExposed not and: [wire isLoaded not]) ifTrue: [
+		wire expose]]
+    ]
+
+]
