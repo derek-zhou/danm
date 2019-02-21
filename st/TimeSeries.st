@@ -17,155 +17,183 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-ExpressionAST subclass: #TimeSeries
-     instanceVariableNames: 'context value width fireTime tsCC simCC'
-     classVariableNames: ''
-     poolDictionaries: ''
-     category: 'simulation'!
+ExpressionAST subclass: TimeSeries [
+    | context value width fireTime tsCC simCC |
+    <comment: 'I model a time series, which yield a value every once in a while.'>
+    <category: 'simulation'>
 
-TimeSeries comment: 
-    'I model a time series, which yield a value every once in a while.'!
+    TimeSeries class >> on: aBlock width: w [
+	"return a TimeSeries and pass it the block. when evaluate is sent the block is ran until a yield: wait: method is called"
+	<category: 'instance creation'>
+	^(self new)
+	    width: w;
+	    forkOn: aBlock;
+	    yourself
+    ]
 
-!TimeSeries methodsFor: 'accessing'!
+    TimeSeries class >> on: aBlock [
+	<category: 'instance creation'>
+	^(self new)
+	    width: 1;
+	    forkOn: aBlock
+    ]
 
-context: c type: t
-    context := c!
+    TimeSeries class >> clockInit: v0 wait: w0 wait: w1 wait: w2 [
+	"this is a infinite clock, with initial value (0/1) in v0 and w0 long. next phase is ~v0(w1) then v0(w2), ~v0(w1),  ..."
+	<category: 'instance creation'>
+	^DANMClock 
+	    startAs: v0
+	    wait: w0
+	    wait: w1
+	    wait: w2
+    ]
 
-context
-    ^context!
+    context: c type: t [
+	<category: 'accessing'>
+	context := c
+    ]
 
-width
-    ^width!
+    context [
+	<category: 'accessing'>
+	^context
+    ]
 
-width: w
-    width := w!
+    width [
+	<category: 'accessing'>
+	^width
+    ]
 
-fireTime
-    "Should be fired at this time. If it is nil then the TimeSeries is ended and should not evaluate it again"
-    ^fireTime!
+    width: w [
+	<category: 'accessing'>
+	width := w
+    ]
 
-fireTime: t
-    fireTime := t!
+    fireTime [
+	"Should be fired at this time. If it is nil then the TimeSeries is ended and should not evaluate it again"
+	<category: 'accessing'>
+	^fireTime
+    ]
 
-<= anotherTS
-    ^ (fireTime <= anotherTS fireTime)!
-!
+    fireTime: t [
+	<category: 'accessing'>
+	fireTime := t
+    ]
 
-!TimeSeries class methodsFor: 'instance creation'!
+    <= anotherTS [
+	<category: 'accessing'>
+	^fireTime <= anotherTS fireTime
+    ]
 
-on: aBlock width: w
-    "return a TimeSeries and pass it the block. when evaluate is sent the block is ran until a yield: wait: method is called"
-    ^self new
-        width: w;
-        forkOn: aBlock;
-        yourself!
+    evaluate [
+	<category: 'generating'>
+	tsCC := tsCC callCC.
+	^value
+    ]
 
-on: aBlock
-^self new
-        width: 1;
-        forkOn: aBlock!
+    staticValue [
+	"I don't have a static value"
+	<category: 'generating'>
+	^nil
+    ]
 
-clockInit: v0 wait: w0 wait: w1 wait: w2
-    "this is a infinite clock, with initial value (0/1) in v0 and w0 long. next phase is ~v0(w1) then v0(w2), ~v0(w1),  ... "
-    ^DANMClock startAs: v0 wait: w0 wait: w1 wait: w2!!
+    value: v [
+	<category: 'generating'>
+	value := v
+    ]
 
-!TimeSeries methodsFor: 'generating'!
+    yield: v wait: d [
+	<category: 'generating'>
+	value := v.
+	self wait: d
+    ]
 
-evaluate
-    tsCC := tsCC callCC.
-    ^value!
+    wait: d [
+	<category: 'generating'>
+	d isNil ifTrue: [fireTime := nil] ifFalse: [fireTime := fireTime + d].
+	self sleep
+    ]
 
-staticValue
-    "I don't have a static value"
-    ^nil!
+    waitFor: anotherTs [
+	<category: 'generating'>
+	fireTime := anotherTs fireTime.
+	self sleep
+    ]
 
-value: v
-    value := v!
+    sleep [
+	<category: 'generating'>
+	simCC := simCC callCC.
+	"protection against reentrance"
+	tsCC := nil
+    ]
 
-yield: v wait: d
-    value := v.
-    self wait: d!
+    forkOn: aBlock [
+	"similiar to generator's forkOn"
+	<category: 'generating'>
+	fireTime := 0.
+	simCC := Continuation escapeDo: [:cc | 
+	    tsCC := cc.
+	    ^self ].
+	value := nil.
+	tsCC := nil.
+	aBlock value: self.
+	fireTime := nil.
+	simCC oneShotValue
+    ]
 
-wait: d
-    d isNil 
-        ifTrue: [ fireTime := nil ]
-        ifFalse: [ fireTime := fireTime + d ].
-    self sleep!
+    test: n [
+	<category: 'testing'>
+	n timesRepeat: [
+	    Transcript nextPutAll: 'At: %1, %2' % {fireTime. self evaluate}; nl.
+	    fireTime isNil ifTrue: [
+		Transcript nextPutAll: 'Aborting'; nl.
+		^self ]]
+    ]
+]
 
-waitFor: anotherTs
-    fireTime := anotherTs fireTime.
-    self sleep!
-    
-sleep
-    simCC := simCC callCC.
-    "protection against reentrance"
-    tsCC := nil!
+TimeSeries subclass: DANMClock [
+    | initWait firstPhase secondPhase phase |
+    <comment: 'I am a simple clock'>
+    <category: ''>
 
-forkOn: aBlock
-    "similiar to generator's forkOn"
-    fireTime := 0.
-    simCC := Continuation escapeDo: [ :cc |
-        tsCC := cc.
-        ^self ].
-    value := nil.
-    tsCC := nil.
-    aBlock value: self.
-    fireTime := nil.
-    simCC oneShotValue!
-!
+    DANMClock class >> startAs: v0 wait: w0 wait: w1 wait: w2 [
+	<category: 'instance creation'>
+	^self new 
+	    init: v0
+	    wait: w0
+	    wait: w1
+	    wait: w2
+    ]
 
-!TimeSeries methodsFor: 'testing'!
+    init: v0 wait: w0 wait: w1 wait: w2 [
+	<category: 'accessing'>
+	value := v0.
+	fireTime := 0.
+	initWait := w0.
+	firstPhase := w1.
+	secondPhase := w2.
+	phase := 0
+    ]
 
-test: n
-    n timesRepeat: [   
-        Transcript nextPutAll: 'At: %1, %2' % {fireTime. self evaluate}; nl.
-        fireTime isNil ifTrue: [ 
-            Transcript nextPutAll: 'Aborting'; nl.
-            ^self ]]!
-!
+    width [
+	<category: 'accessing'>
+	^1
+    ]
 
-TimeSeries subclass: #DANMClock
-    instanceVariableNames: 'initWait firstPhase secondPhase phase'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
-
-DANMClock comment:
-    'I am a simple clock'!
-
-!DANMClock class methodsFor: 'instance creation'!
-
-startAs: v0 wait: w0 wait: w1 wait: w2
-    ^self new 
-        init: v0 wait: w0 wait: w1 wait: w2!
-!
-
-!DANMClock methodsFor: 'accessing'!
-
-init: v0 wait: w0 wait: w1 wait: w2
-    value := v0.
-    fireTime := 0.
-    initWait := w0.
-    firstPhase := w1.
-    secondPhase := w2.
-    phase := 0!
-
-width
-    ^1!
-
-evaluate
-    phase == 0 ifTrue: [
-        phase := 1.
-        fireTime := initWait.
-        ^value ].
-    phase == 1 ifTrue: [
-        phase := 2.
-        fireTime := fireTime + firstPhase.
-        value := value == 0 ifTrue: [ 1 ] ifFalse: [ 0 ].
-        ^value ].
-    phase == 2 ifTrue: [
-        phase := 1.
-        fireTime := fireTime + secondPhase.
-        value := value == 0 ifTrue: [ 1 ] ifFalse: [ 0 ].
-        ^value ]!
-!
+    evaluate [
+	<category: 'accessing'>
+	phase == 0 ifTrue: [
+	    phase := 1.
+	    fireTime := initWait.
+	    ^value ].
+	phase == 1 ifTrue: [
+	    phase := 2.
+	    fireTime := fireTime + firstPhase.
+	    value := value == 0 ifTrue: [1] ifFalse: [0].
+	    ^value ].
+	phase == 2 ifTrue: [
+	    phase := 1.
+	    fireTime := fireTime + secondPhase.
+	    value := value == 0 ifTrue: [1] ifFalse: [0].
+	    ^value ]
+    ]
+]

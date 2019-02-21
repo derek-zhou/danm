@@ -17,74 +17,78 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-DANMExpressionWire subclass: #DANMMonostable
-    instanceVariableNames: 'delay stimuli'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
+DANMExpressionWire subclass: DANMMonostable [
+    | delay stimuli |
+    <comment: 'I am a monostable which goes back to 0 after certain delay'>
+    <category: ''>
 
-DANMMonostable comment:
-    'I am a monostable which goes back to 0 after certain delay'!
+    delay: d [
+	<category: 'accessing'>
+	delay := d
+    ]
 
-!DANMMonostable methodsFor: 'accessing'!
+    delay [
+	<category: 'accessing'>
+	^delay
+    ]
 
-delay: d
-    delay := d!
+    staticValue [
+	<category: 'basic'>
+	self nextValue: 0.
+	nextValue ~= value ifTrue: [^nextValue].
+	^nil
+    ]
 
-delay
-    ^delay!
-!
+    evaluate [
+	<category: 'basic'>
+	| v |
+	stimuli notNil ifTrue: [
+	    (context context isKindOf: DANMSimulator) ifTrue: [
+		stimuli fireTime == context context currentTime ifTrue: [
+		    stimuli fireTime: nil.
+		    stimuli := nil.
+		    self nextValue: 0.
+		    nextValue ~= value ifTrue: [ ^nextValue ]]].
+		^nil].
+	^super evaluate
+    ]
 
-!DANMMonostable methodsFor: 'basic'!
+    flip [
+	<category: 'basic'>
+	nextValue ~= 0 & (context context isKindOf: DANMSimulator) ifTrue: [
+	    stimuli := TimeSeries new.
+	    stimuli fireTime: context context currentTime + delay.
+	    stimuli context: self type: #DIRECT.
+	    context context addStimuli: stimuli ].
+	^super flip
+    ]
 
-staticValue
-    self nextValue: 0.
-    nextValue ~= value ifTrue: [ ^nextValue ].
-    ^nil!
+    printOn: aStream [
+	<category: 'printing'>
+	aStream nextPutAll: '(%1\_%2) ' % {expression. delay}
+    ]
 
-evaluate
-    |v|
-    stimuli notNil ifTrue: [
-        (context context isKindOf: DANMSimulator) ifTrue: [ 
-            stimuli fireTime == context context currentTime ifTrue: [ 
-                stimuli fireTime: nil.
-                stimuli := nil.
-                self nextValue: 0.
-                nextValue ~= value ifTrue: [ ^nextValue ]]].
-        ^nil ].
-    ^super evaluate!
+    basicPrintVerilogOn: aStream [
+	<category: 'printing'>
+	self printVerilogRegsOn: aStream.
+	expression printAdditionalVerilogOn: aStream.
+	expression printVerilogOn: aStream withAlias: 'Monostable'
+    ]
 
-flip
-    (nextValue ~= 0 & (context context isKindOf: DANMSimulator)) ifTrue: [
-        stimuli := TimeSeries new.
-        stimuli fireTime: context context currentTime + delay.
-        stimuli context: self type: #DIRECT.
-        context context addStimuli: stimuli ].
-    ^super flip!
-!
-
-!DANMMonostable methodsFor: 'printing'!
-
-printOn: aStream
-    aStream nextPutAll: ('(%1\_%2) ' % {expression. delay})!
-
-basicPrintVerilogOn: aStream
-    self printVerilogRegsOn: aStream.
-    expression printAdditionalVerilogOn: aStream.
-    expression printVerilogOn: aStream withAlias: 'Monostable'!
-
-printBlockVerilogOn: aStream
-    |w name|
-    name := self verilogName.
-    aStream nl.
-    aStream 
-        nextPutAll: '    always @(posedge %1 or posedge %2)' 
-            % {expression printStringStyle: #VERILOG. name}; nl;
-        nextPutAll: '        if (%1)' % {name}; nl;
-        nextPutAll: '            %1 <= #%2 0;' % {name. delay} ; nl;
-        nextPutAll: '        else'; nl;
-        nextPutAll: '            %1 <= %2;' 
-            % {name. expression printStringStyle: #VERILOG. name}; nl;
-        nextPutAll: '    initial %1=0;' % {name}; nl.
-    expression clearAlias!
-!
+    printBlockVerilogOn: aStream [
+	<category: 'printing'>
+	| w name |
+	name := self verilogName.
+	aStream nl.
+	aStream
+	    nextPutAll: '    always @(posedge %1 or posedge %2)' % 
+	    {expression printStringStyle: #VERILOG. name}; nl;
+	    nextPutAll: '        if (%1)' % {name}; nl;
+	    nextPutAll: '            %1 <= #%2 0;' % {name. delay}; nl;
+	    nextPutAll: '        else'; nl;
+	    nextPutAll: '            %1 <= %2;' % 
+	    {name. expression printStringStyle: #VERILOG. name}; nl;
+	    nextPutAll: '    initial %1=0;' % {name}; nl.
+	expression clearAlias
+    ]
+]

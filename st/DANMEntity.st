@@ -17,92 +17,113 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-Object subclass: #DANMEntity
-       instanceVariableNames: 'attrs entityName tag'
-       classVariableNames: ''
-       poolDictionaries: ''
-       category: 'DANM'!
+Object subclass: DANMEntity [
+    | attrs entityName tag |
+    <category: 'DANM'>
+    <comment: 'I represent an entity, which has a name and a bunch of 
+attributes'>
 
-DANMEntity comment: 'I represent an entity, which has a name and a bunch of 
-attributes'!
+    DANMEntity class >> newNamed: aName [
+	<category: 'instance creation'>
+	^self new name: aName
+    ]
 
-!DANMEntity methodsFor: 'accessing'!
+    DANMEntity class >> castFrom: anotherEntity [
+	"construct an entity from an instance of one of its subclasses.
+	 all instance variable is copyed and old one becomes new one"
+	<category: 'instance creation'>
+	| newEntity |
+	    (anotherEntity isKindOf: self) ifFalse: [
+		self error: 'Can not cast from an unrelated entity' ].
+	newEntity := self new.
+	1 to: self instSize do: [:i |
+	    newEntity instVarAt: i put: (anotherEntity instVarAt: i) ].
+	^anotherEntity become: newEntity
+    ]
 
-name
-    ^entityName!
+    name [
+	<category: 'accessing'>
+	^entityName
+    ]
 
-verilogName
-"name escaped with verilog convention. We need to do this for the flattened
-name that can possibly contain '/'. "
-    |vName|
-    vName := entityName.
-    (vName includes: $/) ifTrue: [ vName := '\', vName, ' ' ].
-    ^vName!
+    verilogName [
+	"name escaped with verilog convention. We need to do this for the flattened
+	 name that can possibly contain '/'."
+	<category: 'accessing'>
+	| vName |
+	vName := entityName.
+	(vName includes: $/) ifTrue: [vName := '\' , vName , ' '].
+	^vName
+    ]
 
-comment
-    (self hasAttribute: #COMMENT) ifTrue: [ ^self attribute: #COMMENT ].
-    ^self class comment!
+    comment [
+	<category: 'accessing'>
+	(self hasAttribute: #COMMENT) ifTrue: [^self attribute: #COMMENT].
+	^self class comment
+    ]
 
-comment: str
-    self setAttribute: #COMMENT to: str!
+    comment: str [
+	<category: 'accessing'>
+	self setAttribute: #COMMENT to: str
+    ]
 
-name: aName
-    entityName := aName!
+    name: aName [
+	<category: 'accessing'>
+	entityName := aName
+    ]
 
-tag
-    ^tag!
+    tag [
+	<category: 'accessing'>
+	^tag
+    ]
 
-tag: t
-    tag := t!
+    tag: t [
+	<category: 'accessing'>
+	tag := t
+    ]
 
-setAttribute: anAssociation
-    attrs isNil ifTrue: [ attrs := IdentityDictionary new ].
-    attrs add: anAssociation!
+    setAttribute: anAssociation [
+	<category: 'accessing'>
+	attrs isNil ifTrue: [attrs := IdentityDictionary new].
+	attrs add: anAssociation
+    ]
 
-unsetAttribute: attrName
-    attrs isNil ifTrue: [ ^self ].
-    attrs removeKey: attrName ifAbsent: [nil]!
-    
-setAttribute: attrName to: attrValue
-    attrs isNil ifTrue: [ attrs := IdentityDictionary new ].
-    attrs at: attrName put: attrValue!
+    unsetAttribute: attrName [
+	<category: 'accessing'>
+	attrs isNil ifTrue: [^self].
+	attrs removeKey: attrName ifAbsent: [nil]
+    ]
 
-hasAttribute: attrName
-    attrs isNil ifTrue: [ ^false ].
-    ^attrs includesKey: attrName!
+    setAttribute: attrName to: attrValue [
+	<category: 'accessing'>
+	attrs isNil ifTrue: [attrs := IdentityDictionary new].
+	attrs at: attrName put: attrValue
+    ]
 
-attribute: attrName
-    attrs isNil ifTrue: [ ^nil ].
-    ^attrs at: attrName ifAbsent: [nil]!
+    hasAttribute: attrName [
+	<category: 'accessing'>
+	attrs isNil ifTrue: [^false].
+	^attrs includesKey: attrName
+    ]
 
-<= anotherEntity
-    self class = anotherEntity class ifTrue: [
-        ^ entityName <= anotherEntity name ].
-    (self isKindOf: anotherEntity class) ifTrue: [ ^false ].
-    (anotherEntity isKindOf: self class) ifTrue: [ ^true ].
-    ^ self class printString <= anotherEntity class printString!
-!
+    attribute: attrName [
+	<category: 'accessing'>
+	attrs isNil ifTrue: [^nil].
+	^attrs at: attrName ifAbsent: [nil]
+    ]
 
-!DANMEntity class methodsFor: 'instance creation'!
+    <= anotherEntity [
+	<category: 'accessing'>
+	self class = anotherEntity class 
+	    ifTrue: [^entityName <= anotherEntity name].
+	(self isKindOf: anotherEntity class) ifTrue: [^false].
+	(anotherEntity isKindOf: self class) ifTrue: [^true].
+	^self class printString <= anotherEntity class printString
+    ]
 
-newNamed: aName
-    ^self new 
-        name: aName!
+    printOn: aStream [
+	<category: 'printing'>
+	aStream nextPutAll: '%1(%2)' % {entityName. self class}
+    ]
+]
 
-castFrom: anotherEntity
-    "construct an entity from an instance of one of its subclasses.
-     all instance variable is copyed and old one becomes new one"
-    |newEntity|
-    (anotherEntity isKindOf: self) ifFalse: [
-        self error: 'Can not cast from an unrelated entity' ].
-    newEntity := self new.
-    1 to: self instSize do: [ :i |
-        newEntity instVarAt: i put: (anotherEntity instVarAt: i) ].
-    ^anotherEntity become: newEntity!
-!
-
-!DANMEntity methodsFor: 'printing'!
-
-printOn: aStream
-    aStream nextPutAll: ('%1(%2)' % {entityName. self class})!        
-!

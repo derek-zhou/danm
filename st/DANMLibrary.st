@@ -17,281 +17,306 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-DANMEntity subclass: #DANMTemplate
-    instanceVariableNames: 'reference srcPath'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: 'DANM'!
+DANMEntity subclass: DANMTemplate [
+    | reference srcPath |
+    <comment: nil>
+    <category: 'DANM'>
 
-!DANMTemplate methodsFor: 'accessing'!
+    DANMTemplate class >> newNamed: n fromPath: p [
+	<category: 'instance creation'>
+	^(super newNamed: n) srcPath: p
+    ]
 
-srcPath
-    ^srcPath!
+    srcPath [
+	<category: 'accessing'>
+	^srcPath
+    ]
 
-srcPath: p
-    srcPath := p!
-!
+    srcPath: p [
+	<category: 'accessing'>
+	srcPath := p
+    ]
 
-!DANMTemplate class methodsFor: 'instance creation'!
+    printOn: aStream [
+	<category: 'producing'>
+	aStream nextPutAll: entityName
+    ]
 
-newNamed: n fromPath: p
-    ^(super newNamed: n) 
-        srcPath: p!
-!
+    produce [
+	<category: 'producing'>
+	self subclassResponsibility
+    ]
+]
 
-!DANMTemplate methodsFor: 'producing'!
+DANMTemplate subclass: DANMCloningTemplate [
+    | reference |
+    <comment: 'I am used to reproduce real module used in a schematic by cloning a 
+reference box'>
+    <category: 'DANM'>
 
-printOn: aStream
-    aStream nextPutAll: entityName!        
+    DANMCloningTemplate class >> newNamed: n fromPath: p ofReference: r [
+	<category: 'instance creation'>
+	^(super newNamed: n)
+	    srcPath: p;
+	    reference: r;
+	    name: r name
+    ]
 
-produce
-    self subclassResponsibility!
-!
+    DANMCloningTemplate class >> clearTag [
+	<category: 'tagging'>
+	self allInstancesDo: [:each | each clearTag]
+    ]
 
-DANMTemplate subclass: #DANMCloningTemplate
-    instanceVariableNames: 'reference'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: 'DANM'!
+    reference [
+	<category: 'accessing'>
+	^reference
+    ]
 
-DANMCloningTemplate comment:
-    'I am used to reproduce real module used in a schematic by cloning a 
-reference box'!
+    reference: ref [
+	<category: 'accessing'>
+	ref reference: self.
+	reference := ref
+    ]
 
-!DANMCloningTemplate class methodsFor: 'instance creation'!
+    produce [
+	<category: 'producing'>
+	^reference copy
+    ]
 
-newNamed: n fromPath: p ofReference: r
-    ^(super newNamed: n) 
-        srcPath: p;
-        reference: r;
-        name: r name!
-!
+    clearTag [
+	<category: 'printing'>
+	tag := nil
+    ]
 
-!DANMCloningTemplate class methodsFor: 'tagging'!
+    returnThenSetTag [
+	"se the tag then return old tag"
+	<category: 'printing'>
+	| t |
+	t := tag.
+	tag := true.
+	^t
+    ]
 
-clearTag
-    self allInstancesDo: [ :each |
-        each clearTag ]!
-!
+    printTextOn: aStream [
+	<category: 'printing'>
+	| s |
+	self returnThenSetTag notNil ifTrue: [^self].
+	s := (File name: srcPath) readStream.
+	[s nextPutAllOn: aStream] ensure: [s close]
+    ]
+]
 
-!DANMCloningTemplate methodsFor: 'accessing'!
+DANMTemplate subclass: DANMClassicTemplate [
+    <comment: 'I am used to reproduce real module by instanciating a class'>
+    <category: ''>
+    produce [
+	<category: 'producing'>
+	| className class |
+	className := ('DANMSchematic_' , self name) asSymbol.
+	class := (nil metaclassFor: className) instanceClass.
+	^class new reference: self
+    ]
+]
 
-reference
-    ^reference!
- 
-reference: ref
-    ref reference: self.
-    reference := ref!
-!
-
-!DANMCloningTemplate methodsFor: 'producing'!
-
-produce
-    ^reference copy!
-!
-
-!DANMCloningTemplate methodsFor: 'printing'!
-
-clearTag
-    tag := nil!
-
-returnThenSetTag
-    "se the tag then return old tag"
-    |t| 
-    t := tag.
-    tag := true.
-    ^t!
-
-printTextOn: aStream
-    |s|
-    self returnThenSetTag notNil ifTrue: [ ^self ].
-    s := (File name: srcPath) readStream.
-    [ s nextPutAllOn: aStream ] ensure: [s close ]!
-!
-
-DANMTemplate subclass: #DANMClassicTemplate
-    instanceVariableNames: ''
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
-
-DANMClassicTemplate comment:
-    'I am used to reproduce real module by instanciating a class'!
-
-!DANMClassicTemplate methodsFor: 'producing'!
-
-produce
-    |className class|
-    className := ('DANMSchematic_',self name) asSymbol.
-    class := (nil metaclassFor: className) instanceClass.
-    ^class new reference: self!
-!
-
-Object subclass: #DANMLibrary
-       instanceVariableNames: 'library topModule paths 
-stFiles vFiles pathIndex'
-       classVariableNames: 'sharedLibrary'
-       poolDictionaries: ''
-       category: 'DANM'!
-
-DANMLibrary comment: 'I am a singleton class that does library look up'!
-
-!DANMLibrary methodsFor: 'accessing'!
-
-init
-    paths := OrderedCollection new.
-    library := LookupTable new.
-    stFiles := LookupTable new.
-    vFiles := LookupTable new.
-    pathIndex := 0!
-
-addPath: p
-    paths add: p!
-
-paths
-    ^paths asArray!
-
-paths: ps
-    ^paths := ps asOrderedCollection!
-
-moduleByName: mName
-    |m|
-    m := library at: mName ifAbsent: [ nil ].
-    m == 0 ifTrue: [ 
-        "the module is still loading, so this is a illegal recursion"
-        self error: 'Circular reference on module %1' % {mName} ].
-    m notNil ifTrue: [ ^m produce ].
-    m :=self loadModuleByName: mName.
-    self addModule: m.
-    ^m produce!
-
-addModule: mod
-    library at: mod name put: mod!
-    
-topModule: mod
-    mod name: 'top'.
-    mod elaborate.
-    topModule := mod!
-
-topModule
-    ^topModule!
-
-size
-    ^library size!
-
-list
-    ^library printString!
-!
-
-!DANMLibrary methodsFor: 'loading'!
-
-loadModuleByName: mName
-    "Load a module from either st schematic or verilog blackbox"
-    |m|
-    "This is a tag indicating we are loading this module. Wil be overwritten 
-     after the module is successfully loaded"
-    library at: mName put: 0.
-    [ m := self tryLoadModuleByName: mName.
-      m isNil & self searchMorePath ] whileTrue.
-    m isNil ifTrue: [ m := self tryLoadBlackBoxModuleByName: mName ].
-    m isNil ifTrue: [
-        self error: 'The module %1 is not found in search paths: %2' 
-            % {mName. self paths} ].
-    ^m!
-
-tryLoadBlackBoxModuleByName: mName
-    |fileName m fs|
-    fileName := vFiles at: mName ifAbsent: [ nil ].
-    fileName notNil ifTrue: [
-        Transcript 
-            nextPutAll: 'Loading blackbox %1 from %2' % {mName. fileName};
-            nl.
-        fs := (Tokenizer on: (File name: fileName) readStream).
-        [ m := DANMBlackBox parseVerilog: fs ] ensure: [ fs close ].
-        ^DANMCloningTemplate newNamed: mName 
-                             fromPath: fileName 
-                             ofReference: m ].
-    ^nil!
-    
-tryLoadModuleByName: mName
-    |fileName m className class|
-    fileName := stFiles at: mName ifAbsent: [ nil ].
-    fileName notNil ifTrue: [
-        className := ('DANMSchematic_',mName) asSymbol.
-        class := (nil metaclassFor: className) instanceClass.
-        class isNil ifTrue: [ 
-            Transcript 
-                nextPutAll: 'Loading schematic %1 from %2' % {mName. fileName};
-                nl.
-            [ FileStream fileIn: fileName ] 
-                ifError: [ self error: '%1 cannot be loaded' % {fileName} ]].
-        class := (nil metaclassFor: className) instanceClass.
-        class isNil ifTrue: [
-            self error: 'Error: class %1 is not defined in %2' 
-                % {className. fileName} ].
-        ^DANMClassicTemplate newNamed: mName fromPath: fileName ].
-    ^nil!
-    
-searchMorePath
-    |dir|
-    pathIndex < paths size ifFalse: [ ^false ].
-    dir := File name: (paths at: pathIndex + 1).
-    (dir exists and: [dir isDirectory]) ifFalse: [
-        self error: 'the dir %1 does not exist!' % {dir}; nl ].
-    dir namesDo: [ :name |
-        |fullname|
-        fullname := FilePath append: name to: dir name.
-        name =~ '^(\w+)\.st$$' ifMatched: [ :result |
-            (stFiles includesKey: (result at: 1)) ifFalse: [
-            stFiles at: (result at: 1) put: fullname ]].
-        name =~ '^(\w+)\.v$$' ifMatched: [ :result |
-            (vFiles includesKey: (result at: 1)) ifFalse: [
-            vFiles at: (result at: 1) put: fullname ]].
-        ].
-    pathIndex := pathIndex + 1.
-    ^true!
-!
-
-!DANMLibrary class methodsFor: 'accessing'!
-
-sharedLibrary
-    sharedLibrary isNil ifTrue: [ sharedLibrary := self new init ].
-    ^sharedLibrary!
-
-clearLibrary
-    sharedLibrary := nil!
-
-addPath: p
-    self sharedLibrary addPath: p!
-
-paths
-    ^self sharedLibrary paths!
-
-moduleByName: mName
-    ^self sharedLibrary moduleByName: mName!
-
-addModule: mod
-    self sharedLibrary addModule: mod!
-
-topModule: mod
-    self sharedLibrary topModule: mod!
-
-topModule
-    ^self sharedLibrary topModule!
-
-size
-    ^self sharedLibrary size!
-
-list
-    ^self sharedLibrary list!
-
-moduleByName: mName fromPaths: ps
-    |mod|
-    sharedLibrary := self new init.
-    sharedLibrary paths: ps.
-    mod := (sharedLibrary moduleByName: mName) 
-        name: 'top';
-        elaborate.
+Object subclass: DANMLibrary [
+    | library topModule paths stFiles vFiles pathIndex |
+    <category: 'DANM'>
+    <comment: 'I am a singleton class that does library look up'>
     sharedLibrary := nil.
-    ^mod!
-!
+
+    DANMLibrary class >> sharedLibrary [
+	<category: 'accessing'>
+	sharedLibrary isNil ifTrue: [ sharedLibrary := self new init ].
+	^sharedLibrary
+    ]
+
+    DANMLibrary class >> clearLibrary [
+	<category: 'accessing'>
+	sharedLibrary := nil
+    ]
+
+    DANMLibrary class >> addPath: p [
+	<category: 'accessing'>
+	self sharedLibrary addPath: p
+    ]
+
+    DANMLibrary class >> paths [
+	<category: 'accessing'>
+	^self sharedLibrary paths
+    ]
+
+    DANMLibrary class >> moduleByName: mName [
+	<category: 'accessing'>
+	^self sharedLibrary moduleByName: mName
+    ]
+
+    DANMLibrary class >> addModule: mod [
+	<category: 'accessing'>
+	self sharedLibrary addModule: mod
+    ]
+
+    DANMLibrary class >> topModule: mod [
+	<category: 'accessing'>
+	self sharedLibrary topModule: mod
+    ]
+
+    DANMLibrary class >> topModule [
+	<category: 'accessing'>
+	^self sharedLibrary topModule
+    ]
+
+    DANMLibrary class >> size [
+	<category: 'accessing'>
+	^self sharedLibrary size
+    ]
+
+    DANMLibrary class >> list [
+	<category: 'accessing'>
+	^self sharedLibrary list
+    ]
+
+    DANMLibrary class >> moduleByName: mName fromPaths: ps [
+	<category: 'accessing'>
+	| mod |
+	sharedLibrary := self new init.
+	sharedLibrary paths: ps.
+	mod := (sharedLibrary moduleByName: mName)
+		    name: 'top';
+		    elaborate.
+	sharedLibrary := nil.
+	^mod
+    ]
+
+    init [
+	<category: 'accessing'>
+	paths := OrderedCollection new.
+	library := LookupTable new.
+	stFiles := LookupTable new.
+	vFiles := LookupTable new.
+	pathIndex := 0
+    ]
+
+    addPath: p [
+	<category: 'accessing'>
+	paths add: p
+    ]
+
+    paths [
+	<category: 'accessing'>
+	^paths asArray
+    ]
+
+    paths: ps [
+	<category: 'accessing'>
+	^paths := ps asOrderedCollection
+    ]
+
+    moduleByName: mName [
+	<category: 'accessing'>
+	| m |
+	m := library at: mName ifAbsent: [nil].
+	m == 0 ifTrue: [
+	    "the module is still loading, so this is a illegal recursion"
+	    self error: 'Circular reference on module %1' % {mName} ].
+	m notNil ifTrue: [ ^m produce ].
+	m := self loadModuleByName: mName.
+	self addModule: m.
+	^m produce
+    ]
+
+    addModule: mod [
+	<category: 'accessing'>
+	library at: mod name put: mod
+    ]
+
+    topModule: mod [
+	<category: 'accessing'>
+	mod name: 'top'.
+	mod elaborate.
+	topModule := mod
+    ]
+
+    topModule [
+	<category: 'accessing'>
+	^topModule
+    ]
+
+    size [
+	<category: 'accessing'>
+	^library size
+    ]
+
+    list [
+	<category: 'accessing'>
+	^library printString
+    ]
+
+    loadModuleByName: mName [
+	"Load a module from either st schematic or verilog blackbox"
+	<category: 'loading'>
+	"This is a tag indicating we are loading this module. Wil be overwritten
+	 after the module is successfully loaded"
+	| m |
+	library at: mName put: 0.
+	[   m := self tryLoadModuleByName: mName.
+	    m isNil & self searchMorePath ] whileTrue.
+	m isNil ifTrue: [ m := self tryLoadBlackBoxModuleByName: mName ].
+	m isNil ifTrue: [
+	    self error: 'The module %1 is not found in search paths: %2' %
+		{mName. self paths} ].
+	^m
+    ]
+
+    tryLoadBlackBoxModuleByName: mName [
+	<category: 'loading'>
+	| fileName m fs |
+	fileName := vFiles at: mName ifAbsent: [nil].
+	fileName notNil ifTrue: [
+	    Transcript nextPutAll: 'Loading blackbox %1 from %2' % {mName. fileName}; nl.
+		fs := Tokenizer on: (File name: fileName) readStream.
+		[m := DANMBlackBox parseVerilog: fs] ensure: [fs close].
+		^DANMCloningTemplate 
+		    newNamed: mName
+		    fromPath: fileName
+		    ofReference: m ].
+	^nil
+    ]
+
+    tryLoadModuleByName: mName [
+	<category: 'loading'>
+	| fileName m className class |
+	fileName := stFiles at: mName ifAbsent: [nil].
+	fileName notNil ifTrue: [
+	    className := ('DANMSchematic_' , mName) asSymbol.
+	    class := (nil metaclassFor: className) instanceClass.
+	    class isNil ifTrue: [
+		Transcript nextPutAll: 'Loading schematic %1 from %2' % {mName. fileName}; nl.
+		[FileStream fileIn: fileName] ifError: [
+		    self error: '%1 cannot be loaded' % {fileName} ]].
+	    class := (nil metaclassFor: className) instanceClass.
+	    class isNil ifTrue: [
+		self error: 'Error: class %1 is not defined in %2' % {className. fileName}].
+	    ^DANMClassicTemplate newNamed: mName fromPath: fileName ].
+	^nil
+    ]
+
+    searchMorePath [
+	<category: 'loading'>
+	| dir |
+	pathIndex < paths size ifFalse: [^false].
+	dir := File name: (paths at: pathIndex + 1).
+	(dir exists and: [dir isDirectory]) ifFalse: [
+	    self error: 'the dir %1 does not exist!' % {dir}; nl ].
+	dir namesDo: [:name | 
+	    | fullname |
+	    fullname := FilePath append: name to: dir name.
+	    name =~ '^(\w+)\.st$$' ifMatched: [ :result | 
+		(stFiles includesKey: (result at: 1)) 
+		    ifFalse: [ stFiles at: (result at: 1) put: fullname ]].
+	    name =~ '^(\w+)\.v$$' ifMatched: [:result | 
+		(vFiles includesKey: (result at: 1)) 
+		    ifFalse: [ vFiles at: (result at: 1) put: fullname ]]].
+	pathIndex := pathIndex + 1.
+	^true
+    ]
+]

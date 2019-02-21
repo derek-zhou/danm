@@ -17,86 +17,88 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-DANMExpressionWire subclass: #DANMDelayLine
-    instanceVariableNames: 'delay stimuli fireTimes fireValues'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
+DANMExpressionWire subclass: DANMDelayLine [
+    | delay stimuli fireTimes fireValues |
+    <comment: 'I am a delay line that model transport delay'>
+    <category: ''>
 
-DANMDelayLine comment:
-    'I am a delay line that model transport delay'!
+    delay: d [
+	<category: 'accessing'>
+	delay := d
+    ]
 
-!DANMDelayLine methodsFor: 'accessing'!
+    delay [
+	<category: 'accessing'>
+	^delay
+    ]
 
-delay: d
-    delay := d!
+    addValue: v [
+	<category: 'accessing'>
+	fireTimes isNil ifTrue: [
+	    fireTimes := OrderedCollection new.
+	    fireValues := OrderedCollection new ].
+	fireValues add: v.
+	fireTimes add: context context currentTime + delay.
+	stimuli isNil ifTrue: [
+	    stimuli := TimeSeries new.
+	    stimuli fireTime: fireTimes first.
+	    stimuli context: self type: #DIRECT.
+	    context context addStimuli: stimuli ]
+    ]
 
-delay
-    ^delay!
+    lastValue [
+	<category: 'accessing'>
+	(fireValues isNil or: [fireValues size == 0]) ifTrue: [^value].
+	^fireValues last
+    ]
 
-addValue: v
-    fireTimes isNil ifTrue: [
-        fireTimes := OrderedCollection new.
-        fireValues := OrderedCollection new ].
-    fireValues add: v.
-    fireTimes add: context context currentTime + delay.
-    stimuli isNil ifTrue: [
-        stimuli := TimeSeries new.
-        stimuli fireTime: fireTimes first.
-        stimuli context: self type: #DIRECT.
-        context context addStimuli: stimuli ]!
+    shiftValue [
+	<category: 'accessing'>
+	fireTimes removeFirst.
+	fireTimes isEmpty
+	    ifTrue: [
+		stimuli fireTime: nil.
+		stimuli := nil ]
+	    ifFalse: [
+		stimuli fireTime: fireTimes first ].
+	^fireValues removeFirst
+    ]
 
-lastValue
-    (fireValues isNil or: [ fireValues size == 0 ]) ifTrue: [
-        ^value ].
-    ^fireValues last!
+    evaluate [
+	<category: 'basic'>
+	| v |
+	(context context isKindOf: DANMSimulator) ifFalse: [^super evaluate].
+	ASTIdentifier useNextValue: true.
+	v := expression evaluate.
+	v = self lastValue ifFalse: [self addValue: v].
+	(stimuli notNil and: [stimuli fireTime == context context currentTime]) 
+	    ifTrue: [
+		self nextValue: self shiftValue.
+		nextValue ~= value ifTrue: [^nextValue ]].
+	^nil
+    ]
 
-shiftValue
-    fireTimes removeFirst.
-    fireTimes isEmpty 
-        ifTrue: [
-            stimuli fireTime: nil.
-            stimuli := nil ]
-        ifFalse: [
-            stimuli fireTime: fireTimes first ].    
-    ^fireValues removeFirst!
-!
+    printOn: aStream [
+	<category: 'printing'>
+	aStream nextPutAll: '(%1#%2) ' % {expression. delay}
+    ]
 
-!DANMDelayLine methodsFor: 'basic'!
+    basicPrintVerilogOn: aStream [
+	<category: 'printing'>
+	self printVerilogRegsOn: aStream.
+	expression printAdditionalVerilogOn: aStream.
+	expression printVerilogOn: aStream withAlias: 'DelayLine'
+    ]
 
-evaluate
-    |v|
-    (context context isKindOf: DANMSimulator) ifFalse: [
-        ^super evaluate ].
-    ASTIdentifier useNextValue: true.
-    v := expression evaluate.
-    v = self lastValue ifFalse: [ 
-        self addValue: v ].
-    (stimuli notNil and: [
-        stimuli fireTime == context context currentTime]) ifTrue: [ 
-            self nextValue: self shiftValue.
-            nextValue ~= value ifTrue: [ ^nextValue ]].
-    ^nil!
-!
-
-!DANMDelayLine methodsFor: 'printing'!
-
-printOn: aStream
-    aStream nextPutAll: ('(%1#%2) ' % {expression. delay})!
-
-basicPrintVerilogOn: aStream
-    self printVerilogRegsOn: aStream.
-    expression printAdditionalVerilogOn: aStream.
-    expression printVerilogOn: aStream withAlias: 'DelayLine'!
-
-printBlockVerilogOn: aStream
-    |w name|
-    name := self verilogName.
-    aStream 
-        nl;
-        nextPutAll: '    always @(%1)' 
-        % {expression printStringStyle: #VERILOG}; nl;
-        nextPutAll: '        %1 <= #%2 %3;' 
-        % {name. delay. expression printStringStyle: #VERILOG. name}; nl.
-    expression clearAlias!
-!
+    printBlockVerilogOn: aStream [
+	<category: 'printing'>
+	| w name |
+	name := self verilogName.
+	aStream nl;
+	    nextPutAll: '    always @(%1)' %
+	    {expression printStringStyle: #VERILOG}; nl;
+	    nextPutAll: '        %1 <= #%2 %3;' % 
+	    {name. delay. expression printStringStyle: #VERILOG. name}; nl.
+	expression clearAlias
+    ]
+]

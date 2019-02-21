@@ -17,88 +17,98 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-ExpressionAST subclass: #ModeledExpression
-    instanceVariableNames: 'references block width'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
+ExpressionAST subclass: ModeledExpression [
+    | references block width |
+    <comment: 'I am a ExpressionAST modeled withan arbitrary block closure'>
+    <category: ''>
 
-ModeledExpression comment:
-    'I am a ExpressionAST modeled withan arbitrary block closure'!
+    ModeledExpression class >> with: args do: b [
+	<category: 'instance creation'>
+	^(self new)
+	    references: (args collect: [:each | ExpressionAST newFrom: each]);
+	    block: b;
+	    width: 1
+    ]
 
-!ModeledExpression class methodsFor: 'instance creation'!
+    ModeledExpression class >> with: args width: w do: b [
+	<category: 'instance creation'>
+	^(self new)
+	    references: (args collect: [:each | ExpressionAST newFrom: each]);
+	    block: b;
+	    width: w
+    ]
 
-with: args do: b
-    ^self new
-        references: (args collect: [ :each | 
-            ExpressionAST newFrom: each ]);
-        block: b;
-        width: 1!
+    references: r [
+	<category: 'accessing'>
+	references := r
+    ]
 
-with: args width: w do: b
-    ^self new
-        references: (args collect: [ :each | 
-            ExpressionAST newFrom: each ]);
-        block: b;
-        width: w!
-!
+    block: b [
+	<category: 'accessing'>
+	block := b
+    ]
 
-!ModeledExpression methodsFor: 'accessing'!
+    width: w [
+	<category: 'accessing'>
+	width := w
+    ]
 
-references: r
-    references := r!
+    width [
+	<category: 'accessing'>
+	^width
+    ]
 
-block: b
-    block := b!
+    clearAlias [
+	<category: 'accessing'>
+	super clearAlias.
+	references do: [:each | each clearAlias]
+    ]
 
-width: w
-    width := w!
+    dependencies [
+	<category: 'accessing'>
+	^references inject: #() into: [:list :each | list , each dependencies]
+    ]
 
-width
-    ^width!
+    printAdditionalVerilogOn: aStream [
+	<category: 'printing'>
+	references do: [:each | each printAdditionalVerilogOn: aStream]
+    ]
 
-clearAlias
-    super clearAlias.
-    references do: [ :each | each clearAlias ]!
+    basicPrintStringStyle: style [
+	<category: 'printing'>
+	| aStream |
+	aStream := WriteStream on: String new.
+	aStream nextPutAll: 'Function('.
+	references do: [
+	    :each | aStream nextPutAll: '%1, ' % {each printStringStyle: style} ].
+	aStream nextPut: $).
+	^aStream contents
+    ]
 
-dependencies
-    ^references inject: #() into: [ :list :each |
-        list, each dependencies ]!
-!
+    checkDesign [
+	<category: 'basic'>
+	^references inject: block argumentCount == references size into: [:r :each |
+	    r & each checkDesign]
+    ]
 
-!ModeledExpression methodsFor: 'printing'!
+    context: c type: t [
+	<category: 'basic'>
+	references do: [:each | each context: c type: t]
+    ]
 
-printAdditionalVerilogOn: aStream
-    references do: [ :each |
-        each printAdditionalVerilogOn: aStream ]!
+    destroy [
+	<category: 'basic'>
+	references do: [:each | each destroy]
+    ]
 
-basicPrintStringStyle: style
-    |aStream|
-    aStream := WriteStream on: String new.
-    aStream nextPutAll: 'Function('.
-    references do: [ :each |
-        aStream nextPutAll: '%1, ' % {each printStringStyle: style} ].
-    aStream nextPut: $).
-    ^aStream contents!
-!
+    evaluate [
+	<category: 'basic'>
+	^block valueWithArguments: (references collect: [:each | each evaluate])
+    ]
 
-!ModeledExpression methodsFor: 'basic'!
-
-checkDesign
-    ^ references inject: (block argumentCount == references size) 
-                 into: [ :r :each | r & each checkDesign ]!
-
-context: c type: t
-    references do: [ :each | each context: c type: t ]!
-
-destroy
-    references do: [ :each | each destroy ]!
-
-evaluate
-    ^ block valueWithArguments: (references collect: [ :each |
-        each evaluate ])!
-
-staticValue
-    ^[ self evaluate ] ifError: [ nil ]!
-!
+    staticValue [
+	<category: 'basic'>
+	^[self evaluate] ifError: [nil]
+    ]
+]
 

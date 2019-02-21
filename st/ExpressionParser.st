@@ -17,175 +17,192 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-Object subclass: #ExpressionParser
-       instanceVariableNames: 'stream'
-       classVariableNames: ''
-       poolDictionaries: ''
-       category: 'expression parsing'!
-    
-ExpressionParser comment:
-    'I am a parser that parse a string to construct a expression AST'!
+Object subclass: ExpressionParser [
+    | stream |
+    <category: 'expression parsing'>
+    <comment: 'I am a parser that parse a string to construct a expression AST'>
 
-!ExpressionParser class methodsFor: 'instance creation'!
+    ExpressionParser class >> newFrom: o [
+	<category: 'instance creation'>
+	o isNil ifTrue: [^super new].
+	(o isKindOf: String) ifTrue: [^self newFromString: o].
+	^self newFromString: o printString
+    ]
 
-newFrom: o
-    o isNil ifTrue: [ ^super new ].
-    (o isKindOf: String) ifTrue: [ ^ self newFromString: o ].
-    ^ self newFromString: o printString!
+    ExpressionParser class >> newFromString: str [
+	<category: 'instance creation'>
+	^super new stream: (Tokenizer on: (ReadStream on: str))
+    ]
 
-newFromString: str
-    ^super new
-        stream: (Tokenizer on: (ReadStream on: str))!
-!
+    stream [
+	<category: 'accessing'>
+	^stream
+    ]
 
-!ExpressionParser methodsFor: 'accessing'!
+    stream: s [
+	<category: 'accessing'>
+	stream := s
+    ]
 
-stream
-    ^stream!
+    parse [
+	<category: 'parsing'>
+	| e |
+	stream isNil ifTrue: [^ASTDefault new].
+	e := self parseExpression.
+	stream atEnd ifFalse: [stream parseError: 'garbage at the end'].
+	^e
+    ]
 
-stream: s
-    stream := s!
-!
+    parseExpression [
+	<category: 'parsing'>
+	| condition choices |
+	condition := self parseSegment.
+	(stream testNext: $?) 
+	    ifFalse: [ ^condition ]
+	    ifTrue: [
+		choices := OrderedCollection new.
+		choices add: self parseSegment.
+		[ stream testNext: $: ] whileTrue: [
+		    choices add: self parseSegment ]].
+	^ASTChoiceOp newChoice: condition among: choices asArray
+    ]
 
-!ExpressionParser methodsFor: 'parsing'!
+    parseSegmentOrder1 [
+	<category: 'parsing'>
+	| os ps op |
+	ps := OrderedCollection new.
+	os := OrderedCollection new.
+	ps add: self parseTerm.
+	[   op := self tryParseDoubleBinaryOp.
+	    op == nil ] whileFalse: [
+	    os add: op.
+	    ps add: self parseTerm ].
+	^ASTBinaryOp newOps: os among: ps
+    ]
 
-parse
-    |e|
-    stream isNil ifTrue: [ ^ASTDefault new ].
-    e := self parseExpression.
-    stream atEnd ifFalse: [
-        stream parseError: 'garbage at the end' ].
-    ^e!
+    parseSegment [
+	<category: 'parsing'>
+	| os ps op |
+	ps := OrderedCollection new.
+	os := OrderedCollection new.
+	ps add: self parseSegmentOrder1.
+	[   op := self tryParseBinaryOp.
+	    op == nil ] whileFalse: [
+	    os add: op.
+	    ps add: self parseSegmentOrder1 ].
+	^ASTBinaryOp newOps: os among: ps
+    ]
 
-parseExpression
-    |condition choices|
-    condition := self parseSegment.
-    (stream testNext: $?)
-        ifFalse: [ ^condition ]
-        ifTrue: [
-            choices := OrderedCollection new.
-            choices add: (self parseSegment).
-            [ stream testNext: $: ] whileTrue: [
-                choices add: (self parseSegment) ]].
-    ^ASTChoiceOp newChoice: condition among: choices asArray!
+    parseTerm [
+	<category: 'parsing'>
+	| ops factor op |
+	ops := OrderedCollection new.	
+	[   op := self tryParseUnaryOp.
+	    op == nil ] whileFalse: [
+	    ops add: op ].
+	factor := self parseModTerm.
+	^ASTUnaryOp newOps: ops on: factor
+    ]
 
-parseSegmentOrder1
-    |os ps op|
-    ps := OrderedCollection new.
-    os := OrderedCollection new.
-    ps add: self parseTerm.
-    [op := self tryParseDoubleBinaryOp.
-     op == nil] whileFalse: [
-         os add: op.
-         ps add: self parseTerm ].
-    ^ASTBinaryOp newOps: os among: ps!
+    parseModTerm [
+	<category: 'parsing'>
+	| factor size msb lsb step |
+	factor := self parseFactor.
+	(stream testNext: $*) ifTrue: [
+	    size := stream expectKind: Integer.
+	    ^ASTDuplicator newDuplicatorOn: factor by: size ].
+	(stream testNext: $[) ifTrue: [
+	    msb := stream expectKind: Integer.
+	    lsb := msb.
+	    step := -1.
+	    (stream testNext: $:) ifTrue: [lsb := stream expectKind: Integer].
+	    (stream testNext: $:) ifTrue: [step := stream expectKind: Integer].
+	    stream expect: $].
+	    ^ASTExtractor newExtractorOn: factor from: msb to: lsb step: step ].
+	^factor
+    ]
 
-parseSegment
-    |os ps op|
-    ps := OrderedCollection new.
-    os := OrderedCollection new.
-    ps add: self parseSegmentOrder1.
-    [op := self tryParseBinaryOp.
-     op == nil] whileFalse: [
-         os add: op.
-         ps add: self parseSegmentOrder1 ].
-    ^ASTBinaryOp newOps: os among: ps!
+    parseFactor [
+	<category: 'parsing'>
+	| c exp |
+	(stream testNext: $() ifTrue: [
+	    exp := self parseExpression.
+	    stream expect: $).
+	    ^exp ].
+	c := self tryParseConstant.
+	c == nil ifFalse: [^c].
+	^ASTIdentifier newIdentifier: (stream expectKind: String)
+    ]
 
-parseTerm
-    |ops factor op|
-    ops := OrderedCollection new.
-    [    op := self tryParseUnaryOp.
-         op == nil ] 
-        whileFalse: [ ops add: op ]. 
-    factor := self parseModTerm.
-    ^ASTUnaryOp newOps: ops on: factor!
+    tryParseConstant [
+	<category: 'parsing'>
+	| width radix value |
+	width := stream nextToken.
+	(width isKindOf: Integer) ifFalse: [
+	    stream pushBackLastToken.
+	    ^nil ].
+	stream testNext: $'.
+	radix := self tryParseRadix.
+	radix isNil ifTrue: [^ASTConstant newConstant: width].
+	value := self parseDigitsWithRadix: radix.
+	^ASTConstant newConstant: value width: width
+    ]
 
-parseModTerm
-    |factor size msb lsb step|
-    factor := self parseFactor.
-    (stream testNext: $*) ifTrue: [
-        size := stream expectKind: Integer.
-        ^ASTDuplicator newDuplicatorOn: factor by: size ].
-    (stream testNext: $[) ifTrue: [
-        msb := stream expectKind: Integer.
-        lsb := msb.
-        step := -1.
-        (stream testNext: $:) ifTrue: [
-            lsb := stream expectKind: Integer ].
-        (stream testNext: $:) ifTrue: [
-            step := stream expectKind: Integer ].
-        stream expect: $].
-        ^ASTExtractor newExtractorOn: factor from: msb to: lsb step: step ].
-    ^factor!
+    tryParseRadix [
+	<category: 'parsing'>
+	| ch |
+	ch := stream next.
+	ch isNil ifTrue: [^nil].
+	ch := ch asLowercase.
+	ch == $b ifTrue: [^2].
+	ch == $o ifTrue: [^8].
+	ch == $d ifTrue: [^10].
+	ch == $h ifTrue: [^16].
+	stream pushBack: 1.
+	^nil
+    ]
 
-parseFactor
-    |c exp|
-    (stream testNext: $() ifTrue: [
-        exp := self parseExpression.
-        stream expect: $).
-        ^exp ].
-    c := self tryParseConstant.
-    (c == nil) ifFalse: [ ^c ].
-    ^ASTIdentifier newIdentifier: (stream expectKind: String)!
-        
-tryParseConstant
-    |width radix value|
-    width := stream nextToken.
-    (width isKindOf: Integer) ifFalse: [ 
-        stream pushBackLastToken.
-        ^nil ].
-    stream testNext: $'.
-    radix := self tryParseRadix.
-    radix isNil ifTrue: [ ^ASTConstant newConstant: width ].
-    value := self parseDigitsWithRadix: radix.
-    ^ASTConstant newConstant: value width: width!
+    parseDigitsWithRadix: r [
+	<category: 'parsing'>
+	| oldPos ch value |
+	value := 0.
+	[   oldPos := stream position.
+	    ch := stream next.
+	    ch notNil and: [ ch == $_ or: [ ch asUppercase isDigit: r]]] whileTrue: [
+	    ch == $_ ifFalse: [ value := value * r + ch asUppercase digitValue ]].
+	stream position: oldPos.
+	^value
+    ]
 
-tryParseRadix
-    |ch|
-    ch := stream next.
-    ch isNil ifTrue: [ ^nil ].
-    ch := ch asLowercase.
-    (ch == $b) ifTrue: [ ^2 ].
-    (ch == $o) ifTrue: [ ^8 ].
-    (ch == $d) ifTrue: [ ^10 ].
-    (ch == $h) ifTrue: [ ^16 ].
-    stream pushBack: 1.
-    ^nil!
+    tryParseUnaryOp [
+	<category: 'parsing'>
+	| token |
+	token := stream nextToken.
+	(ASTUnaryOp hasValidOp: token) ifFalse: [
+	    stream pushBackLastToken.
+	    ^nil ].
+	^token
+    ]
 
-parseDigitsWithRadix: r
-    |oldPos ch value|
-    value := 0.
-    [   oldPos := stream position.
-        ch := stream next. 
-        ch notNil and: [ ch == $_ or: [ch asUppercase isDigit: r]] ] 
-        whileTrue: [
-            ch == $_ ifFalse: [
-                value := value * r + ch asUppercase digitValue ]].
-    stream position: oldPos.
-    ^value!
+    tryParseBinaryOp [
+	<category: 'parsing'>
+	| token |
+	token := stream nextToken.
+	(ASTBinaryOp hasValidOp: token) ifFalse: [
+	    stream pushBackLastToken.
+	    ^nil ].
+	^token
+    ]
 
-tryParseUnaryOp
-    |token|
-    token := stream nextToken. 
-    (ASTUnaryOp hasValidOp: token) ifFalse: [
-        stream pushBackLastToken.
-        ^nil ].
-    ^token!
+    tryParseDoubleBinaryOp [
+	<category: 'parsing'>
+	| oldPos str |
+	oldPos := stream position.
+	str := stream nextAvailable: 2.
+	(ASTBinaryOp hasValidOp: str) ifFalse: [
+	    stream position: oldPos.
+	    ^nil ].
+	^str
+    ]
+]
 
-tryParseBinaryOp
-    |token|
-    token := stream nextToken. 
-    (ASTBinaryOp hasValidOp: token) ifFalse: [
-        stream pushBackLastToken.
-        ^nil ].
-    ^token!
-
-tryParseDoubleBinaryOp
-    |oldPos str|
-    oldPos := stream position.
-    str := stream nextAvailable: 2. 
-    (ASTBinaryOp hasValidOp: str) ifFalse: [
-        stream position: oldPos.
-        ^nil ].
-    ^str!
-!

@@ -17,258 +17,278 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-ExpressionAST subclass: #ASTUnaryOp
-              instanceVariableNames: 'operand'
-              classVariableNames: ''
-              poolDictionaries: ''
-              category: 'expression AST'!
+ExpressionAST subclass: ASTUnaryOp [
+    | operand |
+    <comment: nil>
+    <category: 'expression AST'>
 
-!ASTUnaryOp class methodsFor: 'instance creation'!
+    ASTUnaryOp class >> newOps: os on: e [
+	<category: 'instance creation'>
+	| factor |
+	factor := e.
+	os reverseDo: [:op | factor := self newOp: op on: factor].
+	^factor
+    ]
 
-newOps: os on: e
-    |factor|
-    factor := e.
-    os reverseDo: [ :op | factor := self newOp: op on: factor ].
-    ^factor!
+    ASTUnaryOp class >> newOp: op on: e [
+	<category: 'instance creation'>
+	self subclassesDo: [:each | each op = op ifTrue: [^each newOn: e]]
+    ]
 
-newOp: op on: e
-    self subclassesDo: [ :each |
-            each op = op ifTrue: [ ^each newOn: e ]]!
+    ASTUnaryOp class >> newOn: e [
+	<category: 'instance creation'>
+	^super new operand: e
+    ]
 
-newOn: e
-    ^super new
-        operand: e!
-!
+    ASTUnaryOp class >> hasValidOp: op [
+	<category: 'accessing'>
+	self subclassesDo: [:each | each op = op ifTrue: [^true]].
+	^false
+    ]
 
-!ASTUnaryOp class methodsFor: 'accessing'!
+    ASTUnaryOp class >> op [
+	<category: 'accessing'>
+	self subclassResponsibility
+    ]
 
-hasValidOp: op
-    self subclassesDo: [ :each | 
-        each op = op ifTrue: [ ^true ]].
-    ^false!
+    clearAlias [
+	<category: 'accessing'>
+	super clearAlias.
+	operand clearAlias
+    ]
 
-op
-    self subclassResponsibility!
-!
+    width [
+	<category: 'accessing'>
+	^1
+    ]
 
-!ASTUnaryOp methodsFor: 'accessing'!
+    operand [
+	<category: 'accessing'>
+	^operand
+    ]
 
-clearAlias
-    super clearAlias.
-    operand clearAlias!
+    operand: e [
+	<category: 'accessing'>
+	operand := e
+    ]
 
-width
-    ^1!
+    dependencies [
+	<category: 'accessing'>
+	^operand dependencies
+    ]
 
-operand
-    ^operand!
+    optimize [
+	<category: 'basic'>
+	operand := operand optimize.
+	^super optimize
+    ]
 
-operand: e
-    operand := e!
+    context: c type: t [
+	<category: 'basic'>
+	operand context: c type: t
+    ]
 
-dependencies
-    ^operand dependencies!
-!
+    checkDesign [
+	<category: 'basic'>
+	^operand checkDesign
+    ]
 
-!ASTUnaryOp methodsFor: 'basic'!
+    destroy [
+	<category: 'basic'>
+	operand destroy
+    ]
 
-optimize
-    operand := operand optimize.
-    ^super optimize!
+    printAdditionalVerilogOn: aStream [
+	<category: 'printing'>
+	operand printAdditionalVerilogOn: aStream
+    ]
 
-context: c type: t
-    operand context: c type: t!
+    basicPrintStringStyle: style [
+	<category: 'printing'>
+	^'(%1%2)' % 
+		{self class op.
+		operand printStringStyle: style}
+    ]
+]
 
-checkDesign
-    ^ operand checkDesign!
+ASTUnaryOp subclass: ASTBitwiseNotOp [
+    | max |
+    <comment: nil>
+    <category: 'expression AST'>
 
-destroy
-    operand destroy!
-!
+    ASTBitwiseNotOp class >> op [
+	<category: 'accessing'>
+	^$~
+    ]
 
-!ASTUnaryOp methodsFor: 'printing'!
+    width [
+	<category: 'accessing'>
+	^operand width
+    ]
 
-printAdditionalVerilogOn: aStream
-    operand printAdditionalVerilogOn: aStream!
+    evaluate [
+	<category: 'basic'>
+	| v |
+	v := operand evaluate.
+	max isNil ifTrue: [max := (1 bitShift: operand width) - 1].
+	^max - v
+    ]
 
-basicPrintStringStyle: style
-    ^'(%1%2)' % {self class op. operand printStringStyle: style}!
-!
+    staticValue [
+	<category: 'basic'>
+	| v |
+	v := operand staticValue.
+	v notNil ifTrue: [^(1 bitShift: operand width) - v - 1].
+	^nil
+    ]
+]
 
-ASTUnaryOp subclass: #ASTBitwiseNotOp
-              instanceVariableNames: 'max'
-              classVariableNames: ''
-              poolDictionaries: ''
-              category: 'expression AST'!
 
-!ASTBitwiseNotOp methodsFor: 'accessing'!
-width
-    ^operand width!
-!
+
+ASTUnaryOp subclass: ASTNegateOp [
+    | max |
+    <comment: nil>
+    <category: 'expression AST'>
 
-!ASTBitwiseNotOp methodsFor: 'basic'!
+    ASTNegateOp class >> op [
+	<category: 'accessing'>
+	^$-
+    ]
 
-evaluate
-    |v|
-    v := operand evaluate.
-    max isNil ifTrue: [ max := (1 bitShift: operand width) - 1 ].
-    ^max - v!
+    width [
+	<category: 'accessing'>
+	^operand width
+    ]
 
-staticValue
-    |v|
-    v := operand staticValue.
-    v notNil ifTrue: [ ^(1 bitShift: operand width) - v - 1 ].
-    ^nil!
-!
+    evaluate [
+	<category: 'basic'>
+	| v |
+	v := operand evaluate.
+	max isNil ifTrue: [max := 1 bitShift: operand width].
+	^max - v
+    ]
 
-!ASTBitwiseNotOp class methodsFor: 'accessing'!
-op
-    ^$~!
-!
+    staticValue [
+	<category: 'basic'>
+	| v |
+	v := operand staticValue.
+	v notNil ifTrue: [^(1 bitShift: operand width) - v].
+	^nil
+    ]
+]
 
-ASTUnaryOp subclass: #ASTNegateOp
-              instanceVariableNames: 'max'
-              classVariableNames: ''
-              poolDictionaries: ''
-              category: 'expression AST'!
+ASTUnaryOp subclass: ASTLogicalNotOp [
+    <comment: nil>
+    <category: 'expression AST'>
 
-!ASTNegateOp methodsFor: 'accessing'!
-width
-    ^operand width!
-!
+    ASTLogicalNotOp class >> op [
+	<category: 'accessing'>
+	^$!
+    ]
 
-!ASTNegateOp methodsFor: 'basic'!
+    evaluate [
+	<category: 'basic'>
+	| v |
+	v := operand evaluate.
+	^v > 0 ifTrue: [0] ifFalse: [1]
+    ]
 
-evaluate
-    |v|
-    v := operand evaluate.
-    max isNil ifTrue: [ max := 1 bitShift: operand width ].
-    ^max - v!
+    staticValue [
+	<category: 'basic'>
+	| v |
+	v := operand staticValue.
+	v notNil ifTrue: [^v > 0 ifTrue: [0] ifFalse: [1]].
+	^nil
+    ]
+]
 
-staticValue
-    |v|
-    v := operand staticValue.
-    v notNil ifTrue: [ ^(1 bitShift: operand width) - v ].
-    ^nil!
-!
+ASTUnaryOp subclass: ASTUnaryAndOp [
+    | max |
+    <comment: nil>
+    <category: 'expression AST'>
 
-!ASTNegateOp class methodsFor: 'accessing'!
-op
-    ^$-!
-!
+    ASTUnaryAndOp class >> op [
+	<category: 'accessing'>
+	^$&
+    ]
 
-ASTUnaryOp subclass: #ASTLogicalNotOp
-              instanceVariableNames: ''
-              classVariableNames: ''
-              poolDictionaries: ''
-              category: 'expression AST'!
+    evaluate [
+	<category: 'basic'>
+	| v |
+	v := operand evaluate.
+	max isNil ifTrue: [max := (1 bitShift: operand width) - 1].
+	^v == max ifTrue: [1] ifFalse: [0]
+    ]
 
-!ASTLogicalNotOp methodsFor: 'basic'!
+    staticValue [
+	<category: 'basic'>
+	| v |
+	v := operand staticValue.
+	v notNil 
+	    ifTrue: [^v == ((1 bitShift: operand width) - 1) ifTrue: [1] ifFalse: [0]].
+	^nil
+    ]
+]
 
-evaluate
-    |v|
-    v := operand evaluate.
-    ^ (v > 0 ifTrue: [ 0 ] ifFalse: [ 1 ])!
+ASTUnaryOp subclass: ASTUnaryOrOp [
+    <comment: nil>
+    <category: 'expression AST'>
 
-staticValue
-    |v|
-    v := operand staticValue.
-    v notNil ifTrue: [ ^ (v > 0 ifTrue: [ 0 ] ifFalse: [ 1 ]) ].
-    ^nil!
-!
+    ASTUnaryOrOp class >> op [
+	<category: 'accessing'>
+	^$|
+    ]
 
-!ASTLogicalNotOp class methodsFor: 'accessing'!
-op
-    ^$!!
-!
+    evaluate [
+	<category: 'basic'>
+	| v |
+	v := operand evaluate.
+	^v == 0 ifTrue: [0] ifFalse: [1]
+    ]
 
-ASTUnaryOp subclass: #ASTUnaryAndOp
-              instanceVariableNames: 'max'
-              classVariableNames: ''
-              poolDictionaries: ''
-              category: 'expression AST'!
+    staticValue [
+	<category: 'basic'>
+	| v |
+	v := operand staticValue.
+	v notNil ifTrue: [^v == 0 ifTrue: [0] ifFalse: [1]].
+	^nil
+    ]
+]
 
-!ASTUnaryAndOp methodsFor: 'basic'!
+ASTUnaryOp subclass: ASTUnaryXorOp [
+    | operandWidth |
+    <comment: nil>
+    <category: 'expression AST'>
 
-evaluate
-    |v|
-    v := operand evaluate.
-    max isNil ifTrue: [ max := (1 bitShift: operand width) - 1 ].
-    ^ v == max ifTrue: [ 1 ] ifFalse: [ 0 ]!
+    ASTUnaryXorOp class >> op [
+	<category: 'accessing'>
+	^$^
+    ]
 
-staticValue
-    |v|
-    v := operand staticValue.
-    v notNil ifTrue: [
-        ^ (v == ((1 bitShift: operand width) - 1) 
-               ifTrue: [ 1 ] ifFalse: [ 0 ]) ].
-    ^nil!
-!
+    evaluate [
+	<category: 'basic'>
+	| v s r |
+	v := operand evaluate.
+	s := 0.
+	operandWidth isNil ifTrue: [operandWidth := operand width].
+	operandWidth timesRepeat: [
+	    r := v \\ 2.
+	    v := v // 2.
+	    s := (s + r) \\ 2 ].
+	^s
+    ]
 
-!ASTUnaryAndOp class methodsFor: 'accessing'!
-op
-    ^$&!
-!
-
-ASTUnaryOp subclass: #ASTUnaryOrOp
-              instanceVariableNames: ''
-              classVariableNames: ''
-              poolDictionaries: ''
-              category: 'expression AST'!
-
-!ASTUnaryOrOp methodsFor: 'basic'!
-
-evaluate
-    |v|
-    v := operand evaluate.
-    ^ (v == 0 ifTrue: [ 0 ] ifFalse: [ 1 ])!
-
-staticValue
-    |v|
-    v := operand staticValue.
-    v notNil ifTrue: [ ^ (v == 0 ifTrue: [ 0 ] ifFalse: [ 1 ]) ].
-    ^nil!
-!
-
-!ASTUnaryOrOp class methodsFor: 'accessing'!
-op
-    ^$|!
-!
-
-ASTUnaryOp subclass: #ASTUnaryXorOp
-              instanceVariableNames: 'operandWidth'
-              classVariableNames: ''
-              poolDictionaries: ''
-              category: 'expression AST'!
-
-!ASTUnaryXorOp methodsFor: 'basic'!
-
-evaluate
-    |v s r|
-    v := operand evaluate.
-    s := 0.
-    operandWidth isNil ifTrue: [ operandWidth := operand width ].
-    operandWidth timesRepeat: [
-        r := v \\ 2.
-        v := v // 2.
-        s := (s + r) \\ 2 ]. 
-    ^ s!
-
-staticValue
-    |v s r|
-    v := operand staticValue.
-    v notNil ifTrue: [
-        s := 0.
-        operand width timesRepeat: [
-            r := v \\ 2.
-            v := v // 2.
-            s := (s + r) \\ 2 ]. 
-        ^ s ].
-    ^nil!
-!
-
-!ASTUnaryXorOp class methodsFor: 'accessing'!
-op
-    ^$^!
-!
-
+    staticValue [
+	<category: 'basic'>
+	| v s r |
+	v := operand staticValue.
+	v notNil ifTrue: [
+	    s := 0.
+	    operand width timesRepeat: [
+		r := v \\ 2.
+		v := v // 2.
+		s := (s + r) \\ 2 ].
+	    ^s ].
+	^nil
+    ]
+]

@@ -17,204 +17,232 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-PositionableStream subclass: #LineCountingStream
-                   instanceVariableNames: 
-                       'stream lines pos line column lastPos'
-                   classVariableNames: ''
-                   poolDictionaries: ''
-                   category: 'Streams-Files'!
+PositionableStream subclass: LineCountingStream [
+    | stream lines pos line column lastPos |
+    <category: 'Streams-Files'>
+    <comment: 'I am like a ReadStream, but I also keep track of the current line and column 
+number. '>
 
-LineCountingStream comment: 
-'I am like a ReadStream, but I also keep track of the current line and column 
-number. '!
+    LineCountingStream class >> on: aStream [
+	<category: 'instance creation'>
+	^self new stream: aStream
+    ]
 
-!LineCountingStream class methodsFor: 'instance creation'!
+    name [
+	<category: 'accessing'>
+	^stream name
+    ]
 
-on: aStream
-    ^self new
-        stream: aStream!
-!
+    close [
+	<category: 'accessing'>
+	stream close
+    ]
 
-!LineCountingStream methodsFor: 'accessing'!
+    size [
+	<category: 'accessing'>
+	^stream size
+    ]
 
-name
-    ^stream name!
+    line [
+	<category: 'accessing'>
+	^line
+    ]
 
-close
-    stream close!
+    column [
+	<category: 'accessing'>
+	^column
+    ]
 
-size 
-    ^stream size!
+    position [
+	<category: 'accessing'>
+	^pos
+    ]
 
-line
-    ^line!
+    stream [
+	<category: 'accessing'>
+	^stream
+    ]
 
-column
-    ^column!
+    stream: aStream [
+	"init self to pristine state"
+	<category: 'accessing'>
+	stream := aStream.
+	pos := 0.
+	lastPos := 0.
+	line := 1.
+	column := 1.
+	lines := OrderedCollection new.
+	stream isPositionable ifTrue: [
+	    "reset and re-seek to get the line and column info"
+	    | oldPosition |
+	    oldPosition := stream position.
+	    oldPosition == 0 ifFalse: [
+		stream reset.
+		self next: oldPosition ]]
+    ]
 
-position
-    ^pos!
+    reset [
+	<category: 'buffering'>
+	pos := 0.
+	line := 1.
+	column := 1
+    ]
 
-stream
-    ^stream!
+    lastPos [
+	<category: 'buffering'>
+	^lastPos
+    ]
 
-stream: aStream
-    "init self to pristine state"
-    stream := aStream.
-    pos := 0.
-    lastPos := 0.
-    line := 1.
-    column := 1.
-    lines := OrderedCollection new.
-    (stream isPositionable) ifTrue: [
-        |oldPosition|
-        "reset and re-seek to get the line and column info"
-        oldPosition := stream position.
-        (oldPosition == 0) ifFalse: [
-            stream reset.
-            self next: oldPosition ]]!
-!
+    gotoLastPos [
+	<category: 'buffering'>
+	pos := lastPos.
+	line := lines size + 1.
+	column := 1
+    ]
 
-!LineCountingStream methodsFor: 'buffering'!
+    computeLineAndColumn [
+	<category: 'buffering'>
+	| count |
+	count := 0.
+	line := 1.
+	[ lines size >= line and: [pos - count >= (lines at: line) size ]] whileTrue: [
+	    count := count + (lines at: line) size.
+	    line := line + 1 ].
+	column := pos - count + 1
+    ]
 
-reset
-    pos := 0.
-    line := 1.
-    column := 1!
+    nextFromBuffer [
+	<category: 'buffering'>
+	| next thisLine |
+	thisLine := lines at: line.
+	next := thisLine at: column.
+	thisLine size == column
+	    ifTrue: [
+		line := line + 1.
+		column := 1 ]
+	    ifFalse: [
+		column := column + 1 ].
+	pos := pos + 1.
+	^next
+    ]
 
-lastPos
-    ^lastPos!
+    copyTo: last [
+	<category: 'buffering'>
+	| wB |
+	wB := WriteStream on: (String new: last - pos).
+	last - pos timesRepeat: [wB nextPut: self nextFromBuffer].
+	^wB contents
+    ]
 
-gotoLastPos
-    pos := lastPos.
-    line := lines size + 1.
-    column := 1!
+    peek [
+	<category: 'buffering'>
+	| char oldPos oldLine oldColumn |
+	oldPos := pos.
+	oldLine := line.
+	oldColumn := column.
+	char := self next.
+	pos := oldPos.
+	line := oldLine.
+	column := oldColumn.
+	^char
+    ]
 
-computeLineAndColumn
-    |count|
-    count := 0.
-    line := 1.
-    [(lines size >= line) and: [(pos - count) >= (lines at: line) size]] 
-        whileTrue: [
-            count := count + ((lines at: line) size).
-            line := line + 1 ].
-    column := pos - count + 1!
+    peekAvailable: len [
+	<category: 'buffering'>
+	| chars oldPos oldLine oldColumn |
+	oldPos := pos.
+	oldLine := line.
+	oldColumn := column.
+	chars := self nextAvailable: len.
+	pos := oldPos.
+	line := oldLine.
+	column := oldColumn.
+	^chars
+    ]
 
-nextFromBuffer
-    |next thisLine|
-    thisLine := lines at: line.
-    next := thisLine at: column.
-    (thisLine size == column) 
-        ifTrue: [
-            line := line + 1.
-            column := 1]
-        ifFalse: [
-            column := column + 1 ].
-    pos := pos + 1.
-    ^next!
+    atEnd [
+	<category: 'buffering'>
+	^pos == lastPos and: [stream atEnd]
+    ]
 
-copyTo: last
-    |wB|
-    wB := WriteStream on: (String new: (last - pos)).
-    last - pos timesRepeat: [ wB nextPut: self nextFromBuffer ].
-    ^wB contents!
+    next [
+	<category: 'buffering'>
+	pos < lastPos ifFalse: [self scanForward ifFalse: [^nil]].
+	^self nextFromBuffer
+    ]
 
-peek
-    |char oldPos oldLine oldColumn|
-    oldPos := pos.
-    oldLine := line.
-    oldColumn := column.
-    char := self next.
-    pos := oldPos.
-    line := oldLine.
-    column := oldColumn.
-    ^char!
+    next: numberOfChars [
+	<category: 'buffering'>
+	[ pos + numberOfChars >= lastPos and: [ self scanForward ]] whileTrue.
+	lastPos < (pos + numberOfChars) ifTrue: [
+	    SystemExceptions.NotEnoughElements signalOn: pos + numberOfChars - lastPos ].
+	^self copyTo: pos + numberOfChars
+    ]
 
-peekAvailable: len
-    |chars oldPos oldLine oldColumn|
-    oldPos := pos.
-    oldLine := line.
-    oldColumn := column.
-    chars := self nextAvailable: len.
-    pos := oldPos.
-    line := oldLine.
-    column := oldColumn.
-    ^chars!
+    nextAvailable: numberOfChars [
+	<category: 'buffering'>
+	[pos + numberOfChars >= lastPos and: [self scanForward]] whileTrue.
+	^self copyTo: (lastPos min: pos + numberOfChars)
+    ]
 
-atEnd
-    ^(pos == lastPos) and: [ stream atEnd]!
+    nextLine [
+	<category: 'buffering'>
+	| s |
+	s := self nextRawLine.
+	s == nil ifTrue: [^nil].
+	^s chomp
+    ]
 
-next
-    (pos < lastPos) 
-        ifFalse: [ self scanForward ifFalse: [ ^nil ]].
-    ^self nextFromBuffer!
+    nextRawLine [
+	<category: 'buffering'>
+	| chars neof |
+	line <= lines size ifFalse: [self scanForward ifFalse: [^nil]].
+	chars := (lines at: line) copyFrom: column.
+	line := line + 1.
+	column := 1.
+	pos := pos + chars size.
+	^chars
+    ]
 
-next: numberOfChars
-    [(pos + numberOfChars >= lastPos) and: [self scanForward]]
-        whileTrue.
-    lastPos < (pos + numberOfChars) ifTrue: [
-        SystemExceptions.NotEnoughElements signalOn: 
-            pos + numberOfChars - lastPos ].
-    ^self copyTo: pos + numberOfChars!
+    pushBack: n [
+	<category: 'buffering'>
+	n > pos ifTrue: [
+	    self error: 'Can''t pushback %1 while the stream has only %2' % {n. pos} ].
+	pos := pos - n.
+	column > n 
+	    ifTrue: [column := column - n]
+	    ifFalse: [self computeLineAndColumn].
+	^self
+    ]
 
-nextAvailable: numberOfChars
-    [(pos + numberOfChars >= lastPos) and: [self scanForward]]
-        whileTrue.
-    ^self copyTo: (lastPos min: (pos + numberOfChars))!
+    position: newPosition [
+	<category: 'buffering'>
+	| chars |
+	newPosition <= lastPos ifTrue: [
+	    pos := newPosition.
+	    self computeLineAndColumn.
+	    ^self ].
+	self gotoLastPos.
+	self nextAvailable: newPosition - lastPos.
+	^self
+    ]
 
-nextLine
-    |s|
-    s := self nextRawLine.
-    (s == nil) ifTrue: [ ^nil ].
-    ^s chomp!
+    scanForward [
+	"scan the input some more, typically a line. return false if EOF,
+	 true otherwise."
+	<category: 'scaning'>
+	| thisLine |
+	thisLine := self stream readNextRawLine.
+	thisLine == nil ifTrue: [^false].
+	lines add: thisLine.
+	lastPos := lastPos + thisLine size.
+	^true
+    ]
 
-nextRawLine
-    |chars neof|
-    (line <= lines size) ifFalse: [ self scanForward ifFalse: [ ^nil ]].
-    chars := (lines at: line) copyFrom: column.
-    line := line + 1.
-    column := 1.
-    pos := pos + chars size.
-    ^chars!
-
-pushBack: n
-    (n > pos) ifTrue: [
-        self error: 'Can''t pushback %1 while the stream has only %2' %
-            {n. pos} ].
-    pos := pos - n.
-    column > n 
-        ifTrue: [ column := column - n ]
-        ifFalse: [ self computeLineAndColumn ].
-    ^self!
-
-position: newPosition
-    |chars|
-    (newPosition <= lastPos) ifTrue: [
-        pos := newPosition.
-        self computeLineAndColumn.
-        ^self ].
-    self gotoLastPos.
-    self nextAvailable: (newPosition - lastPos).
-    ^self!
-!
-
-!LineCountingStream methodsFor: 'scaning'!
-scanForward
-    "scan the input some more, typically a line. return false if EOF,
-     true otherwise."
-    |thisLine|
-    thisLine := self stream readNextRawLine.
-    (thisLine == nil) ifTrue: [ ^false ].
-    lines add: thisLine.
-    lastPos := lastPos + thisLine size.
-    ^true!
-!
-
-!LineCountingStream methodsFor: 'printing'!
-printOn: aStream
-    aStream nextPutAll: ('%1 on: (%2) at: (line: %3 column: %4)'
-                             bindWithArguments: {self class name.
-                                                 self name.
-                                                 self line.
-                                                 self column})!
-!
+    printOn: aStream [
+	<category: 'printing'>
+	aStream 
+	    nextPutAll: '%1 on: (%2) at: (line: %3 column: %4)' % 
+	    {self class name. self name. self line. self column}
+    ]
+]

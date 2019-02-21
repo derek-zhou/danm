@@ -17,175 +17,220 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-DANMEntity subclass: #DANMPort
-           instanceVariableNames: 'context'
-           classVariableNames: 'ValidDirections'
-           poolDictionaries: ''
-           category: 'DANM'!
+DANMEntity subclass: DANMPort [
+    | context |
+    <comment: 'I represent a port of a module'>
+    <category: 'DANM'>
+    ValidDirections := nil.
 
-DANMPort comment: 'I represent a port of a module'!
+    DANMPort class >> initialize [
+	<category: 'initialization'>
+	ValidDirections := (IdentitySet new)
+	    add: #input;
+	    add: #output;
+	    add: #inout;
+	    yourself.
+	^self
+    ]
 
-!DANMPort class methodsFor: 'initialization'!
+    DANMPort class >> newNamed: aName width: w direction: d [
+	<category: 'instance creation'>
+	^(super newNamed: aName)
+	    width: w;
+	    direction: d
+    ]
 
-initialize
-    ValidDirections := IdentitySet new
-        add: #input;
-        add: #output;
-        add: #inout;
-        yourself.
-    ^self!
-!
+    DANMPort class >> newInputPort: aName [
+	<category: 'instance creation'>
+	^self 
+	    newNamed: aName
+	    width: 1
+	    direction: #input
+    ]
 
-DANMPort initialize!
+    DANMPort class >> newOutputPort: aName [
+	<category: 'instance creation'>
+	^self 
+	    newNamed: aName
+	    width: 1
+	    direction: #output
+    ]
 
-!DANMPort methodsFor: 'accessing'!
+    DANMPort class >> newInputPort: aName width: w [
+	<category: 'instance creation'>
+	^self 
+	    newNamed: aName
+	    width: w
+	    direction: #input
+    ]
 
-"My context is the module that includes me"
-context
-    ^context!
+    DANMPort class >> newOutputPort: aName width: w [
+	<category: 'instance creation'>
+	^self 
+	    newNamed: aName
+	    width: w
+	    direction: #output
+    ]
 
-context: newContext
-    context := newContext!
+    context [
+	<category: 'accessing'>
+	^context
+    ]
 
-widthHTMLString
-    |w|
-    w := self basicWidth.
-    (w isKindOf: Integer) ifTrue: [ ^w printString ].
-    ^w printStringStyle: #HTML!
+    context: newContext [
+	<category: 'accessing'>
+	context := newContext
+    ]
 
-width
-    |myWidth expression|
-    expression := self basicWidth.
-    (expression isKindOf: Integer) ifTrue: [ ^expression ].
-    DANMCurrentDesign use: self context during: [
-        myWidth := expression value ].
-    (myWidth isInteger and: [myWidth > 0]) ifFalse: [
-        self error: ('Ilegal width: %1' % {myWidth}) ].
-    ^myWidth!
+    widthHTMLString [
+	<category: 'accessing'>
+	| w |
+	w := self basicWidth.
+	(w isKindOf: Integer) ifTrue: [^w printString].
+	^w printStringStyle: #HTML
+    ]
 
-basicWidth
-    ^self attribute: #WIDTH!
+    width [
+	<category: 'accessing'>
+	| myWidth expression |
+	expression := self basicWidth.
+	(expression isKindOf: Integer) ifTrue: [^expression].
+	DANMCurrentDesign use: self context during: [myWidth := expression value].
+	(myWidth isInteger and: [myWidth > 0]) ifFalse: [
+	    self error: 'Ilegal width: %1' % {myWidth}].
+	^myWidth
+    ]
 
-direction
-    ^self attribute: #DIRECTION!
+    basicWidth [
+	<category: 'accessing'>
+	^self attribute: #WIDTH
+    ]
 
-isInput
-    ^(self direction == #input)!
+    direction [
+	<category: 'accessing'>
+	^self attribute: #DIRECTION
+    ]
 
-isOutput
-    ^(self direction == #output)!
+    isInput [
+	<category: 'accessing'>
+	^self direction == #input
+    ]
 
-isInout
-    ^(self direction == #inout)!    
+    isOutput [
+	<category: 'accessing'>
+	^self direction == #output
+    ]
 
-width: newWidth
-    self setAttribute: #WIDTH to: newWidth!
+    isInout [
+	<category: 'accessing'>
+	^self direction == #inout
+    ]
 
-direction: newDirection
-    (ValidDirections includes: newDirection) ifFalse: [
-        self error: ('Ilegal direction: %1' bindWith: newDirection)].
-    self setAttribute: #DIRECTION to: newDirection!
+    width: newWidth [
+	<category: 'accessing'>
+	self setAttribute: #WIDTH to: newWidth
+    ]
 
-<= anotherPort
-   (((anotherPort isKindOf: self class) not) or: [
-       self direction = anotherPort direction]) ifTrue: [
-       ^ super <= anotherPort ].
-   ^ self direction <= anotherPort direction!
-!
+    direction: newDirection [
+	<category: 'accessing'>
+	(ValidDirections includes: newDirection) ifFalse: [
+	    self error: ('Ilegal direction: %1' bindWith: newDirection)].
+	self setAttribute: #DIRECTION to: newDirection
+    ]
 
-!DANMPort class methodsFor: 'instance creation'!
+    <= anotherPort [
+	<category: 'accessing'>
+	((anotherPort isKindOf: self class) not 
+	    or: [self direction = anotherPort direction]) 
+		ifTrue: [^super <= anotherPort].
+	^self direction <= anotherPort direction
+    ]
 
-newNamed: aName width: w direction: d 
-    ^ (super newNamed: aName)
-        width: w; direction: d!
+    msbString [
+	<category: 'printing'>
+	^(self width - 1) printString
+    ]
 
-newInputPort: aName
-    ^self newNamed: aName width: 1 direction: #input!
+    printOn: aStream [
+	<category: 'printing'>
+	self isInput ifTrue: [aStream nextPut: $<].
+	self isOutput ifTrue: [aStream nextPut: $>].
+	self width == 1 
+	    ifTrue: [
+		aStream nextPutAll: '%1' % {entityName}]
+	    ifFalse: [
+		aStream nextPutAll: '%1[%2:0]' % 
+		    {entityName. self msbString}]
+    ]
 
-newOutputPort: aName
-    ^self newNamed: aName width: 1 direction: #output!
+    printHTMLOn: aStream [
+	<category: 'printing'>
+	aStream
+	    nextPutAll: '<h3>%1 port <a name="WIRE_%2">%2</a>, width is %3</h3>' % 
+	    {self direction asString. entityName. self width}; nl;
+	    nextPutAll: '<p>%1</p>' % {self comment}; nl
+    ]
 
-newInputPort: aName width: w
-    ^self newNamed: aName width: w direction: #input!
+    printVerilogOn: aStream [
+	<category: 'printing'>
+	| w |
+	w := self width.
+	self width == 1
+            ifTrue: [
+		aStream nextPutAll: '    %1 %2;' % 
+		    {self direction asString. self verilogName}; nl ]
+	    ifFalse: [
+		aStream nextPutAll: '    %1 [%2:0] %3;' % 
+		    {self direction asString. w - 1. self verilogName}; nl ]
+    ]
+]
 
-newOutputPort: aName width: w
-    ^self newNamed: aName width: w direction: #output!
-!
+Eval [
+    DANMPort initialize
+]
 
-!DANMPort methodsFor: 'printing'!
+DANMPort subclass: DANMSchematicPort [
+    | wire |
+    <comment: 'I represent a port of a schematic'>
+    <category: 'DANM'>
 
-msbString
-    ^(self width - 1) printString!
+    DANMSchematicPort class >> newFromWire: w [
+	<category: 'instance creation'>
+	^(super new)
+	    wire: w;
+	    name: w name
+    ]
 
-printOn: aStream
-    (self isInput) ifTrue: [ aStream nextPut: $< ].
-    (self isOutput) ifTrue: [ aStream nextPut: $> ].
-    ((self width) == 1) 
-        ifTrue: [
-            aStream nextPutAll: ('%1' % {entityName})]
-        ifFalse: [
-            aStream nextPutAll: '%1[%2:0]' % 
-                {entityName. self msbString}]!
+    wire [
+	<category: 'accessing'>
+	^wire
+    ]
 
-printHTMLOn: aStream
-    aStream 
-        nextPutAll: ('<h3>%1 port <a name="WIRE_%2">%2</a>, width is %3</h3>' 
-                         % {self direction asString. entityName. 
-                            self width});
-        nl;
-      nextPutAll: ('<p>%1</p>' % {self comment});
-        nl!
+    wire: newWire [
+	<category: 'accessing'>
+	wire := newWire
+    ]
 
-printVerilogOn: aStream
-    |w|
-    w := self width.
-    self width == 1 
-        ifTrue: [ 
-            aStream nextPutAll: '    %1 %2;' 
-                % {self direction asString. self verilogName}; nl]
-        ifFalse: [ 
-            aStream nextPutAll: '    %1 [%2:0] %3;' 
-                % {self direction asString. w - 1. self verilogName}; nl]!
-!
+    basicWidth [
+	<category: 'accessing'>
+	^wire width
+    ]
 
-DANMPort subclass: #DANMSchematicPort
-    instanceVariableNames: 'wire'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: 'DANM'!
+    direction [
+	<category: 'accessing'>
+	wire isDrivenInternally ifTrue: [^#output].
+	wire isTriState ifTrue: [^#inout].
+	^#input
+    ]
 
-DANMSchematicPort comment:
-    'I represent a port of a schematic'!
+    copy [
+	"copy into a vanila port"
+	<category: 'accessing'>
+	| clone |
+	clone := DANMPort newNamed: self name.
+	clone width: self width.
+	clone direction: self direction.
+	^clone
+    ]
+]
 
-!DANMSchematicPort class methodsFor: 'instance creation'!
-
-newFromWire: w
-    ^super new 
-        wire: w; 
-        name: w name!
-!
-
-!DANMSchematicPort methodsFor: 'accessing'!
-
-wire
-    ^wire!
-
-wire: newWire
-    wire := newWire!
-
-basicWidth
-    ^wire width!
-
-direction
-    wire isDrivenInternally ifTrue: [ ^#output ].
-    wire isTriState ifTrue: [ ^#inout ].
-    ^#input!
-
-copy
-    "copy into a vanila port"
-    |clone|
-    clone := DANMPort newNamed: self name.
-    clone width: self width.
-    clone direction: self direction.
-    ^clone!
-!

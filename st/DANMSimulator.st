@@ -1,323 +1,364 @@
-"
-    Copyright (c) 2008-2012 Derek Zhou (derekzhou@gmail.com)
+SystemExceptions.UserInterrupt extend [
 
-    This file is part of DANM: Design Automation aNd Manipulation.
+    isResumable [
+	"override so ctl-c is resumable"
+	<category: 'exception description'>
+	^true
+    ]
 
-    DANM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+]
 
-    DANM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with DANM.  If not, see <http://www.gnu.org/licenses/>.
-"
-
-!SystemExceptions.UserInterrupt methodsFor: 'exception description'!
-
-isResumable
-"override so ctl-c is resumable"
-    ^true!
-!
-
-Object subclass: #DANMSimulator
-    instanceVariableNames: 
-        'sch stimuli evSets changeSet currentTime callbacks 
-stepCount evCount changeCount shouldContinue stopper trigger triggeringValue'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
-
-DANMSimulator comment:
-    'I am a simulator that simulates a discrate time system described by a
+Object subclass: DANMSimulator [
+    | sch stimuli evSets changeSet currentTime callbacks stepCount evCount changeCount shouldContinue stopper trigger triggeringValue |
+    <category: ''>
+    <comment: 'I am a simulator that simulates a discrate time system described by a
 schematic. At each (varying) time step one or more stimuli fire and trigger
 cascading changes for a set of wires in the schematic. All affect wires then 
-change to new value together then wait for the next time step'!
+change to new value together then wait for the next time step'>
 
-!DANMSimulator class methodsFor: 'instance creation'!
+    DANMSimulator class >> on: dut [
+	<category: 'instance creation'>
+	^self new initWith: dut
+    ]
 
-on: dut
-    ^ self new 
-        initWith: dut!
-!
+    initWith: dut [
+	<category: 'initialize'>
+	sch := dut.
+	sch context: self.
+	changeSet := OrderedCollection new.
+	currentTime := 0.
+	stepCount := 0.
+	evCount := 0.
+	changeCount := 0.
+	shouldContinue := true.
+	stimuli := SortedCollection new.
+	callbacks := IdentityDictionary new.
+	sch wires do: [:w | 
+	    (w expression notNil and: [w expression isKindOf: TimeSeries]) ifTrue: [
+		stimuli add: w expression ]]
+    ]
 
-!DANMSimulator methodsFor: 'initialize'!
+    dut [
+	<category: 'accessing'>
+	^sch
+    ]
 
-initWith: dut
-    sch := dut.
-    sch context: self.
-    changeSet := OrderedCollection new.
-    currentTime := 0.
-    stepCount := 0.
-    evCount := 0.
-    changeCount := 0.
-    shouldContinue := true.
-    stimuli := SortedCollection new.
-    callbacks := IdentityDictionary new.
-    sch wires do: [ :w |
-        (w expression notNil and: [ w expression isKindOf: TimeSeries ])
-            ifTrue: [ stimuli add: w expression ]]!
-!
+    changeSet [
+	<category: 'accessing'>
+	^changeSet
+    ]
 
-!DANMSimulator methodsFor: 'accessing'!
+    currentTime [
+	<category: 'accessing'>
+	^currentTime
+    ]
 
-dut 
-    ^sch!
+    wires [
+	<category: 'accessing'>
+	^sch wires
+    ]
 
-changeSet
-    ^changeSet!
+    context [
+	"simulator is the top level"
+	<category: 'accessing'>
+	^self
+    ]
 
-currentTime
-    ^currentTime!
+    fullPath [
+	"for reporting"
+	<category: 'accessing'>
+	^''
+    ]
 
-wires
-    ^sch wires!
+    finish [
+	"shutdown the simulator, cannot resume"
+	<category: 'accessing'>
+	self postEvent: #SimulationEnded.
+	Transcript nextPutAll: 'Simulation finished at: %1' % {currentTime}; nl
+    ]
 
-context
-    "simulator is the top level"
-    ^self!
+    setCallbackFrom: obj on: event do: aBlock [
+	<category: 'accessing'>
+	| dic |
+	dic := callbacks at: event ifAbsent: [nil].
+	dic isNil ifTrue: [
+	    dic := IdentityDictionary new.
+	    callbacks at: event put: dic ].
+	dic at: obj put: aBlock
+    ]
 
-fullPath
-    "for reporting"
-    ^''!
-finish
-    "shutdown the simulator, cannot resume"
-    self postEvent: #SimulationEnded.
-    Transcript nextPutAll: 'Simulation finished at: %1' % {currentTime}; nl!
+    unsetCallbackFrom: obj on: event [
+	<category: 'accessing'>
+	(callbacks at: event) removeKey: obj
+    ]
 
-setCallbackFrom: obj on: event do: aBlock
-    |dic|
-    dic := callbacks at: event ifAbsent: [ nil ].
-    dic isNil ifTrue: [ 
-        dic := IdentityDictionary new.
-        callbacks at: event put: dic ].
-    dic at: obj put: aBlock!
+    settle [
+	"Settle the system for time 0. All stimuli fire once and value propagate
+	 through out the schematic"
+	<category: 'simulating'>
+	evSets := sch buildEvaluationOrderSet.
+	"faster this way"
+	evSets do: [:each | each become: each asArray].
+	self settleStimuli.
+	"then settle all undriven wire"
+	sch wires do: [:w | w trySettleTo: 0].
+	"then settle all other"
+	sch calculateQuiescentState: evSets.
+	"settle all non-quiescent flop then try again"
+	sch wires do: [:w | w settleTo: 0].
+	sch calculateQuiescentState: evSets.
+	"everything should be settled by now"
+	sch wires do: [:w | 
+	    w currentValue isNil ifTrue: [
+		self error: 'Error: %1 still not settled' % {w name}; nl ]].
+	changeSet empty.
+	self postEvent: #SimulationSettled
+    ]
 
-unsetCallbackFrom: obj on: event
-    (callbacks at: event) removeKey: obj! 
-!
+    runUntil: w is: v [
+	"run until the wire become v"
+	<category: 'simulating'>
+	^self runUntil: w is: v timeout: SmallInteger largest
+    ]
 
-!DANMWire methodsFor: 'simulating'!
+    runUntil: w is: v timeout: t [
+	"run until the wire become v, or timeout"
+	<category: 'simulating'>
+	| ret wire |
+	(w isKindOf: DANMWire) 
+	    ifTrue: [wire := w]
+	    ifFalse: [wire := sch wireByName: w].
+	trigger := wire.
+	triggeringValue := v.
+	ret := self runUpto: currentTime + t.
+	trigger := nil.
+	triggeringValue := nil.
+	^ret
+    ]
 
-trySettleTo: v
-    value isNil ifTrue: [ 
-        Transcript nextPutAll: 'Warning: wire %1 is undriven, set to %2 now for simulation' 
-            % {self name. v}; nl.
-        value := v ]!
+    valueOf: w [
+	<category: 'simulating'>
+	(w isKindOf: DANMWire) 
+	    ifTrue: [^w currentValue]
+	    ifFalse: [^(sch wireByName: w) currentValue]
+    ]
 
-settleTo: v
-    ^self!
+    widthOf: w [
+	<category: 'simulating'>
+	(w isKindOf: DANMWire) 
+	    ifTrue: [^w width]
+	    ifFalse: [^(sch wireByName: w) width]
+    ]
 
-forceTo: v
-    "force me to some new value and trigger all down stream. 
-     This should only be called inside simulation"
-    self value: v.
-    context context addTriggerOn: self!
-!
+    force: w to: v [
+	<category: 'simulating'>
+	(w isKindOf: DANMWire) 
+	    ifTrue: [w forceTo: v]
+	    ifFalse: [(sch wireByName: w) forceTo: v]
+    ]
 
-!DANMExpressionWire methodsFor: 'simulating'!
+    run [
+	"run until all stimuli go out"
+	<category: 'simulating'>
+	^self runUpto: SmallInteger largest
+    ]
 
-trySettleTo: v
-    ^self!
+    stop: source [
+	"stop the simulation from eg. an error condition happened within,
+	 at the end of the current timestep"
+	<category: 'simulating'>
+	stopper := source.
+	shouldContinue := false
+    ]
 
-forceTo: v
-    "force me to some new value and trigger all down stream. 
-     This should only be called inside simulation"
-    self nextValue: v.
-    self flip.
-    context context addTriggerOn: self!
-!
+    isFinished [
+	<category: 'simulating'>
+	^shouldContinue
+    ]
 
-!DANMFlipflop methodsFor: 'simulating'!
+    runUpto: limit [
+	"run until all stimuli go out, or timeout, return the time
+	 * intertupt signal; return the signal
+	 * assertion fired, return the assertion
+	 * triggering wire triggered. return the wire.
+	 in the last case the simulator is expected to resume shortly so
+	 some clean up is not done. If you do not want to resume you need to
+	 call -finish"
+	<category: 'simulating'>
+	shouldContinue ifFalse: [
+	    (stopper isKindOf: DANMWire) ifFalse: [self postEvent: #SimulationResumed].
+	    stopper := nil.
+	    shouldContinue := true.
+	    "outside might have changed something"
+	    self reEvaluate ].
+	[
+	    [   currentTime < limit & (stimuli size > 0) & shouldContinue ] whileTrue: [
+		self runOnce.
+		self heartBeat ]
+	] on: SystemExceptions.UserInterrupt do: [ :sig | 
+	    self stop: sig.
+	    sig resume ].
+	shouldContinue ifTrue: [ self stop: currentTime ].
+	(stopper isKindOf: DANMWire) ifFalse: [
+	    self postEvent: #SimulationEnded.
+	    Transcript nextPutAll: 'Simulation stopped at: %1' % {currentTime}; nl ].
+	(stopper isKindOf: DANMAssertion) ifTrue: [
+	    self error: 'assertion triggered, cannot continue'].
+	^stopper
+    ]
 
-settleTo: v
-    value isNil ifTrue: [
-        Transcript nextPutAll: 'Warning: flop %1 fails to reach quiescent, set to %2 now for simulation' 
-            % {self name. v}; nl.
-        self nextValue: v.
-        context context addStaticTriggerOn: self ]!
-!
+    runOnce [
+	"run one time step"
+	<category: 'simulating'>
+	currentTime := stimuli first fireTime.
+	self fireStimuli.
+	self reEvaluate
+    ]
 
-!DANMSimulator methodsFor: 'simulating'!
- 
-settle
-    "Settle the system for time 0. All stimuli fire once and value propagate
-through out the schematic"
-    evSets := sch buildEvaluationOrderSet.
-    "faster this way"
-    evSets do: [ :each | each become: each asArray ].
-    self settleStimuli.
-    "then settle all undriven wire"
-    sch wires do: [ :w | w trySettleTo: 0 ].
-    "then settle all other"
-    sch calculateQuiescentState: evSets.
-    "settle all non-quiescent flop then try again"
-    sch wires do: [ :w | w settleTo: 0 ].
-    sch calculateQuiescentState: evSets.
-    "everything should be settled by now"
-    sch wires do: [ :w |
-        w currentValue isNil ifTrue: [ 
-            self error: 'Error: %1 still not settled' % {w name}; nl ]].
-    changeSet empty.
-    self postEvent: #SimulationSettled!
+    reEvaluate [
+	<category: 'simulating'>
+	evSets do: [:s | self runOneSet: s].
+	changeSet do: [:w | 
+	    w dataRefSet do: [:each | each setDataDirty].
+	    (w == trigger and: [w nextValue == triggeringValue]) ifTrue: [
+		self stop: w ].
+	    w flip ].
+	changeCount := changeCount + changeSet size.
+	stepCount := stepCount + 1.
+	self postEvent: #SimulationStepEnded.
+	changeSet empty
+    ]
 
-runUntil: w is: v
-    "run until the wire become v"
-    ^self runUntil: w is: v timeout: SmallInteger largest!
+    heartBeat [
+	<category: 'simulating'>
+	evCount > 100000 ifTrue: [
+	    Transcript nextPutAll: 'Info: at %1: %2 steps, %3 evaluations and %4 changes since last log' %
+		{currentTime. stepCount. evCount. changeCount}; nl.
+	    stepCount := 0.
+	    changeCount := 0.
+	    evCount := 0]
+    ]
 
-runUntil: w is: v timeout: t
-    "run until the wire become v, or timeout"
-    |ret wire|
-    (w isKindOf: DANMWire) 
-        ifTrue: [ wire := w ]
-        ifFalse: [ wire := sch wireByName: w ].
-    trigger := wire.
-    triggeringValue := v.
-    ret := self runUpto: currentTime + t.
-    trigger := nil.
-    triggeringValue := nil.
-    ^ret!
+    runOneSet: s [
+	<category: 'simulating'>
+	s do: [ :w | 
+	    w isDirty ifTrue: [
+		w evaluate notNil ifTrue: [self addTriggerOn: w].
+		evCount := evCount + 1.
+		w resetDirty ]]
+    ]
 
-valueOf: w
-    (w isKindOf: DANMWire) 
-        ifTrue: [ ^w currentValue ]
-        ifFalse: [ ^(sch wireByName: w) currentValue ]!
+    fireStimuli [
+	<category: 'simulating'>
+	| s w |
+        [ stimuli size > 0 and: [ stimuli first fireTime == currentTime ]] whileTrue: [
+	    s := stimuli first.
+	    w := s context.
+	    stimuli removeFirst.
+	    w evaluate notNil ifTrue: [self addTriggerOn: w].
+	    s fireTime notNil ifTrue: [
+		s fireTime <= currentTime ifTrue: [
+		    self error: 'stimuli %1 did not advance time at %2.' % 
+			{w. currentTime}; nl ].
+		stimuli add: s ]]
+    ]
 
-widthOf: w
-    (w isKindOf: DANMWire) 
-        ifTrue: [ ^w width ]
-        ifFalse: [ ^(sch wireByName: w) width ]!
+    addStimuli: s [
+	<category: 'simulating'>
+	stimuli add: s
+    ]
 
-force: w to: v
-    (w isKindOf: DANMWire) 
-        ifTrue: [ w forceTo: v ]
-        ifFalse: [ (sch wireByName: w) forceTo: v ]!
-    
-run
-    "run until all stimuli go out"
-    ^self runUpto: SmallInteger largest!
+    settleStimuli [
+	<category: 'simulating'>
+	| sc |
+	sc := stimuli asArray.
+	stimuli empty.
+	sc do: [:s | 
+	    s context evaluate.
+	    s fireTime notNil ifTrue: [stimuli add: s]]
+    ]
 
-stop: source
-    "stop the simulation from eg. an error condition happened within, 
-at the end of the current timestep"
-    stopper := source.
-    shouldContinue := false!
+    addTriggerOn: w [
+	<category: 'simulating'>
+	changeSet add: w.
+	w directRefSet do: [:each | each setDirty].
+	w fastWidth == 1 & (w nextValue == 1) ifTrue: [
+	    "clock rising"
+	    w clockRefSet do: [:each | each setClockDirty ]]
+    ]
 
-isFinished
-    ^shouldContinue!
+    addStaticTriggerOn: w [
+	"a static trigger triggers all loads, including D pin of a flop"
+	<category: 'simulating'>
+	w flip.
+	w directRefSet do: [:each | each setDirty].
+	w dataRefSet do: [:each | 
+	    each
+		setDataDirty;
+		setClockDirty ]
+    ]
 
-runUpto: limit
-    "run until all stimuli go out, or timeout, return the time
-     * intertupt signal; return the signal
-     * assertion fired, return the assertion
-     * triggering wire triggered. return the wire.
-     in the last case the simulator is expected to resume shortly so
-     some clean up is not done. If you do not want to resume you need to
-     call -finish"
-    shouldContinue ifFalse: [
-        (stopper isKindOf: DANMWire) ifFalse: [
-            self postEvent: #SimulationResumed ].
-        stopper := nil.
-        shouldContinue := true.
-        "outside might have changed something"
-        self reEvaluate ].
-    [ 
-        [(currentTime < limit) & (stimuli size > 0) & 
-             shouldContinue ] whileTrue: [ 
-                 self runOnce.
-                 self heartBeat ]] 
-        on: SystemExceptions.UserInterrupt
-        do: [ :sig |
-            self stop: sig.
-            sig resume ].
-    shouldContinue ifTrue: [ self stop: currentTime ].
-    (stopper isKindOf: DANMWire) ifFalse: [
-        self postEvent: #SimulationEnded.
-        Transcript nextPutAll: 'Simulation stopped at: %1' % {currentTime}; 
-            nl ].
-    (stopper isKindOf: DANMAssertion) ifTrue: [
-        self error: 'assertion triggered, cannot continue' ].
-    ^stopper!
-    
-runOnce 
-    "run one time step"
-    currentTime := stimuli first fireTime.
-    self fireStimuli.
-    self reEvaluate!
+    postEvent: event [
+	<category: 'simulating'>
+	| hooks |
+	hooks := callbacks at: event ifAbsent: [nil].
+	hooks isNil ifTrue: [^self].
+	hooks do: [:block | block value: self]
+    ]
+]
 
-reEvaluate
-    evSets do: [ :s | self runOneSet: s ].
-    changeSet do: [ :w | 
-        w dataRefSet do: [ :each | each setDataDirty ].
-        (w == trigger and: [ w nextValue == triggeringValue ]) ifTrue: [
-            self stop: w ].
-        w flip ].
-    changeCount := changeCount + changeSet size.
-    stepCount := stepCount + 1.
-    self postEvent: #SimulationStepEnded.
-    changeSet empty!
-    
-heartBeat
-    evCount > 100000 ifTrue: [
-        Transcript nextPutAll: 'Info: at %1: %2 steps, %3 evaluations and %4 changes since last log' 
-            % {currentTime. stepCount. evCount. changeCount}; nl.
-        stepCount := 0.
-        changeCount := 0.
-        evCount := 0 ]!
-    
-runOneSet: s
-    s do: [ :w |
-        w isDirty ifTrue: [
-            w evaluate notNil ifTrue: [ self addTriggerOn: w ].
-            evCount := evCount + 1.
-            w resetDirty ]]!
+DANMWire extend [
 
-fireStimuli
-    |s w|
-    [ stimuli size > 0 and: [ 
-        stimuli first fireTime == currentTime ]] whileTrue: [
-            s := stimuli first.
-            w := s context.
-            stimuli removeFirst.
-            w evaluate notNil ifTrue: [ self addTriggerOn: w ].
-            s fireTime notNil ifTrue: [ 
-                s fireTime <= currentTime ifTrue: [
-                    self error: 'stimuli %1 did not advance time at %2.'
-                        % {w. currentTime}; nl ].
-                stimuli add: s ]]!
+    trySettleTo: v [
+	<category: 'simulating'>
+	value isNil ifTrue: [
+	    Transcript nextPutAll: 'Warning: wire %1 is undriven, set to %2 now for simulation' % 
+		{self name. v}; nl.
+	    value := v ]
+    ]
 
-addStimuli: s
-    stimuli add: s!
-    
-settleStimuli
-    |sc|
-    sc := stimuli asArray.
-    stimuli empty.
-    sc do: [ :s |
-        s context evaluate.
-        s fireTime notNil ifTrue: [ stimuli add: s ]]!
+    settleTo: v [
+	<category: 'simulating'>
+	^self
+    ]
 
-addTriggerOn: w
-    changeSet add: w.
-    w directRefSet do: [ :each | each setDirty ].
-    (w fastWidth == 1) & (w nextValue == 1) ifTrue: [   
-        "clock rising"
-        w clockRefSet do: [ :each | each setClockDirty ]]!
+    forceTo: v [
+	"force me to some new value and trigger all down stream.
+	 This should only be called inside simulation"
+	<category: 'simulating'>
+	self value: v.
+	context context addTriggerOn: self
+    ]
 
-addStaticTriggerOn: w
-    "a static trigger triggers all loads, including D pin of a flop"
-    w flip.
-    w directRefSet do: [ :each | each setDirty ].
-    w dataRefSet do: [ :each |
-        each setDataDirty; setClockDirty ]!
+]
 
-postEvent: event
-    |hooks|
-    hooks := callbacks at: event ifAbsent: [ nil ].
-    hooks isNil ifTrue: [ ^self ].
-    hooks do: [ :block | block value: self ]! 
-!
+DANMExpressionWire extend [
+
+    trySettleTo: v [
+	<category: 'simulating'>
+	^self
+    ]
+
+    forceTo: v [
+	"force me to some new value and trigger all down stream.
+	 This should only be called inside simulation"
+	<category: 'simulating'>
+	self nextValue: v.
+	self flip.
+	context context addTriggerOn: self
+    ]
+
+]
+
+DANMFlipflop extend [
+
+    settleTo: v [
+	<category: 'simulating'>
+	value isNil ifTrue: [
+	    Transcript nextPutAll: 'Warning: flop %1 fails to reach quiescent, set to %2 now for simulation' % 
+		{self name. v}; nl.
+	    self nextValue: v.
+	    context context addStaticTriggerOn: self ]
+    ]
+
+]
