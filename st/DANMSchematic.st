@@ -17,811 +17,937 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-DynamicVariable subclass: #DANMCurrentDesign
-    instanceVariableNames: ''
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
+DynamicVariable subclass: DANMCurrentDesign [
+    <category: ''>
+    <comment: ''>
+]
 
-DANMCurrentDesign comment:
-    ''!
+DANMBlackBox subclass: DANMSchematic [
+    | instances wires userData generatedNames |
+    <comment: 'I am a module that is modeled by a schematic 
+containing instances of modules and the wires among them.'>
+    <category: 'DANM'>
 
-DANMBlackBox subclass: #DANMSchematic
-             instanceVariableNames: 'instances wires userData generatedNames'
-             classVariableNames: ''
-             poolDictionaries: ''
-             category: 'DANM'!
+    DANMSchematic class >> emptySchematic [
+	<category: 'accessing'>
+	^DANMClasslessSchematic new elaborate
+    ]
 
-DANMSchematic comment: 'I am a module that is modeled by a schematic 
-containing instances of modules and the wires among them.'!
+    init [
+	"this method should not be called unless the init method of the
+	 schematic is wrong"
+	<category: 'init'>
+	self error: '%1 cannot be elaborated' % {entityName}
+    ]
 
-!DANMSchematic class methodsFor: 'accessing'!
+    hierNamePrefix [
+	"return the name prefix when hier is flattened. In most cases the name
+	 and slash should be used; however wrappers are invisible"
+	<category: 'accessing'>
+	self reference isNil ifFalse: [^entityName , '/'].
+	^''
+    ]
 
-emptySchematic
-    ^DANMClasslessSchematic new elaborate!
-!
+    referencePrintName [
+	<category: 'accessing'>
+	"do not uniqify if not printed inline"
+	| prefix |
+	self canBePrintedInLine ifFalse: [^self referenceName].
+	self context isNil ifTrue: [^self uniquifiedRefName].
+	prefix := Smalltalk getenv: 'MODULE_PREFIX'.
+	prefix isNil ifTrue: [^self uniquifiedRefName].
+	^prefix , self uniquifiedRefName
+    ]
 
-!DANMSchematic methodsFor: 'init'!
+    isUniquified [
+	<category: 'accessing'>
+	^self uniquifiedRefName ~= self referenceName
+    ]
 
-init
-    "this method should not be called unless the init method of the 
-     schematic is wrong"
-    self error: '%1 cannot be elaborated' % {entityName}!
-!
+    hasAssertion [
+	<category: 'accessing'>
+	wires do: [:each | (each isKindOf: DANMAssertion) ifTrue: [^true]].
+	instances do: [:each | each hasAssertion ifTrue: [^true]].
+	^false
+    ]
 
-!DANMSchematic methodsFor: 'accessing'!
+    mayMunge [
+	<category: 'accessing'>
+	^true
+    ]
 
-hierNamePrefix
-    "return the name prefix when hier is flattened. In most cases the name 
-     and slash should be used; however wrappers are invisible"
-    (self reference isNil) ifFalse: [ ^entityName, '/' ].
-    ^''!
+    shouldMunge [
+	<category: 'accessing'>
+	^self mayMunge & ((Smalltalk getenv: 'MUNGE') = '1')
+    ]
 
-referencePrintName
-    |prefix|
-    "do not uniqify if not printed inline"
-    self canBePrintedInLine ifFalse: [ ^self referenceName ].
-    self context isNil ifTrue: [ ^self uniquifiedRefName ].
-    prefix := Smalltalk getenv: 'MODULE_PREFIX'.
-    prefix isNil ifTrue: [ ^self uniquifiedRefName ].
-    ^prefix, self uniquifiedRefName!
+    shouldObfuscate [
+	<category: 'accessing'>
+	^(Smalltalk getenv: 'OBFUSCATE') = '1'
+    ]
 
-isUniquified
-    ^self uniquifiedRefName ~= self referenceName!
+    skipBlackBox [
+	<category: 'accessing'>
+	^(Smalltalk getenv: 'SKIPBLACKBOX') = '1'
+    ]
 
+    shouldPrintParameterInVerilog [
+	<category: 'accessing'>
+	^false
+    ]
 
-hasAssertion
-    wires do: [ :each |
-	(each isKindOf: DANMAssertion) ifTrue: [ ^true ]].
-    instances do: [ :each |
-	each hasAssertion ifTrue: [ ^true ]].
-    ^false!
+    uniqueWireNameLike: wName [
+	<category: 'accessing'>
+	| salt newName |
+	generatedNames isNil ifTrue: [generatedNames := LookupTable new].
+	newName := wires uniqueKeyLike: wName.
+	generatedNames at: newName put: 1.
+	^newName
+    ]
 
-mayMunge
-    ^true!
+    containsGeneratedName: wName [
+	<category: 'accessing'>
+	generatedNames isNil ifTrue: [^false].
+	^generatedNames includesKey: wName
+    ]
 
-shouldMunge
-    ^self mayMunge & ((Smalltalk getenv: 'MUNGE') = '1')!
+    isFlat [
+	"a flat schematic does not contains any instance"
+	<category: 'accessing'>
+	instances isNil ifTrue: [^false].
+	^instances size > 0
+    ]
 
-shouldObfuscate
-    ^(Smalltalk getenv: 'OBFUSCATE') = '1'!
+    canBeFlatten [
+	"whether I can be flatten. schematic can"
+	<category: 'accessing'>
+	self shouldBlackBox ifFalse: [^true].
+	self isUniquified ifTrue: [^true].
+	^false
+    ]
 
-skipBlackBox
-    ^(Smalltalk getenv: 'SKIPBLACKBOX') = '1'!
+    canBePrintedInLine [
+	"whether I can be printed as inline verilog. For schematic the printing
+	 will be recursive. Any schematic that do not want to be printed inline
+	 should override this method."
+	<category: 'accessing'>
+	self shouldBlackBox ifTrue: [^false].
+	self shouldNotPrint ifTrue: [^false].
+	^true
+    ]
 
-"st module has all parameter passed down and expanded, no need to print again"
-shouldPrintParameterInVerilog
-    ^false!
+    ports [
+	<category: 'accessing'>
+	wires isNil ifTrue: [self elaborate].
+	^super ports
+    ]
 
-uniqueWireNameLike: wName
-    |salt newName|
-    generatedNames isNil ifTrue: [
-        generatedNames := LookupTable new ].
-    newName := wires uniqueKeyLike: wName.
-    generatedNames at: newName put: 1.
-    ^newName!
+    type [
+	<category: 'accessing'>
+	^'schematic'
+    ]
 
-containsGeneratedName: wName
-    generatedNames isNil ifTrue: [ ^false ].
-    ^generatedNames includesKey: wName!
+    instanceByName: iName [
+	<category: 'accessing'>
+	| inst |
+	inst := self findInstanceByName: iName.
+	inst isNil ifTrue: [
+	    self error: 'Instance by the name of %1 does not exist in %2' % 
+		{iName. self}].
+	^inst
+    ]
 
-isFlat
-    "a flat schematic does not contains any instance"
-    instances isNil ifTrue: [ ^false ].
-    ^(instances size > 0)!
+    findInstanceByName: iName [
+	<category: 'accessing'>
+	^instances at: iName ifAbsent: [nil]
+    ]
 
-canBeFlatten
-    "whether I can be flatten. schematic can"
-    self shouldBlackBox ifFalse: [ ^true ].
-    self isUniquified ifTrue: [ ^true ].
-    ^false!
+    clearUserData [
+	"userData is for user to stash some data"
+	<category: 'accessing'>
+	userData := LookupTable new
+    ]
 
-canBePrintedInLine
-    "whether I can be printed as inline verilog. For schematic the printing
-     will be recursive. Any schematic that do not want to be printed inline
-     should override this method."
-    self shouldBlackBox ifTrue: [ ^false ]. 
-    self shouldNotPrint ifTrue: [ ^false ]. 
-    ^true!
+    clearInstances [
+	"instances is a dictionary of instances, keyed by the instance name"
+	<category: 'accessing'>
+	instances := LookupTable new
+    ]
 
-ports
-    wires isNil ifTrue: [ self elaborate ].
-    ^super ports!
+    instances [
+	<category: 'accessing'>
+	^instances
+    ]
 
-type
-    ^'schematic'!
+    userData [
+	<category: 'accessing'>
+	^userData
+    ]
 
-instanceByName: iName
-    |inst|
-    inst := self findInstanceByName: iName.
-    inst isNil ifTrue: [
-        self error: ('Instance by the name of %1 does not exist in %2' % 
-                         {iName. self}) ].
-    ^inst!
+    userDataAt: key [
+	<category: 'accessing'>
+	^userData at: key
+    ]
 
-findInstanceByName: iName
-    ^instances at: iName ifAbsent: [ nil ]!
+    userDataAt: key ifAbsent: block [
+	<category: 'accessing'>
+	^userData at: key ifAbsent: block
+    ]
 
-clearUserData
-    "userData is for user to stash some data"
-    userData := LookupTable new!
+    userDataAt: key put: v [
+	<category: 'accessing'>
+	userData at: key put: v
+    ]
 
-clearInstances
-    "instances is a dictionary of instances, keyed by the instance name"
-    instances := LookupTable new!
+    getWire: w [
+	<category: 'accessing'>
+	(w isKindOf: DANMWire) ifTrue: [^w].
+	^self wireByName: w
+    ]
 
-instances
-    ^instances!
+    wireByName: wName [
+	<category: 'accessing'>
+	| w |
+	w := self findWireByName: wName.
+	w isNil ifTrue: [
+	    self error: 'Wire by the name of %1 does not exist in %2' % 
+		{wName. self}].
+	^w
+    ]
 
-userData
-    ^userData!
+    removeWireByName: wName [
+	<category: 'accessing'>
+	| w |
+	w := self findWireByName: wName.
+	w notNil ifTrue: [wires removeKey: wName]
+    ]
 
-userDataAt: key
-    ^userData at: key!
+    findWireByName: wName [
+	<category: 'accessing'>
+	^wires at: wName ifAbsent: [nil]
+    ]
 
-userDataAt: key ifAbsent: block
-    ^userData at: key ifAbsent: block!
+    addWire: w byName: wName [
+	<category: 'accessing'>
+	"if there is a port by the same name, replace the wire it points to"
+	| port |
+	port := self findPortByName: wName.
+	port notNil ifTrue: [port wire: w].
+	w name: wName.
+	w context: self.
+	wires at: wName put: w
+    ]
 
-userDataAt: key put: v
-    userData at: key put: v!
-    
-getWire: w
-    (w isKindOf: DANMWire) ifTrue: [ ^w ].
-    ^self wireByName: w!
+    addWire: w [
+	<category: 'accessing'>
+	"if there is a port by the same name, replace the wire it points to"
+	| port wName |
+	wName := w name.
+	port := self findPortByName: wName.
+	port notNil ifTrue: [port wire: w].
+	w context: self.
+	wires at: wName put: w
+    ]
 
-wireByName: wName
-    |w|
-    w := self findWireByName: wName.
-    w isNil ifTrue: [ 
-        self error: ('Wire by the name of %1 does not exist in %2' % 
-                         {wName. self}) ].
-    ^w!
+    addInstance: i byName: iName [
+	<category: 'accessing'>
+	i name: iName.
+	i context: self.
+	instances at: iName put: i
+    ]
 
-removeWireByName: wName
-    |w|
-    w := self findWireByName: wName.
-    w notNil ifTrue: [ wires removeKey: wName ]!
+    addInstance: i [
+	<category: 'accessing'>
+	i context: self.
+	instances at: i name put: i
+    ]
 
-findWireByName: wName
-    ^wires at: wName ifAbsent: [ nil ]!
+    clearWires [
+	"wires is a doctionary of wires, keyed by the wire name"
+	<category: 'accessing'>
+	wires := LookupTable new
+    ]
 
-findInstanceByName: iName
-    ^instances at: iName ifAbsent: [ nil ]!
+    wires [
+	<category: 'accessing'>
+	^wires
+    ]
 
-addWire: w byName: wName
-    |port|
-    "if there is a port by the same name, replace the wire it points to"
-    port := self findPortByName: wName.
-    port notNil ifTrue: [ port wire: w ].
-    w name: wName.
-    w context: self.
-    wires at: wName put: w!
+    maxEvaluationOrder [
+	<category: 'accessing'>
+	^wires inject: 1 into: [:s :each | s max: each evaluationOrder + 1]
+    ]
 
-addWire: w
-    |port wName|
-    "if there is a port by the same name, replace the wire it points to"
-    wName := w name.
-    port := self findPortByName: wName.
-    port notNil ifTrue: [ port wire: w ].
-    w context: self.
-    wires at: wName put: w!
+    addInstanceOf: moduleName [
+	"make a unique name and add it"
+	<category: 'accessing'>
+	| iName |
+	iName := 'u_%1' % {moduleName}.
+	iName := instances uniqueKeyLike: iName.
+	^self addInstanceOf: moduleName name: iName
+    ]
 
-addInstance: i byName: iName
-    i name: iName.
-    i context: self.
-    instances at: iName put: i!
+    addInstanceOf: moduleName name: iName [
+	"add the instance"
+	<category: 'accessing'>
+	| module |
+	(instances includesKey: iName) ifTrue: [
+	    self error: 'An instance named %1 already exists.' % {iName}].
+	module := DANMLibrary moduleByName: moduleName.
+	module isNil ifTrue: [
+	    self error: 'Module %1 does not exist.' % {moduleName}].
+	self addInstance: module byName: iName.
+	^module
+    ]
 
-addInstance: i
-    i context: self.
-    instances at: i name put: i!
+    removeInstanceByName: iName [
+	<category: 'accessing'>
+	| i |
+	i := self findInstanceByName: iName.
+	i notNil ifTrue: [instances removeKey: iName]
+    ]
 
-clearWires
-    "wires is a doctionary of wires, keyed by the wire name"
-    wires := LookupTable new!
+    removeInstance: i [
+	<category: 'accessing'>
+	i ports do: [:port | self disconnectInstance: i port: port].
+	instances removeKey: i name
+    ]
 
-wires
-    ^wires!
+    elaborateAll [
+	"make sure everything is elaborated. It is usually an no-op because
+	 instances should be elaborated in the connection phase but there
+	 could be isolated instances"
+	<category: 'accessing'>
+	instances do: [:each | each elaborate]
+    ]
 
-maxEvaluationOrder
-    ^wires inject: 1 into: [ :s :each | s max: each evaluationOrder + 1 ]!
+    elaborate [
+	<category: 'accessing'>
+	| old |
+	wires notNil ifTrue: [^self].
+	Transcript nextPutAll: 'Elaborating schematic %1 for %2' % 
+	    {self referenceName. entityName}; nl.
+	DANMCurrentDesign use: self during: [
+	    self
+		clearUserData;
+		clearWires;
+		clearInstances;
+		init;
+		elaborateAll]
+    ]
 
-addInstanceOf: moduleName
-    "make a unique name and add it"
-    |iName|
-    iName := 'u_%1' % {moduleName}.
-    iName := instances uniqueKeyLike: iName.
-    ^self addInstanceOf: moduleName name: iName!
+    postProcess [
+	"give each instance a chance to run something after elaborate"
+	<category: 'accessing'>
+	instances do: [:each | each postProcess]
+    ]
 
-addInstanceOf: moduleName name: iName
-    "add the instance"
-    |module|
-    (instances includesKey: iName) ifTrue: [
-        self error: 'An instance named %1 already exists.' % {iName} ].
-    module := DANMLibrary moduleByName: moduleName.
-    module isNil ifTrue: [
-        self error: ('Module %1 does not exist.' % {moduleName}) ].
-    self addInstance: module byName: iName.
-    ^module!
+    pinFromString: pinString [
+	"pin string is like instanceName/portName, return {instance. port}"
+	<category: 'accessing'>
+	pinString =~ '^([\w/]+)/(\w+)$$' 
+	    ifNotMatched: [self error: 'No / found in %1' % {pinString}]
+	    ifMatched: [:r | ^(self instanceByName: (r at: 1)) portByName: (r at: 2)]
+    ]
 
-removeInstanceByName: iName
-    |i|
-    i := self findInstanceByName: iName.
-    i notNil ifTrue: [ instances removeKey: iName ]!
+    createPort: pName [
+	<category: 'accessing'>
+	^self createPort: pName width: 1
+    ]
 
-removeInstance: i
-    i ports do: [ :port |
-        self disconnectInstance: i port: port ].
-    instances removeKey: (i name)!
+    createPort: pName width: w [
+	<category: 'accessing'>
+	| wire port |
+	wire := DANMWire newNamed: pName inContext: self.
+	wire width: w.
+	port := DANMSchematicPort newFromWire: wire.
+	self addPort: port.
+	^port
+    ]
 
-elaborateAll
-    "make sure everything is elaborated. It is usually an no-op because
-     instances should be elaborated in the connection phase but there
-     could be isolated instances"
-    instances do: [ :each | each elaborate ]!
+    disconnectInstance: i port: p [
+	<category: 'accessing'>
+	| wire |
+	wire := i wireOnPort: p.
+	wire == nil ifFalse: [
+	    i disconnectPort: p.
+	    wire disconnectPort: p]
+    ]
 
-elaborate
-    |old|
-    wires notNil ifTrue: [ ^self ].
-    Transcript 
-        nextPutAll: 'Elaborating schematic %1 for %2' % {self referenceName.
-                                                         entityName}; nl.
-    DANMCurrentDesign use: self during: [
-        self
-            clearUserData;
-            clearWires;
-            clearInstances;
-            init;
-            elaborateAll ]!
+    generateVerilogTo: fn [
+	<category: 'printing'>
+	| fs |
+	fs := (File name: fn) writeStream.
+	[   self printVerilogBoilerplateOn: fs.
+	    self printVerilogOn: fs ] ensure: [fs close]
+    ]
 
-postProcess
-    "give each instance a chance to run something after elaborate"
-    instances do: [ :each | each postProcess ]!
+    assignUniqueRefName [
+	<category: 'printing'>
+	| pastModules |
+	pastModules := LookupTable new.
+	self assignUniqueRefNameAndRecordIn: pastModules
+    ]
 
-pinFromString: pinString
-"pin string is like instanceName/portName, return {instance. port}"
-    pinString =~ '^([\w/]+)/(\w+)$$'
-        ifNotMatched: [ self error: ('No / found in %1' % {pinString}) ]
-        ifMatched: [:r |
-            ^ (self instanceByName: (r at: 1)) portByName: (r at: 2) ]!
- 
-createPort: pName
-    ^self createPort: pName width: 1!
+    assignUniqueRefNameAndRecordIn: pastModules [
+	<category: 'printing'>
+	self uniquifiedRefName: (pastModules uniqueKeyLike: self referenceName).
+	pastModules at: self uniquifiedRefName put: 1.
+	instances do: 
+		[:i | 
+		(i isKindOf: DANMSchematic) 
+		    ifTrue: [i assignUniqueRefNameAndRecordIn: pastModules]]
+    ]
 
-createPort: pName width: w
-    |wire port|
-    wire := DANMWire newNamed: pName inContext: self.
-    wire width: w.
-    port := DANMSchematicPort newFromWire: wire.
-    self addPort: port.
-    ^port!
+    generateFullVerilogTo: fn [
+	"print all verilog in one file"
+	<category: 'printing'>
+	| fs |
+	DANMCloningTemplate clearTag.
+	self assignUniqueRefName.
+	fs := (File name: fn) writeStream.
+	[   self printVerilogBoilerplateOn: fs.
+	    self printFullVerilogOn: fs ] ensure: [fs close]
+    ]
 
-disconnectInstance: i port: p
-    |wire|
-    wire := i wireOnPort: p.
-    (wire == nil) ifFalse: [
-        i disconnectPort: p.
-        wire disconnectPort: p ]!
-!
+    generateFullVerilogsToDir: dirName [
+	"print all verilog in one dir, one module per file"
 
-!DANMSchematic methodsFor: 'printing'!
+	<category: 'printing'>
+	| dir |
+	DANMCloningTemplate clearTag.
+	self assignUniqueRefName.
+	dir := File name: dirName.
+	dir exists ifFalse: [dir createDirectory].
+	^self printFullVerilogToDir: dirName
+    ]
 
-generateVerilogTo: fn
-    |fs|
-    fs := (File name: fn) writeStream.
-    [ 
-        self printVerilogBoilerplateOn: fs.
-        self printVerilogOn: fs ] ensure: [ fs close ]!
+    generateSubModuleFullVerilogToDir: dirName [
+	<category: 'printing'>
+	instances do: [:i | 
+	    (i isKindOf: DANMSchematic) & i isUniquified not ifTrue: [
+		i shouldBlackBox ifTrue: [
+		    i shouldMunge ifTrue: [i munge].
+		    i generateFullVerilogTo: dirName , '/' , i referencePrintName , '.v'].
+		i generateSubModuleFullVerilogToDir: dirName]]
+    ]
 
-assignUniqueRefName
-    |pastModules|
-    pastModules := LookupTable new.
-    self assignUniqueRefNameAndRecordIn: pastModules!
-
-assignUniqueRefNameAndRecordIn: pastModules
-    self uniquifiedRefName: 
-        (pastModules uniqueKeyLike: self referenceName).
-    pastModules at: self uniquifiedRefName put: 1.
-    instances do: [ :i |
-        (i isKindOf: DANMSchematic) ifTrue: [
-            i assignUniqueRefNameAndRecordIn: pastModules ]]!
-
-generateFullVerilogTo: fn
-    "print all verilog in one file"
-    |fs|
-    DANMCloningTemplate clearTag.
-    self assignUniqueRefName.
-    fs := (File name: fn) writeStream.
-    [ 
-        self printVerilogBoilerplateOn: fs.
-        self printFullVerilogOn: fs ] ensure: [ fs close ]!
-
-generateFullVerilogsToDir: dirName
-    "print all verilog in one dir, one module per file"
-    |dir|
-    DANMCloningTemplate clearTag.
-    self assignUniqueRefName.
-    dir := File name: dirName.
-    (dir exists) ifFalse: [
-        dir createDirectory ].
-    ^self printFullVerilogToDir: dirName!
-
-generateSubModuleFullVerilogToDir: dirName
-    instances do: [ :i |
-        (i isKindOf: DANMSchematic) & i isUniquified not ifTrue: [
-            i shouldBlackBox ifTrue: [
-		i shouldMunge ifTrue: [ i munge ].
-		i generateFullVerilogTo: dirName, '/', i referencePrintName, '.v' ].
-	    i generateSubModuleFullVerilogToDir: dirName ]]!
-
-printVerilogBoilerplateOn: fs
-"print some boiler headers for verilog. This could be put into a .vh file 
-if it gets longer"
-    fs nextPutAll: '
-// This file is generated by DANM on %1
-' % {DateTime now}.
-    self hasAssertion ifTrue: [
-    fs nextPutAll: '
+    printVerilogBoilerplateOn: fs [
+	"print some boiler headers for verilog. This could be put into a .vh file
+	 if it gets longer"
+	<category: 'printing'>
+	fs nl; nextPutAll: '// This file is generated by DANM on %1' % {DateTime now}; nl.
+	self hasAssertion ifTrue: [
+	    fs nextPutAll: '
 `define ASSERT(condition) always @(condition) \
    if (($stime > 100)&&((condition===1''b0)||(condition===1''bx))) begin \
       $display("Assertion failure at %d: condition in %m", $stime); \
       $finish; \
    end
-']!
+'
+	]
+    ]
 
-printFullVerilogOn: fs
-    self printVerilogOn: fs.
-    instances do: [ :i |
-        i canBePrintedInLine 
-            ifTrue: [ i printFullVerilogOn: fs ]
-            ifFalse: [ 
-                self skipBlackBox not & i shouldBlackBox & 
-                    i isUniquified not ifTrue: [
-                        i printBlackBoxVerilogOn: fs ]]]!
+    printFullVerilogOn: fs [
+	<category: 'printing'>
+	self printVerilogOn: fs.
+	instances do: [:i | 
+	    i canBePrintedInLine 
+		ifTrue: [ i printFullVerilogOn: fs]
+		ifFalse: [
+		    self skipBlackBox not & i shouldBlackBox & i isUniquified not ifTrue: [
+			i printBlackBoxVerilogOn: fs]]]
+    ]
 
-printFullVerilogToDir: dirName
-    |fs|
-    fs := (File name: dirName, '/', self referencePrintName, '.v') 
-        writeStream.
-    [ self printVerilogBoilerplateOn: fs.
-      self printVerilogOn: fs ] 
-        ensure: [ fs close ].
-    instances do: [ :i |
-        i canBePrintedInLine ifTrue: [ i printFullVerilogToDir: dirName ]]!
+    printFullVerilogToDir: dirName [
+	<category: 'printing'>
+	| fs |
+	fs := (File name: dirName , '/' , self referencePrintName , '.v') writeStream.
+	[   self printVerilogBoilerplateOn: fs.
+	    self printVerilogOn: fs ] ensure: [fs close].
+	instances do: [ :i |
+	    i canBePrintedInLine ifTrue: [i printFullVerilogToDir: dirName]]
+    ]
 
-printVerilogCoreOn: aStream
-    "print the verilog meat. Only synthesizable code have valid verilog code"
-    self canBeSynthesized ifTrue: [
-        self printWiresInVerilogOn: aStream.
-        self printInstancesInVerilogOn: aStream ]!
+    printVerilogCoreOn: aStream [
+	"print the verilog meat. Only synthesizable code have valid verilog code"
+	<category: 'printing'>
+	self canBeSynthesized ifTrue: [
+	    self printWiresInVerilogOn: aStream.
+	    self printInstancesInVerilogOn: aStream]
+    ]
 
-printInstancesInVerilogOn: aStream
-    instances size == 0 ifTrue: [ ^self ].
-    aStream nl;
-        nextPutAll: '// %1 instances.' % {instances size}; nl.
-    instances asSortedCollection do: [ :inst |
-        inst printInstanceVerilogOn: aStream ]!
+    printInstancesInVerilogOn: aStream [
+	<category: 'printing'>
+	instances size == 0 ifTrue: [^self].
+	aStream nl; nextPutAll: '// %1 instances.' % {instances size}; nl.
+	instances asSortedCollection do: [:inst |
+	    inst printInstanceVerilogOn: aStream]
+    ]
 
-printWiresInVerilogOn: aStream
-    |wiresSorted|
-    wiresSorted := wires asSortedCollection.
-    wires size == 0 ifTrue: [ ^self ].
-    aStream nl;
-        nextPutAll: '// %1 wires.' % {wires size}; nl.
-    wires do: [ :wire |
-        "this is a flag indicating it should be printed"
-        wire tag: true ].
-    "may add temp wires when generating verilog"
-    CurrentIdentifierDirectory use: wires copy during: [
-    wiresSorted do: [ :wire |
-        wire printVerilogOn: aStream ].
-    wiresSorted do: [ :wire |
-        wire printBlockVerilogOn: aStream ]]!
-!
+    printWiresInVerilogOn: aStream [
+	<category: 'printing'>
+	| wiresSorted |
+	wiresSorted := wires asSortedCollection.
+	wires size == 0 ifTrue: [^self].
+	aStream nl; nextPutAll: '// %1 wires.' % {wires size}; nl.
+	"this is a flag indicating it should be printed"
+	wires do: [ :wire | wire tag: true].
+	"may add temp wires when generating verilog"
+	CurrentIdentifierDirectory use: wires copy during: [
+	    wiresSorted do: [:wire | wire printVerilogOn: aStream].
+	    wiresSorted do: [:wire | wire printBlockVerilogOn: aStream]]
+    ]
 
-!DANMSchematic methodsFor: 'transforming'!
+    clearDerivedData [
+	"some data is derived from more fundimental data; the derived ones are
+	 kept mainly for performance reason. However, sometimes there is a need
+	 to clear all that because structural change that make them stale"
+	<category: 'transforming'>
+	instances do: [:i | i clearDerivedData].
+	wires do: [:w | w clearDerivedData]
+    ]
 
-clearDerivedData
-"some data is derived from more fundimental data; the derived ones are 
- kept mainly for performance reason. However, sometimes there is a need 
- to clear all that because structural change that make them stale"
-    instances do: [ :i | i clearDerivedData ].
-    wires do: [ :w | w clearDerivedData ]!
+    munge [
+	<category: 'transforming'>
+	Transcript nextPutAll: 'Munging schematic %1 for %2' % 
+	    {self referenceName. entityName}; nl.
+	self
+	    flattenAll;
+	    optimize.
+	self shouldObfuscate ifTrue: [self obfuscate]
+    ]
 
-munge
-    Transcript 
-        nextPutAll: 'Munging schematic %1 for %2' % {self referenceName.
-                                                         entityName}; nl.    
-    self 
-	flattenAll;
-	optimize.
-    self shouldObfuscate ifTrue: [
-	self obfuscate ]!
+    obfuscate [
+	"rename all instance and wires to uninteresting name"
+	<category: 'transforming'>
+	| newName |
+	instances copy do: [ :i | 
+	    newName := 'inst_' , (i name hash printString: 16).
+	    [ instances includesKey: newName ] whileTrue: [
+		newName := 'inst_' , (newName hash printString: 16)].
+	    i renameTo: newName ].
+	wires copy do: [:w | 
+	    w isPort ifFalse: [
+		newName := 'wire_' , (w name hash printString: 16).
+		[ wires includesKey: newName ] whileTrue: [
+		    newName := 'wire_' , (newName hash printString: 16)].
+		w renameTo: newName]]
+    ]
 
-obfuscate
-"rename all instance and wires to uninteresting name"
-    |newName|
-    instances copy do: [ :i |
-	newName := 'inst_' , (i name hash printString: 16).
-	[ instances includesKey: newName ] whileTrue: [ 
-	    newName := 'inst_' , (newName hash printString: 16) ].
-	i renameTo: newName ].
-    wires copy do: [ :w |
-	w isPort ifFalse: [
-	    newName := 'wire_' , (w name hash printString: 16).
-	    [ wires includesKey: newName ] whileTrue: [
-		newName := 'wire_' , (newName hash printString: 16) ].
-	    w renameTo: newName]]!
+    flattenAll [
+	<category: 'transforming'>
+	self flattenAllSatisfy: [:i | i canBeFlatten]
+    ]
 
-flattenAll
-    self flattenAllSatisfy: [ :i | i canBeFlatten ]!
+    flattenAllForSynthesis [
+	<category: 'transforming'>
+	self flattenAllSatisfy: [:i | i canBeSynthesized]
+    ]
 
-flattenAllForSynthesis
-    self flattenAllSatisfy: [ :i | i canBeSynthesized ]!
+    flattenAllSatisfy: testBlock [
+	<category: 'transforming'>
+	DANMCurrentDesign use: self during: [
+	    [
+		| changed |
+		changed := false.
+		instances do: [:ins | 
+		    (testBlock value: ins) ifTrue: [
+			ins flatten.
+			self removeInstance: ins.
+			changed := true]].
+		changed ] whileTrue ].
+	self clearDerivedData
+    ]
 
-flattenAllSatisfy: testBlock
-    DANMCurrentDesign use: self during: [
-        [ |changed|
-            changed := false.
-            instances do: [ :ins |
-                (testBlock value: ins) ifTrue: [
-                    ins flatten.
-                    self removeInstance: ins.
-                    changed := true ]].
-            changed ] whileTrue ].
-    self clearDerivedData!
+    flatten [
+	<category: 'transforming'>
+	instances do: [:i |
+	    self context addInstance: i byName: self hierNamePrefix , i name].
+	wires do: [:w | w pushUpHierarchy]
+    ]
 
-flatten
-    instances do: [ :i | 
-        self context addInstance: i byName: (self hierNamePrefix, i name) ].
-    wires do: [ :w | 
-        w pushUpHierarchy ]!
+    expelInstancesSatisfy: testBlock [
+	"move all instances that satisfy the the block. The connectivity likely
+	 need to be repaired"
+	<category: 'transforming'>
+	| toBeRemoved |
+	toBeRemoved := OrderedCollection new.
+	instances do: [:i | 
+	    (testBlock value: i) ifTrue: [
+		toBeRemoved add: i name.
+		self context addInstance: i byName: self hierNamePrefix , i name]].
+	toBeRemoved do: [:each | instances removeKey: each]
+    ]
 
-expelInstancesSatisfy: testBlock
-    "move all instances that satisfy the the block. The connectivity likely
-     need to be repaired"
-    |toBeRemoved|
-    toBeRemoved := OrderedCollection new.
-    instances do: [ :i |
-        (testBlock value: i) ifTrue: [ 
-            toBeRemoved add: i name.
-            self context addInstance: i 
-                         byName: (self hierNamePrefix, i name) ]].
-    toBeRemoved do: [ :each | instances removeKey: each ]!
-    
-expelWiresSatisfy: testBlock
-    "move all wires that satisfy the the block. The connectivity likely
-     need to be repaired"
-    |toBeRemoved|
-    toBeRemoved := OrderedCollection new.
-    wires do: [ :w |
-        (testBlock value: w) ifTrue: [
-            toBeRemoved add: w name.
-            w pushUpHierarchy ]].
-    toBeRemoved do: [ :each | wires removeKey: each ]!
+    expelWiresSatisfy: testBlock [
+	"move all wires that satisfy the the block. The connectivity likely
+	 need to be repaired"
+	<category: 'transforming'>
+	| toBeRemoved |
+	toBeRemoved := OrderedCollection new.
+	wires do: [:w | 
+	    (testBlock value: w) ifTrue: [
+		toBeRemoved add: w name.
+		w pushUpHierarchy]].
+	toBeRemoved do: [:each | wires removeKey: each]
+    ]
 
-expelAllInstances
-    self expelInstancesSatisfy: [ :i | true ].
-    self repairConnection!
+    expelAllInstances [
+	<category: 'transforming'>
+	self expelInstancesSatisfy: [:i | true].
+	self repairConnection
+    ]
 
-wrapAll
-    "wrap everything with a thin layer."
-    |wrapper|
-    wrapper := DANMSchematic emptySchematic.
-    self addInstance: wrapper byName: self referenceName, '_wrapper'.
-    self wrapInstancesSatisfy: [ :i | true ] in: wrapper.
-    self wrapWiresSatisfy: [ :w | true ] in: wrapper.
-    wrapper repairConnection.
-    ^wrapper!
- 
-wrapInstancesSatisfy: testBlock in: wrapper
-    "push instances that satisfy the the block into wrapper.
-     The connectivity likely need to be repaired"
-    |toBeRemoved|
-    toBeRemoved := OrderedCollection new.
-    instances do: [ :i |
-        i ~~ wrapper & (testBlock value: i) ifTrue: [
-            toBeRemoved add: i name.
-            wrapper addInstance: i byName: i name ]].
-    toBeRemoved do: [ :each | instances removeKey: each ].
-    ^wrapper!
+    wrapAll [
+	"wrap everything with a thin layer."
+	<category: 'transforming'>
+	| wrapper |
+	wrapper := DANMSchematic emptySchematic.
+	self addInstance: wrapper byName: self referenceName , '_wrapper'.
+	self wrapInstancesSatisfy: [:i | true] in: wrapper.
+	self wrapWiresSatisfy: [:w | true] in: wrapper.
+	wrapper repairConnection.
+	^wrapper
+    ]
 
-wrapWiresSatisfy: testBlock in: wrapper
-    "push wires that satisfy the the block into wrapper.
-     The connectivity likely need to be repaired"
-    |toBeRemoved|
-    toBeRemoved := OrderedCollection new.
-    wires copy do: [ :w |
-        (testBlock value: w) ifTrue: [
-            toBeRemoved add: w name.
-            wrapper addWire: w]].
-    toBeRemoved do: [ :each | wires removeKey: each ].
-    ^wrapper!
+    wrapInstancesSatisfy: testBlock in: wrapper [
+	"push instances that satisfy the the block into wrapper.
+	 The connectivity likely need to be repaired"
+	<category: 'transforming'>
+	| toBeRemoved |
+	toBeRemoved := OrderedCollection new.
+	instances do: [ :i | 
+	    i ~~ wrapper & (testBlock value: i) ifTrue: [
+		toBeRemoved add: i name.
+		wrapper addInstance: i byName: i name]].
+	toBeRemoved do: [:each | instances removeKey: each].
+	^wrapper
+    ]
 
-repairConnection
-    "repair connection of myself and my context so proper seperation is 
-     maintained. This is mainly used right after an expel and wrap operation.
-     One special case is a total wrap, which does not need to repair.
-     A few things will be done:
-     * if a wire is only used in either low or high level, it will be move 
-     there. 
-     * if a wire is used in both levels it will be splited"
-    wires asArray do: [ :w | w repairHierarchy: self ].
-    context wires asArray do: [ :w | w repairHierarchy: self ]!
+    wrapWiresSatisfy: testBlock in: wrapper [
+	"push wires that satisfy the the block into wrapper.
+	 The connectivity likely need to be repaired"
+	<category: 'transforming'>
+	| toBeRemoved |
+	toBeRemoved := OrderedCollection new.
+	wires copy do: [ :w | 
+	    (testBlock value: w) ifTrue: [
+		toBeRemoved add: w name.
+		wrapper addWire: w]].
+	toBeRemoved do: [:each | wires removeKey: each].
+	^wrapper
+    ]
 
-optimize
-    |eos|
-    eos := self buildEvaluationOrderSet.
-    [ self propagateConstant: eos ] whileTrue.
-    self 
-        markUseful;
-        sweepGarbage;
-        clearDerivedData!
+    repairConnection [
+	"repair connection of myself and my context so proper seperation is
+	 maintained. This is mainly used right after an expel and wrap operation.
+	 One special case is a total wrap, which does not need to repair.
+	 A few things will be done:
+	 * if a wire is only used in either low or high level, it will be move
+	 there.
+	 * if a wire is used in both levels it will be splited"
+	<category: 'transforming'>
+	wires asArray do: [:w | w repairHierarchy: self].
+	context wires asArray do: [:w | w repairHierarchy: self]
+    ]
 
-markUseful
-    "This is the mark phase of the mark and sweep fat trimming. 
-     All useful stuff (those that eventually fanout to outputs) are marked"
-    |set1 set2|
-    set1 := IdentitySet new.
-    ports do: [ :p |
-        p isOutput ifTrue: [ set1 add: p wire ]].
-    [set1 size > 0] whileTrue: [
-        set2 := IdentitySet new.
-        set1 do: [ :each | each tag: true ].
-        set1 do: [ :each |
-            set2 addAll: (each directFanins reject: [ :fanin |
-                fanin tag notNil ])].
-        set1 := set2 ]!
+    optimize [
+	<category: 'transforming'>
+	| eos |
+	eos := self buildEvaluationOrderSet.
+	[self propagateConstant: eos] whileTrue.
+	self
+	    markUseful;
+	    sweepGarbage;
+	    clearDerivedData
+    ]
 
-sweepGarbage
-    "This is the sweep phase of the mark and sweep fat trimming"
-    |toBeDestroyed|
-    toBeDestroyed := OrderedCollection new.
-    wires do: [ :w |
-        (w tag isNil) & w isExposed not ifTrue: [ toBeDestroyed add: w ]].
-    instances do: [ :i |
-        (i tag notNil) ifFalse: [ toBeDestroyed add: i ]].
-    toBeDestroyed do: [ :each | each destroy ]!
-    
-optimizeNoTrim
-    |eos|
-    eos := self buildEvaluationOrderSet.
-    [ self propagateConstant: eos ] whileTrue.
-    self clearDerivedData!
+    markUseful [
+	"This is the mark phase of the mark and sweep fat trimming.
+	 All useful stuff (those that eventually fanout to outputs) are marked"
+	<category: 'transforming'>
+	| set1 set2 |
+	set1 := IdentitySet new.
+	ports do: [:p | p isOutput ifTrue: [set1 add: p wire]].
+	[ set1 size > 0 ] whileTrue: [
+	    set2 := IdentitySet new.
+	    set1 do: [:each | each tag: true].
+	    set1 do: [:each |
+		set2 addAll: (each directFanins reject: [:fanin | fanin tag notNil])].
+	    set1 := set2]
+    ]
 
-propagateConstant: eos
-    |result optimized|
-    result := false.
-    1 to: eos size do: [ :i |
-        optimized := self propagateConstantInSet: (eos at: i).
-        eos at: i put: IdentitySet new.
-        optimized size > 0 ifTrue: [ result := true ].
-        optimized do: [ :each |
-            each refs do: [ :ref |
-                |w|
-                w := ref context.
-                (eos at: (w evaluationOrder + 1)) add: w ]]].
-    ^result!
+    sweepGarbage [
+	"This is the sweep phase of the mark and sweep fat trimming"
+	<category: 'transforming'>
+	| toBeDestroyed |
+	toBeDestroyed := OrderedCollection new.
+	wires do: [:w |
+	    w tag isNil & w isExposed not ifTrue: [toBeDestroyed add: w]].
+	instances do: [:i |
+	    i tag notNil ifFalse: [toBeDestroyed add: i]].
+	toBeDestroyed do: [:each | each destroy]
+    ]
 
-propagateConstantInSet: aSet
-    |newSet|
-    newSet := IdentitySet new.
-    aSet do: [ :each |
-        |newWire|
-        newWire := each optimize.
-        (newWire notNil and: [ newWire expression isKindOf: ASTConstant ]) 
-            ifTrue: [ newSet add: newWire ]].
-    ^newSet!
+    optimizeNoTrim [
+	<category: 'transforming'>
+	| eos |
+	eos := self buildEvaluationOrderSet.
+	[self propagateConstant: eos] whileTrue.
+	self clearDerivedData
+    ]
 
-trimDangle: eos
-    |result optimized|
-    result := false.
-    eos size to: 1 by: -1 do: [ :i |
-        optimized := self trimDangleInSet: (eos at: i).
-        eos at: i put: IdentitySet new.
-        optimized size > 0 ifTrue: [ result := true ].
-        optimized do: [ :each |
-            each directFanins do: [ :w |
-                (eos at: (w evaluationOrder + 1)) add: w ].
-            each destroy ]].
-    ^result!
+    propagateConstant: eos [
+	<category: 'transforming'>
+	| result optimized |
+	result := false.
+	1 to: eos size do: [:i | 
+	    optimized := self propagateConstantInSet: (eos at: i).
+	    eos at: i put: IdentitySet new.
+	    optimized size > 0 ifTrue: [result := true].
+	    optimized do: [:each | 
+		each refs do: [:ref | 
+		    | w |
+		    w := ref context.
+		    (eos at: w evaluationOrder + 1) add: w]]].
+	^result
+    ]
 
-trimDangleInSet: aSet
-    ^ aSet select: [ :each |
-        (each expression notNil and: [ each isLoaded not ])
-            and: [ each isPort not ]]!
-!
+    propagateConstantInSet: aSet [
+	<category: 'transforming'>
+	| newSet |
+	newSet := IdentitySet new.
+	aSet do: [:each | 
+	    | newWire |
+	    newWire := each optimize.
+	    (newWire notNil and: [newWire expression isKindOf: ASTConstant]) ifTrue: [
+		newSet add: newWire]].
+	^newSet
+    ]
 
-!DANMSchematic methodsFor: 'searching'!
+    trimDangle: eos [
+	<category: 'transforming'>
+	| result optimized |
+	result := false.
+	eos size to: 1 by: -1 do: [ :i | 
+	    optimized := self trimDangleInSet: (eos at: i).
+	    eos at: i put: IdentitySet new.
+	    optimized size > 0 ifTrue: [result := true].
+	    optimized do: [ :each | 
+		each directFanins do: [:w | (eos at: w evaluationOrder + 1) add: w].
+		each destroy]].
+	^result
+    ]
 
-allPinNames
-    "return a set of pin names that exist in the design"
-    |set|
-    set := Set new.
-    instances do: [ :each |
-        set addAll: (each ports collect: [ :port | 
-            port name])].
-    ^set!
+    trimDangleInSet: aSet [
+	<category: 'transforming'>
+	^aSet select: [:each | 
+	    (each expression notNil and: [each isLoaded not]) and: [each isPort not]]
+    ]
 
-allUnconnectedPinsWithName: pName
-    |pins|
-    pins := OrderedCollection new.
-    instances do: [ :each |
-        |port|
-        port := each findPortByName: pName.
-        (port ~= nil and: [ (each wireOnPort: port) isNil ]) ifTrue: [ 
-            pins add: port ]].
-    ^pins!
+    allPinNames [
+	"return a set of pin names that exist in the design"
+	<category: 'searching'>
+	| set |
+	set := Set new.
+	instances do: [:each |
+	    set addAll: (each ports collect: [:port | port name])].
+	^set
+    ]
 
-allUnconnectedInputPinsWithName: pName
-    |pins|
-    pins := OrderedCollection new.
-    instances do: [ :each |
-        |port|
-        port := each findPortByName: pName.
-        (port ~= nil and: [ 
-            port isInput & ((each wireOnPort: port) == nil) ]) ifTrue: [ 
-                pins add: port ]].
-    ^pins!
-!
+    allUnconnectedPinsWithName: pName [
+	<category: 'searching'>
+	| pins |
+	pins := OrderedCollection new.
+	instances do: [:each | 
+	    | port |
+	    port := each findPortByName: pName.
+	    (port ~= nil and: [(each wireOnPort: port) isNil]) ifTrue: [
+		pins add: port]].
+	^pins
+    ]
 
-!DANMSchematic methodsFor: 'statistic'!
+    allUnconnectedInputPinsWithName: pName [
+	<category: 'searching'>
+	| pins |
+	pins := OrderedCollection new.
+	instances do: [:each | 
+	    | port |
+	    port := each findPortByName: pName.
+	    (port ~= nil and: [port isInput & ((each wireOnPort: port) == nil)]) ifTrue: [
+		pins add: port]].
+	^pins
+    ]
 
-buildEvaluationOrderSet
-    |orders|
-    orders := OrderedCollection new.
-    wires do: [ :each |
-        |o os|
-        o := each evaluationOrder + 1.
-        os := orders size.
-        os < o ifTrue: [
-            o - os timesRepeat: [ orders add: IdentitySet new ]].
-        (orders at: o) add: each ].
-    ^orders!
+    buildEvaluationOrderSet [
+	<category: 'statistic'>
+	| orders |
+	orders := OrderedCollection new.
+	wires do: [:each | 
+	    | o os |
+	    o := each evaluationOrder + 1.
+	    os := orders size.
+	    os < o ifTrue: [o - os timesRepeat: [orders add: IdentitySet new]].
+	    (orders at: o) add: each].
+	^orders
+    ]
 
-printDigraphOn: aStream
-    |orders|
-    aStream 
-        nextPutAll: 'digraph dependency {'; nl;
-        nextPutAll: 'rankdir = LR;'; nl.
-    orders := OrderedCollection new.
-    wires do: [ :each |
-        |o os|
-        o := each evaluationOrder + 1.
-        os := orders size.
-        each printDigraphOn: aStream.
-        os < o ifTrue: [
-            o - os timesRepeat: [ orders add: OrderedCollection new ]].
-        (orders at: o) add: each ].
-    orders do: [ :nodes |
-        aStream nextPutAll: '{ rank = same; '.
-        nodes do: [ :each |
-            aStream nextPutAll: '"%1"; ' % {each name} ].
-        aStream nextPutAll: '}'; nl ].
-    aStream nextPutAll: '}'; nl!
-!
+    printDigraphOn: aStream [
+	<category: 'statistic'>
+	| orders |
+	aStream
+	    nextPutAll: 'digraph dependency {'; nl;
+	    nextPutAll: 'rankdir = LR;'; nl.
+	orders := OrderedCollection new.
+	wires do: [:each | 
+	    | o os |
+	    o := each evaluationOrder + 1.
+	    os := orders size.
+	    each printDigraphOn: aStream.
+	    os < o ifTrue: [o - os timesRepeat: [orders add: OrderedCollection new]].
+	    (orders at: o) add: each].
+	orders do: [:nodes | 
+	    aStream nextPutAll: '{ rank = same; '.
+	    nodes do: [:each | aStream nextPutAll: '"%1"; ' % {each name}].
+	    aStream nextPutAll: '}'; nl].
+	aStream nextPutAll: '}'; nl
+    ]
+]
 
-DANMSchematic subclass: #DANMModeledSchematic
-    instanceVariableNames: ''
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
+DANMSchematic subclass: DANMModeledSchematic [
+    <comment: 'I am a schematic that should not be synthesised'>
+    <category: ''>
 
-DANMModeledSchematic comment:
-    'I am a schematic that should not be synthesised'!
+    type [
+	<category: 'accessing'>
+	^'model'
+    ]
 
-!DANMModeledSchematic methodsFor: 'accessing'!
+    canBeSynthesized [
+	<category: 'accessing'>
+	^false
+    ]
+]
 
-type
-    ^'model'!
+DANMSchematic subclass: DANMClasslessSchematic [
+    | referenceName |
+    <comment: 'I am a schematic that has no class, but built on the fly'>
+    <category: ''>
 
-canBeSynthesized
-    ^false! 
-!
+    reference [
+	<category: 'accessing'>
+	^nil
+    ]
 
-DANMSchematic subclass: #DANMClasslessSchematic
-    instanceVariableNames: 'referenceName'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
+    referenceName [
+	<category: 'accessing'>
+	^referenceName
+    ]
 
-DANMClasslessSchematic comment:
-    'I am a schematic that has no class, but built on the fly'!
+    referencePath [
+	<category: 'accessing'>
+	^nil
+    ]
 
-!DANMClasslessSchematic methodsFor: 'accessing'!
+    name: n [
+	<category: 'accessing'>
+	super name: n.
+	referenceName isNil ifTrue: [referenceName := n]
+    ]
 
-reference
-    ^nil!
+    elaborate [
+	<category: 'accessing'>
+	self
+	    clearInstances;
+	    clearWires
+    ]
+]
 
-referenceName
-    ^referenceName!
+DANMSchematic subclass: DANMReplicatedSchematic [
+    <comment: 'I am a schematic that is instantiated several times with all instances replicated'>
+    <category: ''>
 
-referencePath
-    ^nil!
+    DANMReplicatedSchematic class >> primary [
+	<category: 'primary accessing'>
+	^self subclassResponsibility
+    ]
 
-name: n
-    super name: n.
-    referenceName isNil ifTrue: [
-	referenceName := n ]!
+    DANMReplicatedSchematic class >> primary: p [
+	<category: 'primary accessing'>
+	^self subclassResponsibility
+    ]
 
-elaborate
-    self
-	clearInstances;
-	clearWires!
-!
+    isPrimary [
+	<category: 'accessing'>
+	^self = self class primary
+    ]
 
-DANMSchematic subclass: #DANMReplicatedSchematic
-    instanceVariableNames: ''
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: ''!
+    referencePrintName [
+	"not uniqified"
 
-DANMReplicatedSchematic comment:
-    'I am a schematic that is instantiated several times with all instances replicated'!
+	<category: 'accessing'>
+	^self referenceName
+    ]
 
-!DANMReplicatedSchematic class methodsFor: 'primary accessing'!
+    isUniquified [
+	<category: 'accessing'>
+	^(self = self class primary) not
+    ]
 
-primary
-    ^self subclassResponsibility!
+    canBeFlatten [
+	<category: 'accessing'>
+	^false
+    ]
 
-primary: p
-    ^self subclassResponsibility!
-!
+    elaborate [
+	<category: 'accessing'>
+	wires notNil ifTrue: [^self].
+	self class primary isNil ifTrue: [
+	    super elaborate.
+	    self class primary: self.
+	    ^self].
+	Transcript nextPutAll: 'Copying schematic %1 for %2' % 
+	    {self referenceName. entityName}; nl.
+	self
+	    clearUserData;
+	    clearWires;
+	    clearInstances;
+	    copyFrom: self class primary
+    ]
 
-!DANMReplicatedSchematic methodsFor: 'accessing'!
+    generateFullVerilogTo: fn [
+	"only primt primary one"
+	<category: 'printing'>
+	self isPrimary ifTrue: [super generateFullVerilogTo: fn].
+	^self
+    ]
 
-isPrimary
-    ^self = self class primary!
+    generateFullVerilogsToDir: dirName [
+	"only primt primary one"
+	<category: 'printing'>
+	self isPrimary ifTrue: [super generateFullVerilogsToDir: dirName].
+	^self
+    ]
 
-referencePrintName
-    "not uniqified"
-    ^self referenceName!
+    printFullVerilogOn: fs [
+	"only primt primary one"
+	<category: 'printing'>
+	self isPrimary ifTrue: [super printFullVerilogOn: fs].
+	^self
+    ]
 
-isUniquified
-    ^(self = self class primary) not!
+    printFullVerilogToDir: dirName [
+	"only primt primary one"
+	<category: 'printing'>
+	self isPrimary ifTrue: [super printFullVerilogToDir: dirName].
+	^self
+    ]
 
-canBeFlatten
-    ^false!
-
-elaborate
-    wires notNil ifTrue: [ ^self ].
-    self class primary isNil ifTrue: [
-	super elaborate.
-	self class primary: self.
-	^self ].
-    Transcript 
-        nextPutAll: 'Copying schematic %1 for %2' % {self referenceName.
-                                                         entityName}; nl.    
-    self
-	clearUserData;
-	clearWires;
-	clearInstances;
-	copyFrom: self class primary!
-!
-
-!DANMReplicatedSchematic methodsFor: 'printing'!
-
-generateFullVerilogTo: fn
-    "only primt primary one"
-    self isPrimary ifTrue: [ super generateFullVerilogTo: fn ].
-    ^self!
-
-generateFullVerilogsToDir: dirName
-    "only primt primary one"
-    self isPrimary ifTrue: [ super generateFullVerilogsToDir: dirName ].
-    ^self!
-
-printFullVerilogOn: fs
-    "only primt primary one"
-    self isPrimary ifTrue: [ super printFullVerilogOn: fs ].
-    ^self!
-
-printFullVerilogToDir: dirName
-    "only primt primary one"
-    self isPrimary ifTrue: [ super printFullVerilogToDir: dirName ].
-    ^self!
-
-generateSubModuleFullVerilogToDir: dirName
-    "only primt primary one"
-    self isPrimary ifTrue: [ super generateSubModuleFullVerilogToDir: dirName ].
-    ^self!
-!
+    generateSubModuleFullVerilogToDir: dirName [
+	"only primt primary one"
+	<category: 'printing'>
+	self isPrimary ifTrue: [super generateSubModuleFullVerilogToDir: dirName].
+	^self
+    ]
+]

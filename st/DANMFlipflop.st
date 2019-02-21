@@ -17,393 +17,442 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-DANMExpressionWire subclass: #DANMFlipflop
-         instanceVariableNames: 'clock'
-         classVariableNames: ''
-         poolDictionaries: ''
-         category: 'DANM'!
+DANMExpressionWire subclass: DANMFlipflop [
+    | clock |
+    <comment: 'I am a wire with a expression of other wires, with 
+a flop at the end.'>
+    <category: 'DANM'>
 
-DANMFlipflop comment: 'I am a wire with a expression of other wires, with 
-a flop at the end.'!
+    isSequential [
+	<category: 'accessing'>
+	^true
+    ]
 
-!DANMFlipflop methodsFor: 'accessing'!
+    expression: newExpr [
+	<category: 'accessing'>
+	expression == newExpr ifTrue: [^self].
+	newExpr notNil ifTrue: [newExpr context: self type: #DATA].
+	expression := newExpr
+    ]
 
-isSequential
-    ^true!
+    clock: newExpr [
+	<category: 'accessing'>
+	clock == newExpr ifTrue: [^self].
+	newExpr notNil ifTrue: [newExpr context: self type: #CLOCK].
+	clock := newExpr
+    ]
 
-expression: newExpr
-    expression == newExpr ifTrue: [ ^self ].
-    newExpr notNil ifTrue: [ newExpr context: self type: #DATA ].
-    expression := newExpr!
+    directFanins [
+	<category: 'accessing'>
+	^clock dependencies , expression dependencies
+    ]
 
-clock: newExpr
-    clock == newExpr ifTrue: [ ^self ].
-    newExpr notNil ifTrue: [ newExpr context: self type: #CLOCK ].
-    clock := newExpr!
+    dependencies [
+	<category: 'accessing'>
+	^clock dependencies
+    ]
 
-directFanins
-    ^clock dependencies, expression dependencies!
-    
-dependencies
-    ^clock dependencies!
+    isDirty [
+	"I am dirty when expression is dirty and clock is rising.
+	 0: clean 1: expression dirty but clock not rising yet. 2: expression
+	 dirty and clock is rising"
+	<category: 'accessing'>
+	^dirty >= 2
+    ]
 
-isDirty
-    "I am dirty when expression is dirty and clock is rising.
-     0: clean 1: expression dirty but clock not rising yet. 2: expression
-     dirty and clock is rising"
-    ^(dirty>=2)!
+    setDirty [
+	<category: 'accessing'>
+	dirty := 2
+    ]
 
-setDirty
-    dirty := 2!
+    setDataDirty [
+	"set expression to be dirty."
+	<category: 'accessing'>
+	dirty == 0 ifTrue: [dirty := 1]
+    ]
 
-setDataDirty
-    "set expression to be dirty."
-    dirty == 0 ifTrue: [ dirty := 1 ]!
+    setClockDirty [
+	"set clock is rising."
+	<category: 'accessing'>
+	dirty == 1 ifTrue: [dirty := 2]
+    ]
 
-setClockDirty
-    "set clock is rising."
-    dirty == 1 ifTrue: [ dirty := 2 ]!
+    resetDirty [
+	"set to clean."
+	<category: 'accessing'>
+	dirty := 0
+    ]
 
-resetDirty
-    "set to clean."
-    dirty := 0!
-!
+    evaluate [
+	"evaluate self, set nextValue and return it if I am changing. otherwise
+	 return nil. The clock is ignored here because this method is invoked
+	 only when clock has a rise edge"
+	<category: 'basic'>
+	ASTIdentifier useNextValue: false.
+	self nextValue: expression evaluate.
+	nextValue ~= value ifTrue: [^nextValue].
+	^nil
+    ]
 
-!DANMFlipflop methodsFor: 'basic'!
+    staticValue [
+	<category: 'basic'>
+	ASTIdentifier useNextValue: false.
+	nextValue isNil ifTrue: [self nextValue: expression staticValue].
+	nextValue ~= value ifTrue: [^nextValue].
+	^nil
+    ]
 
-evaluate
-    "evaluate self, set nextValue and return it if I am changing. otherwise
-     return nil. The clock is ignored here because this method is invoked
-     only when clock has a rise edge"
-    ASTIdentifier useNextValue: false.
-    self nextValue: expression evaluate.
-    nextValue ~= value ifTrue: [ ^nextValue ].
-    ^nil!
+    optimize [
+	<category: 'basic'>
+	| e |
+	e := expression optimize.
+	e isNil ifTrue: [
+	    self destroy.
+	    ^nil].
+	(e isKindOf: ASTConstant) ifTrue: [
+	    clock destroy.
+	    ^(DANMExpressionWire newReplacementNamed: entityName
+				 inContext: self context)
+		expression: e;
+		value: e evaluate ]
+    ]
 
-staticValue
-    ASTIdentifier useNextValue: false.
-    nextValue isNil ifTrue: [
-        self nextValue: expression staticValue ].
-    nextValue ~= value ifTrue: [ ^nextValue ].
-    ^nil!
+    resetBy: reset to: resetTo [
+	<category: 'basic'>
+	^(DANMResetFlop newReplacementNamed: entityName inContext: self context)
+	    expression: expression;
+	    clock: clock;
+	    reset: reset;
+	    resetTo: resetTo
+    ]
 
-optimize
-    |e|
-    e := expression optimize.
-    e isNil ifTrue: [ 
-        self destroy.
-        ^nil ].
-    (e isKindOf: ASTConstant) ifTrue: [
-        clock destroy.
-        ^(DANMExpressionWire newReplacementNamed: entityName 
-                            inContext: self context) 
-            expression: e; 
-            value: e evaluate ]!
+    destroy [
+	<category: 'basic'>
+	clock destroy.
+	super destroy
+    ]
 
-resetBy: reset to: resetTo
-    ^(DANMResetFlop newReplacementNamed: entityName 
-                    inContext: self context) 
-        expression: expression;
-        clock: clock;
-        reset: reset;
-        resetTo: resetTo!
-    
-destroy
-    clock destroy.
-    super destroy!
-!
+    nodeStyle [
+	<category: 'printing'>
+	^'[shape=box,peripheries=2]'
+    ]
 
-!DANMFlipflop methodsFor: 'printing'!
+    printOn: aStream [
+	<category: 'printing'>
+	aStream nextPutAll: '(%1)$(%2) ' % {expression.	clock}
+    ]
 
-nodeStyle
-    ^'[shape=box,peripheries=2]'!
+    printHTMLHeadOn: aStream [
+	<category: 'printing'>
+	aStream
+	    nextPutAll: '<h3><a name="WIRE_%1">Flipflop %1</a></h3><ul><li>width is %2.</li>' % 
+	    {entityName. self width}; nl;
+	    nextPutAll: '<li>clocked by: %1</li>' % {clock printStringStyle: #HTML};
+	    nextPutAll: '<li>data: %1</li>' % {expression printStringStyle: #HTML}; nl
+    ]
 
-printOn: aStream
-    aStream nextPutAll: ('(%1)$(%2) ' % {expression. clock})!
+    printAdditionalVerilogOn: aStream [
+	<category: 'printing'>
+	self tag notNil ifFalse: [^self].
+	self tag: nil.
+	self printVerilogRegsOn: aStream
+    ]
 
-printHTMLHeadOn: aStream
-    aStream 
-        nextPutAll: ('<h3><a name="WIRE_%1">Flipflop %1</a></h3><ul><li>width is %2.</li>' 
-                         % {entityName. self width});
-        nl;
-        nextPutAll: '<li>clocked by: %1</li>' % 
-            {clock printStringStyle: #HTML};
-        nextPutAll: '<li>data: %1</li>' % 
-            {expression printStringStyle: #HTML};
-        nl!
+    printVerilogOn: aStream [
+	<category: 'printing'>
+	self tag notNil ifTrue: [self printVerilogRegsOn: aStream].
+	self tag: nil.
+	self basicPrintVerilogOn: aStream
+    ]
 
-printAdditionalVerilogOn: aStream
-    (self tag notNil) ifFalse: [ ^self ].
-    self tag: nil.
-    self printVerilogRegsOn: aStream!
+    basicPrintVerilogOn: aStream [
+	<category: 'printing'>
+	clock printAdditionalVerilogOn: aStream.
+	clock printVerilogOn: aStream withAlias: 'Clock'.
+	expression printAdditionalVerilogOn: aStream
+    ]
 
-printVerilogOn: aStream
-    (self tag notNil) ifTrue: [ 
-        self printVerilogRegsOn: aStream ].
-    self tag: nil.
-    self basicPrintVerilogOn: aStream!
+    printBlockVerilogOn: aStream [
+	<category: 'printing'>
+	| w name |
+	name := self verilogName.
+	aStream nl.
+	aStream nextPutAll: '    always @(posedge %1)' %
+	    {clock printStringStyle: #VERILOG}; nl.
+	expression alias: name.
+	expression 
+	    printCoreVerilogOn: aStream
+	    indent: 8
+	    blocking: false.
+	clock clearAlias.
+	expression clearAlias
+    ]
+]
 
-basicPrintVerilogOn: aStream
-    clock printAdditionalVerilogOn: aStream.
-    clock printVerilogOn: aStream withAlias: 'Clock'.
-    expression printAdditionalVerilogOn: aStream!
+DANMFlipflop subclass: DANMLatch [
+    <comment: 'I am a wire with a expression of other wires, with 
+a d-latch at the end.'>
+    <category: 'DANM'>
 
-printBlockVerilogOn: aStream
-    |w name|
-    name := self verilogName.
-    aStream nl.
-    aStream 
-        nextPutAll: '    always @(posedge %1)' 
-            % {clock printStringStyle: #VERILOG}; 
-        nl.
-    expression alias: name.
-    expression printCoreVerilogOn: aStream indent: 8 blocking: false.
-    clock clearAlias.
-    expression clearAlias!
-!
+    expression: newExpr [
+	<category: 'accessing'>
+	expression == newExpr ifTrue: [^self].
+	newExpr notNil ifTrue: [newExpr context: self type: #LATCHDATA].
+	expression := newExpr
+    ]
 
-DANMFlipflop subclass: #DANMLatch
-         instanceVariableNames: ''
-         classVariableNames: ''
-         poolDictionaries: ''
-         category: 'DANM'!
+    dependencies [
+	<category: 'accessing'>
+	^clock dependencies , expression dependencies
+    ]
 
-DANMLatch comment: 'I am a wire with a expression of other wires, with 
-a d-latch at the end.'!
+    isDirty [
+	"I am dirty when expression is dirty.
+	 0: clean 1: expression dirty but clock not rising yet. 2: expression
+	 dirty and clock is rising"
+	<category: 'accessing'>
+	^dirty >= 1
+    ]
 
-!DANMLatch methodsFor: 'accessing'!
+    resetDirty [
+	"from state 2 I go back to clean. However, state 1 is not reset because
+	 I could be still be dirty because I may be blocked by the clock"
+	<category: 'accessing'>
+	dirty isNil | (dirty == 2) ifTrue: [dirty == 0]
+    ]
 
-expression: newExpr
-    expression == newExpr ifTrue: [ ^self ].
-    newExpr notNil ifTrue: [ newExpr context: self type: #LATCHDATA ].
-    expression := newExpr!
+    evaluate [
+	"evaluate self, set nextValue and return it if I am changing. otherwise
+	 return nil."
+	<category: 'basic'>
+	ASTIdentifier useNextValue: true.
+	clock evaluate > 0 ifTrue: [
+	    self nextValue: expression evaluate.
+	    nextValue ~= value ifTrue: [^nextValue]].
+	^nil
+    ]
 
-dependencies
-    ^clock dependencies, expression dependencies!
+    staticValue [
+	"evaluate self statically, set nextValue and return it if I am changing.
+	 otherwise return nil"
+	<category: 'basic'>
+	ASTIdentifier useNextValue: true.
+	nextValue isNil ifTrue: [self nextValue: expression staticValue].
+	nextValue ~= value ifTrue: [^nextValue].
+	^nil
+    ]
 
-isDirty
-    "I am dirty when expression is dirty.
-     0: clean 1: expression dirty but clock not rising yet. 2: expression
-     dirty and clock is rising"
-    ^(dirty>=1)!
+    optimize [
+	<category: 'basic'>
+	| e |
+	e := expression optimize.
+	e isNil ifTrue: [
+	    self destroy.
+	    ^nil].
+	(e isKindOf: ASTConstant) ifTrue: [
+	    clock destroy.
+	    ^(DANMExpressionWire newReplacementNamed: entityName
+				 inContext: self context)
+		expression: e;
+		value: e evaluate]
+    ]
 
-resetDirty
-    "from state 2 I go back to clean. However, state 1 is not reset because
-     I could be still be dirty because I may be blocked by the clock"
-    dirty isNil | (dirty == 2) ifTrue: [ dirty == 0 ]!
-!
+    nodeStyle [
+	<category: 'printing'>
+	^'[shape=box]'
+    ]
 
-!DANMLatch methodsFor: 'basic'!
+    printOn: aStream [
+	<category: 'printing'>
+	aStream nextPutAll: '(%1)@(%2) ' % {expression. clock}
+    ]
 
-evaluate
-    "evaluate self, set nextValue and return it if I am changing. otherwise
-     return nil."
-    ASTIdentifier useNextValue: true.
-    clock evaluate > 0 ifTrue: [
-        self nextValue: expression evaluate.
-        nextValue ~= value ifTrue: [ ^nextValue ]].
-    ^nil!
+    printHTMLHeadOn: aStream [
+	<category: 'printing'>
+	aStream
+	    nextPutAll: '<h3><a name="WIRE_%1">Latch %1</a></h3><ul><li>width is %2.</li>' % 
+	    {entityName. self width}; nl;
+	    nextPutAll: '<li>clocked by: %1</li>' % {clock printStringStyle: #HTML};
+	    nextPutAll: '<li>data: %1</li>' % {expression printStringStyle: #HTML}; nl
+    ]
 
-staticValue
-    "evaluate self statically, set nextValue and return it if I am changing. 
-     otherwise return nil"
-    ASTIdentifier useNextValue: true.
-    nextValue isNil ifTrue: [
-        self nextValue: expression staticValue ].
-    nextValue ~= value ifTrue: [ ^nextValue ].
-    ^nil!
+    basicPrintVerilogOn: aStream [
+	<category: 'printing'>
+	clock printAdditionalVerilogOn: aStream.
+	expression printAdditionalVerilogOn: aStream
+    ]
 
-optimize
-    |e|
-    e := expression optimize.
-    e isNil ifTrue: [ 
-        self destroy.
-        ^nil ].
-    (e isKindOf: ASTConstant) ifTrue: [
-        clock destroy.
-        ^(DANMExpressionWire newReplacementNamed: entityName 
-                            inContext: self context) 
-            expression: e; 
-            value: e evaluate ]!
-!
+    printBlockVerilogOn: aStream [
+	<category: 'printing'>
+	| name |
+	name := self verilogName.
+	aStream nl.
+	DANMExpressionWire printDependencies: self dependencies uniquify on: aStream.
+	aStream nextPutAll: '        if (%1)' % {clock printStringStyle: #VERILOG}; nl.
+	expression alias: name.
+	expression 
+	    printCoreVerilogOn: aStream
+	    indent: 12
+	    blocking: true.
+	clock clearAlias.
+	expression clearAlias
+    ]
+]
 
-!DANMLatch methodsFor: 'printing'!
+DANMFlipflop subclass: DANMResetFlop [
+    | reset resetTo |
+    <comment: 'I am a flop with an asynchronous reset'>
+    <category: 'DANM'>
 
-nodeStyle
-    ^'[shape=box]'!
+    reset: newExpr [
+	<category: 'accessing'>
+	reset == newExpr ifTrue: [^self].
+	newExpr notNil ifTrue: [newExpr context: self type: #DIRECT].
+	reset := newExpr
+    ]
 
-printOn: aStream
-    aStream nextPutAll: ('(%1)@(%2) ' % {expression. clock})!
+    resetTo: newExpr [
+	<category: 'accessing'>
+	reset == newExpr ifTrue: [^self].
+	resetTo := newExpr
+    ]
 
-printHTMLHeadOn: aStream
-    aStream 
-        nextPutAll: ('<h3><a name="WIRE_%1">Latch %1</a></h3><ul><li>width is %2.</li>' 
-                         % {entityName. self width});
-        nl;
-        nextPutAll: '<li>clocked by: %1</li>' % 
-            {clock printStringStyle: #HTML};
-        nextPutAll: '<li>data: %1</li>' % 
-            {expression printStringStyle: #HTML};
-        nl!
+    directFanins [
+	<category: 'accessing'>
+	^super directFanins , reset dependencies , resetTo dependencies
+    ]
 
-basicPrintVerilogOn: aStream
-    clock printAdditionalVerilogOn: aStream.
-    expression printAdditionalVerilogOn: aStream!
+    dependencies [
+	<category: 'accessing'>
+	^clock dependencies , reset dependencies
+    ]
 
-printBlockVerilogOn: aStream
-    |name|
-    name := self verilogName.
-    aStream nl.
-    DANMExpressionWire printDependencies: self dependencies uniquify on: aStream.
-    aStream
-        nextPutAll: '        if (%1)' % {clock printStringStyle: #VERILOG};
-        nl.
-    expression alias: name.
-    expression printCoreVerilogOn: aStream indent: 12 blocking: true.
-    clock clearAlias.
-    expression clearAlias!
-!
+    resetDirty [
+	"set to be clean."
+	<category: 'basic'>
+	dirty := dirty == 3 ifTrue: [1] ifFalse: [0]
+    ]
 
-DANMFlipflop subclass: #DANMResetFlop
-         instanceVariableNames: 'reset resetTo'
-         classVariableNames: ''
-         poolDictionaries: ''
-         category: 'DANM'!
+    setDirty [
+	"I am dirty when expression is dirty and clock is rising, or reset is
+	 changing. 0: clean 1: expression dirty but clock not rising yet.
+	 2: expression dirty and clock is rising, 3 reset changed"
+	<category: 'basic'>
+	dirty := 3
+    ]
 
-DANMResetFlop comment: 'I am a flop with an asynchronous reset'!
+    minWidth [
+	<category: 'basic'>
+	expression isNil ifTrue: [^super minWidth].
+	expression width > 0 ifTrue: [^expression width].
+	resetTo isNil ifTrue: [^super minWidth].
+	^resetTo width
+    ]
 
-!DANMResetFlop methodsFor: 'accessing'!
+    evaluate [
+	"evaluate self, set nextValue and return it if I am changing. otherwise
+	 return nil."
+	<category: 'basic'>
+	ASTIdentifier useNextValue: true.
+	"reset condition"
+	reset evaluate == 0 ifTrue: [
+	    self nextValue: resetTo evaluate.
+	    nextValue ~= value ifTrue: [^nextValue] ifFalse: [^nil]].
+	"no reset, so it is just like a regular flop"
+	dirty ~= 3 ifTrue: [^super evaluate].
+	"reset deasserted. no-op, but clock edge aligned here is eaten"
+	^nil
+    ]
 
-reset: newExpr
-    reset == newExpr ifTrue: [ ^self ].
-    newExpr notNil ifTrue: [ newExpr context: self type: #DIRECT ].
-    reset := newExpr!
+    staticValue [
+	<category: 'basic'>
+	ASTIdentifier useNextValue: true.
+	self nextValue: resetTo staticValue.
+	nextValue ~= value ifTrue: [^nextValue].
+	^super staticValue
+    ]
 
-resetTo: newExpr
-    reset == newExpr ifTrue: [ ^self ].
-    resetTo := newExpr!
+    optimize [
+	<category: 'basic'>
+	| e |
+	e := reset optimize.
+	e isNil ifTrue: [
+	    self destroy.
+	    ^nil].
+	(e isKindOf: ASTConstant) ifTrue: [
+	    e evaluate ~= 0 
+		ifTrue:	[
+		    e destroy.
+		    resetTo destroy.
+		    ^(DANMFlipflop newReplacementNamed: entityName inContext: self context)
+			expression: expression;
+			clock: clock;
+			optimize]
+		ifFalse: [
+		    clock destroy.
+		    expression destroy.
+		    ^(DANMExpressionWire newReplacementNamed: entityName
+					 inContext: self context)
+			expression: resetTo;
+			optimize]]
+    ]
 
-directFanins
-    ^super directFanins, reset dependencies, resetTo dependencies!
-    
-dependencies
-    ^clock dependencies, reset dependencies!
-!
+    destroy [
+	<category: 'basic'>
+	reset destroy.
+	resetTo destroy.
+	super destroy
+    ]
 
-!DANMResetFlop methodsFor: 'basic'!
+    nodeStyle [
+	<category: 'printing'>
+	^'[shape=box,peripheries=3]'
+    ]
 
-resetDirty
-    "set to be clean."
-    dirty := (dirty == 3) ifTrue: [ 1 ] ifFalse: [0] !
+    printOn: aStream [
+	<category: 'printing'>
+	aStream nextPutAll: '(%1)$(%2)_(%3)->(%4) ' % {expression. clock. reset. resetTo}
+    ]
 
-setDirty
-    "I am dirty when expression is dirty and clock is rising, or reset is 
-     changing. 0: clean 1: expression dirty but clock not rising yet. 
-     2: expression dirty and clock is rising, 3 reset changed"
-    dirty := 3!
+    printHTMLHeadOn: aStream [
+	<category: 'printing'>
+	aStream
+	    nextPutAll: '<h3><a name="WIRE_%1">ResetFlop %1</a></h3><ul><li>width is %2.</li>' % 
+	    {entityName. self width}; nl;
+	    nextPutAll: '<li>clocked by: %1</li>' % {clock printStringStyle: #HTML};
+	    nextPutAll: '<li>resetted by: %1</li>' % {reset printStringStyle: #HTML};
+	    nextPutAll: '<li>resetted to: %1</li>' % {resetTo printStringStyle: #HTML};
+	    nextPutAll: '<li>data: %1</li>' % {expression printStringStyle: #HTML}; nl
+    ]
 
-minWidth
-    expression isNil ifTrue: [ ^super minWidth ].
-    expression width > 0 ifTrue: [ ^expression width].
-    resetTo isNil ifTrue: [ ^super minWidth ].
-    ^resetTo width!
+    basicPrintVerilogOn: aStream [
+	<category: 'printing'>
+	clock printAdditionalVerilogOn: aStream.
+	clock printVerilogOn: aStream withAlias: 'Clock'.
+	reset printAdditionalVerilogOn: aStream.
+	reset printVerilogOn: aStream withAlias: 'Reset'.
+	expression printAdditionalVerilogOn: aStream
+    ]
 
-evaluate
-    "evaluate self, set nextValue and return it if I am changing. otherwise
-     return nil."
-    ASTIdentifier useNextValue: true.
-    "reset condition"
-    reset evaluate == 0 ifTrue: [ 
-        self nextValue: resetTo evaluate.
-        nextValue ~= value ifTrue: [ ^nextValue ] ifFalse: [ ^nil ]].
-    "no reset, so it is just like a regular flop"
-    (dirty ~= 3) ifTrue: [ ^super evaluate ].
-    "reset deasserted. no-op, but clock edge aligned here is eaten"
-    ^nil!
-
-staticValue
-    ASTIdentifier useNextValue: true.
-    self nextValue: resetTo staticValue.
-    nextValue ~= value ifTrue: [ ^nextValue ].
-    ^super staticValue!
-
-optimize
-    |e|
-    e := reset optimize.
-    e isNil ifTrue: [ 
-        self destroy.
-        ^nil ].
-    (e isKindOf: ASTConstant) ifTrue: [
-        e evaluate ~= 0 
-            ifTrue: [
-                e destroy.
-                resetTo destroy.
-                ^(DANMFlipflop newReplacementNamed: entityName 
-                               inContext: self context) 
-                    expression: expression;
-                    clock: clock;
-                    optimize ]
-            ifFalse: [
-                clock destroy.
-                expression destroy.
-                ^(DANMExpressionWire newReplacementNamed: entityName 
-                               inContext: self context) 
-                    expression: resetTo;
-                    optimize ]]!
-
-destroy
-    reset destroy.
-    resetTo destroy.
-    super destroy!
-!
-
-!DANMResetFlop methodsFor: 'printing'!
-
-nodeStyle
-    ^'[shape=box,peripheries=3]'!
-
-printOn: aStream
-    aStream nextPutAll: ('(%1)$(%2)_(%3)->(%4) ' % {expression. clock. reset. resetTo})!
-
-printHTMLHeadOn: aStream
-    aStream 
-        nextPutAll: ('<h3><a name="WIRE_%1">ResetFlop %1</a></h3><ul><li>width is %2.</li>' 
-                         % {entityName. self width});
-        nl;
-        nextPutAll: '<li>clocked by: %1</li>' % 
-            {clock printStringStyle: #HTML};
-        nextPutAll: '<li>resetted by: %1</li>' % 
-            {reset printStringStyle: #HTML};
-        nextPutAll: '<li>resetted to: %1</li>' % 
-            {resetTo printStringStyle: #HTML};
-        nextPutAll: '<li>data: %1</li>' % 
-            {expression printStringStyle: #HTML};
-        nl!
-
-basicPrintVerilogOn: aStream
-    clock printAdditionalVerilogOn: aStream.
-    clock printVerilogOn: aStream withAlias: 'Clock'.
-    reset printAdditionalVerilogOn: aStream.
-    reset printVerilogOn: aStream withAlias: 'Reset'.
-    expression printAdditionalVerilogOn: aStream!
-
-printBlockVerilogOn: aStream
-    |w name|
-    name := self verilogName.
-    aStream nl.
-    aStream 
-        nextPutAll: '    always @(posedge %1 or negedge %2)' 
-            % {clock printStringStyle: #VERILOG.
-               reset printStringStyle: #VERILOG}; 
-        nl;
-        nextPutAll: '        if (!%1)' % {reset printStringStyle: #VERILOG};
-        nl;
-        nextPutAll: '            %1 <= %2;' % {name. resetTo printStringStyle: #VERILOG};
-        nl;
-        nextPutAll: '        else'; nl.
-    expression alias: name.
-    expression printCoreVerilogOn: aStream indent: 12 
-               blocking: false wrapping: true.
-    clock clearAlias.
-    expression clearAlias!
-!
+    printBlockVerilogOn: aStream [
+	<category: 'printing'>
+	| w name |
+	name := self verilogName.
+	aStream nl.
+	aStream
+	    nextPutAll: '    always @(posedge %1 or negedge %2)' % 
+	    {clock printStringStyle: #VERILOG. reset printStringStyle: #VERILOG}; nl;
+	    nextPutAll: '        if (!%1)' % {reset printStringStyle: #VERILOG}; nl;
+	    nextPutAll: '            %1 <= %2;' % 
+	    {name. resetTo printStringStyle: #VERILOG}; nl;
+	    nextPutAll: '        else'; nl.
+	expression alias: name.
+	expression 
+	    printCoreVerilogOn: aStream
+	    indent: 12
+	    blocking: false
+	    wrapping: true.
+	clock clearAlias.
+	expression clearAlias
+    ]
+]
