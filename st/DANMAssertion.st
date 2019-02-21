@@ -17,53 +17,52 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-DANMExpressionWire subclass: #DANMAssertion
-         instanceVariableNames: ''
-         classVariableNames: ''
-         poolDictionaries: ''
-         category: 'DANM'!
+DANMExpressionWire subclass: DANMAssertion [
+    <comment: 'I am an assertion in simulation, the value has to be 
+as expected, otherwise simulation will abort'>
+    <category: 'DANM'>
 
-DANMAssertion comment: 'I am an assertion in simulation, the value has to be 
-as expected, otherwise simulation will abort'!
+    isLoaded [
+	"supress unloaded warning for assertion"
+	<category: 'basic'>
+	^true
+    ]
 
-!DANMAssertion methodsFor: 'basic'!
+    flip [
+	<category: 'basic'>
+	super flip.
+	value == 0 ifTrue: [
+	    Transcript nextPutAll: 'Assertion %1 failed in %2!' % 
+		{entityName. self context fullPath}; nl.
+	    "in simulation the design is flattened, so context context is the
+	     simulator"
+	    (context context isKindOf: DANMSimulator) ifTrue: [
+		context context stop: self ]]
+    ]
 
-isLoaded
-    "supress unloaded warning for assertion"
-    ^true!
+    nodeStyle [
+	<category: 'printing'>
+	^'[shape=diamond]'
+    ]
 
-flip
-    super flip.
-    value == 0 ifTrue: [ 
-        Transcript nextPutAll: 'Assertion %1 failed in %2!' %
-            {entityName. self context fullPath}; nl.
-        "in simulation the design is flattened, so context context is the 
-simulator"
-        (context context isKindOf: DANMSimulator) ifTrue: [ 
-            context context stop: self]]!
-!
+    printOn: aStream [
+	<category: 'printing'>
+	aStream nextPutAll: '<%1> ' % {expression}
+    ]
 
-!DANMAssertion methodsFor: 'printing'!
+    printHTMLHeadOn: aStream [
+	<category: 'printing'>
+	aStream
+	    nextPutAll: '<h3><a name="WIRE_%1">Assertion %1</a></h3><ul>' % {entityName}; nl;
+	    nextPutAll: '<li>condition: %1</li>' % {expression printStringStyle: #HTML}; nl
+    ]
 
-nodeStyle
-    ^'[shape=diamond]'!
-
-printOn: aStream
-    aStream nextPutAll: ('<%1> ' % {expression})!
-
-printHTMLHeadOn: aStream
-    aStream 
-        nextPutAll: ('<h3><a name="WIRE_%1">Assertion %1</a></h3><ul>' 
-                         % {entityName});
-        nl;
-        nextPutAll: '<li>condition: %1</li>' % 
-            {expression printStringStyle: #HTML};
-        nl!
-
-basicPrintVerilogOn: aStream
-    super basicPrintVerilogOn: aStream.
-    aStream
-	nextPutAll: '// synopsys translate_off'; nl;
-	nextPutAll: '`ASSERT(%1)' % {self verilogName}; nl;
-	nextPutAll: '// synopsys translate_on'; nl!
-!
+    basicPrintVerilogOn: aStream [
+	<category: 'printing'>
+	super basicPrintVerilogOn: aStream.
+	aStream
+	    nextPutAll: '// synopsys translate_off'; nl;
+	    nextPutAll: '`ASSERT(%1)' % {self verilogName}; nl;
+	    nextPutAll: '// synopsys translate_on'; nl
+    ]
+]

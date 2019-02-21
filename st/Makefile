@@ -43,7 +43,7 @@ uninstall:
 	rm -f $(TARGET)
 
 $(TARGET): $(SRCS) package.xml
-	$(GST_PACK) -t $(INSTALL_DIR) package.xml > /dev/null
+	$(GST_PACK) -t $(INSTALL_DIR) package.xml
 
 package.xml: Makefile
 	@echo "<package>" > package.xml
