@@ -175,6 +175,38 @@ DANMSchematic extend [
 	^wire
     ]
 
+    let: encodedBus beEncoded: bus [
+	<category: 'connecting'>
+	|w|
+	w := (bus width log: 2) ceiling. 
+	^ self let: encodedBus be:
+	    (ASTOneHotChoiceOp
+                newChoice: bus
+		among: ((0 to: bus width - 1) collect: [ :i |
+		    ASTConstant newConstant: i width: w ]))
+    ]
+
+    let: decodedBus beDecoded: bus [
+	<category: 'connecting'>
+	|exp wo|
+	wo := 2 raisedTo: bus width.
+	exp := ((0 to: wo - 1) collect: [ :i |
+	    '(bus==%1)' % {i}]) fold: [ :a :b |
+		b, ',', a ].
+	self let: decodedBus be: exp
+    ]
+
+    let: wName beParallelIfs: ifs [
+	<category: 'connecting'>
+	|exp|
+	exp := (ifs collect: [ :each |
+	    '((%1)?(%2):0)' %
+		{ExpressionAST newFrom: each key.
+		 ExpressionAST newFrom: each value}]) fold: [ :a :b |
+		b, '|', a ].
+	^self let: wName be: (ASTIfsOp newIfs: ifs)
+    ]
+    
     defaultClock: clk [
 	<category: 'connecting'>
 	self userDataAt: 'defaultClock' put: clk

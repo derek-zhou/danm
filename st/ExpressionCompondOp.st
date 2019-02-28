@@ -25,8 +25,8 @@ ExpressionAST subclass: ASTChoiceOp [
     ASTChoiceOp class >> newChoice: c among: cs [
 	<category: 'instance creation'>
 	^(super new)
-	    condition: c;
-	    choices: cs
+	    condition: (ExpressionAST newFrom: c);
+	    choices: (cs collect: [ :each | ExpressionAST newFrom: each ])
     ]
 
     clearAlias [
@@ -67,10 +67,15 @@ ExpressionAST subclass: ASTChoiceOp [
 	    list , each dependencies]
     ]
 
+    expectedChoicesCount [
+	<category: 'accessing'>
+	^1 bitShift: condition width
+    ]
+    
     checkDesign [
 	<category: 'basic'>
 	| result w |
-	result := choices size == (1 bitShift: condition width).
+	result := choices size == self expectedChoicesCount.
 	result := result & condition checkDesign.
 	w := self width.
 	^choices inject: result into: [ :r :each | 
@@ -119,20 +124,145 @@ ExpressionAST subclass: ASTChoiceOp [
 	    result notNil ifTrue: [^result]]
     ]
 
-    printAdditionalVerilogOn: aStream [
+    inlined [
 	"a?b:c can be inlined. However, the extension a[1:0]?b:c:d:e must be treat
 	 differently"
+	^choices size <= 2
+    ]
+    
+    printAdditionalVerilogOn: aStream [
 	<category: 'printing'>
 	condition printAdditionalVerilogOn: aStream.
 	choices do: [:c | c printAdditionalVerilogOn: aStream].
-	choices size > 2 ifTrue: [
+	self inlined ifFalse: [
 	    self printVerilogOn: aStream withAlias: 'Choice']
     ]
 
     printVerilogOn: aStream [
 	<category: 'printing'>
 	| deps |
-	choices size > 2 
+	self inlined 
+	    ifTrue: [^super printVerilogOn: aStream]
+	    ifFalse: [self printVerilogRegsOn: aStream].
+	deps := self dependencies.
+	DANMExpressionWire printDependencies: deps uniquify on: aStream.
+	self 
+	    printCoreVerilogOn: aStream
+	    indent: 8
+	    blocking: true
+    ]
+
+    printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping [
+	<category: 'printing'>
+	| w e |
+	self inlined ifTrue: [
+	    ^super printCoreVerilogOn: aStream
+		   indent: num
+		   blocking: blocking
+		   wrapping: wrapping].
+	w := condition width.
+	aStream
+	    next: num put: $ ;
+	    nextPutAll: 'case (%1)' % {condition printStringStyle: #VERILOG}; nl.
+	"we make sure the case is full and parallel in check design, so no need to
+	 add synopsis comments"
+	0 to: choices size - 1 do: [ :i | 
+	    aStream
+		next: num + 4 put: $ ;
+		nextPutAll: '%1''d%2: ' % {w. i}; nl.
+		e := choices at: s - i.
+		e alias: alias.
+		e printCoreVerilogOn: aStream
+		  indent: num + 8
+		  blocking: blocking
+		  wrapping: false].
+	aStream
+	    next: num put: $ ;
+	    nextPutAll: 'endcase'; nl
+    ]
+
+    basicPrintStringStyle: style [
+	"not inlined verilog is covered elsewhere"
+	<category: 'printing'>
+	| aStream |
+	aStream := WriteStream on: String new.
+	(style == #VERILOG) & self inlined not ifTrue: [
+	    self error: 'cannot print inline' ].
+	(style == #NONE) | (style == #VERILOG) ifTrue: [
+	    aStream nextPutAll: '(%1?' % {condition printStringStyle: style}.
+	    1 to: choices size do: [ :i | 
+		i == 1 ifFalse: [ aStream nextPut: $: ].
+		aStream nextPutAll: (choices at: i) printStringStyle: style ].
+	    aStream nextPut: $) ].
+	style == #HTML ifTrue: [
+	    aStream nextPutAll: 'Choices from 0 up:<br/><table  border="1"><tr><th>value</th></tr>'; nl.
+	    1 to: choices size do: [:i | 
+		aStream nextPutAll: '<tr><td>%1</td></tr>' % 
+		    {(choices at: i) basicPrintStringStyle: #HTML}].
+	    aStream nextPutAll: '</table>'; nl].	
+	^aStream contents
+    ]
+]
+
+ASTChoiceOp subclass: ASTOneHotChoiceOp [
+    <comment: 'I model a mux, with one hot condition input'>
+    <category: 'expression AST'>
+
+    expectedChoicesCount [
+	<category: 'accessing'>
+	^condition width
+    ]
+    
+    evaluate [
+	<category: 'basic'>
+	| v |
+	v = condition evaluate.
+	^ ((0 to: condition width - 1) collect: [ :i |
+	    (v bitAnd: (1 bitShift: i)) > 0
+	        ifTrue: [ choices at: i + 1 ]
+		ifFalse: [ 0 ]]) fold: [ :a :b |
+		    b bitOr: a ]
+    ]
+
+    staticValue [
+	<category: 'basic'>
+	| v |
+	v := condition staticValue.
+	v isNil ifTrue: [ ^nil ].
+	v = 0 ifTrue: [ ^ 0 ].
+	0 to: condition width - 1 do: [ :i |
+	    v = (1 bitShift: i) ifTrue: [ ^ (choices at: i+1) staticValue ]].
+	self error: 'condition is not one hot. it is %1' % {v}
+    ]
+
+    optimize [
+	<category: 'basic'>
+	| v result w|
+	condition := condition optimize.
+	choices := choices collect: [:each | each optimize].
+	v := condition staticValue.
+	w := self width.
+	v isNil ifTrue: [ ^self ].
+	condition destroy.
+	v = 0 ifTrue: [
+	    choices do: [ :each | each destroy ].
+	    ^ASTConstant newConstant: 0 width: w ].
+	0 to: condition width - 1 do: [ :i |
+	    v = (1 bitShift: i)
+                ifTrue: [ result := choices at: i+1 ]
+		ifFalse: [ (choices at: i+1) destroy ]].
+	self error: 'condition is not one hot. it is %1' % {v}
+    ]
+
+    inlined [
+	"a?b:c can be inlined. However, the extension a[1:0]?b:c:d:e must be treat
+	 differently"
+	^true
+    ]
+
+    printVerilogOn: aStream [
+	<category: 'printing'>
+	| deps |
 	    ifFalse: [^super printVerilogOn: aStream]
 	    ifTrue: [self printVerilogRegsOn: aStream].
 	deps := self dependencies.
@@ -156,6 +286,8 @@ ExpressionAST subclass: ASTChoiceOp [
 	aStream
 	    next: num put: $ ;
 	    nextPutAll: 'case (%1)' % {condition printStringStyle: #VERILOG}; nl.
+	"we make sure the case is full and parallel in check design, so no need to
+	 add synopsis comments"
 	0 to: s - 1 do: [ :i | 
 	    aStream
 		next: num + 4 put: $ ;
@@ -173,16 +305,124 @@ ExpressionAST subclass: ASTChoiceOp [
 
     basicPrintStringStyle: style [
 	<category: 'printing'>
+	| aStream w|
+	(style == #NONE) | (style == #VERILOG) ifTrue: [
+	    w := self width.
+	    ^ ((0 to: choices size - 1) collect: [ :i |
+		'(%1[%2]?%3:%4d0)' %
+		    { condition printStringStyle: style. i.
+		      (choices at: i) printStringStyle: style. 
+		      w }]) fold: [ :a :b |
+			  b, '|', a ]].
+	style == #HTML ifTrue: [
+	    aStream := WriteStream on: String new.
+	    aStream nextPutAll: 'Choices from 0 up:<br/><table  border="1"><tr><th>value</th></tr>'; nl.
+	    1 to: choices size do: [:i | 
+		aStream nextPutAll: '<tr><td>%1</td></tr>' % 
+		    {(choices at: i) basicPrintStringStyle: #HTML} ].
+	    aStream nextPutAll: '</table>'; nl.	
+	    ^aStream contents ]
+    ]
+]
+
+ExpressionAST subclass: ASTBundleOp [
+    | items |
+    <comment: 'I bundle all wires together.'>
+    <category: 'expression AST'>
+
+    ASTBundleOp class >> newFrom: a [
+	<category: 'instance creation'>
+	^(super new)
+	    items: (a collect: [ :each | ExpressionAST newFrom: each ])
+    ]
+
+    clearAlias [
+	<category: 'accessing'>
+	super clearAlias.
+	items do: [:each | each clearAlias]
+    ]
+
+    width [
+	<category: 'accessing'>
+	^ items fold: [ :a :b |
+	    b width + a width ]
+    ]
+
+    items [
+	<category: 'accessing'>
+	^items
+    ]
+
+    items: a [
+	<category: 'accessing'>
+	items := a
+    ]
+
+    dependencies [
+	<category: 'accessing'>
+	^items fold: [ :a :b |
+	    a dependencies , b dependencies]
+    ]
+
+    checkDesign [
+	<category: 'basic'>
+	^items fold: [ :a :b | 
+	    a checkDesign & b checkDesign ]
+    ]
+
+    context: c type: t [
+	<category: 'basic'>
+	items do: [:each | each context: c type: t]
+    ]
+
+    destroy [
+	<category: 'basic'>
+	items do: [:each | each destroy]
+    ]
+
+    evaluate [
+	<category: 'basic'>
+	^items inject: 0 into: [ :r :each |
+	    (r bitShift: each width) + each evalute ]
+    ]
+
+    staticValue [
+	<category: 'basic'>
+	|v|
+	^items inject: 0 into: [ :r :each |
+	    v := each staticValue.
+	    v isNil ifTrue: [ ^nil ].
+	    (r bitShift: each width) + v ]
+    ]
+
+    optimize [
+	<category: 'basic'>
+	items := items collect: [:each | each optimize]
+	^super optimize
+    ]
+
+    printAdditionalVerilogOn: aStream [
+	<category: 'printing'>
+	items do: [:c | c printAdditionalVerilogOn: aStream]
+    ]
+
+    basicPrintStringStyle: style [
+	"not inlined verilog is covered elsewhere"
+	<category: 'printing'>
 	| aStream |
 	aStream := WriteStream on: String new.
-	aStream nextPutAll: '(%1?' % {condition printStringStyle: style}.
-	1 to: choices size do: [ :i | 
-	    i == 1 
-		ifTrue: [
-		    aStream nextPutAll: '%1' % {(choices at: i) printStringStyle: style}]
-		ifFalse: [
-		    aStream nextPutAll: ':%1' % {(choices at: i) printStringStyle: style}]].
-	aStream nextPut: $).
+	(style == #NONE) | (style == #VERILOG) ifTrue: [
+	    aStream nextPut: ${.
+	    1 to: items size do: [ :i | 
+		i == 1 ifFalse: [ aStream nextPut: $: ].
+		aStream nextPutAll: (choices at: i) printStringStyle: style ].
+	    aStream nextPut: $} ].
+	style == #HTML ifTrue: [
+	    aStream nextPutAll: 'Bundle from MSB down:<br/><table  border="1"><tr><th>value</th></tr>'; nl.
+	    1 to: choices size do: [:i | 
+		aStream nextPutAll: '<tr><td>%1</td></tr>' % 
+		    {(choices at: i) basicPrintStringStyle: #HTML}].
+	    aStream nextPutAll: '</table>'; nl].	
 	^aStream contents
     ]
 ]

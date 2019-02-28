@@ -64,7 +64,7 @@ Object subclass: ExpressionParser [
 		choices add: self parseSegment.
 		[ stream testNext: $: ] whileTrue: [
 		    choices add: self parseSegment ]].
-	^ASTChoiceOp newChoice: condition among: choices asArray
+	^ASTChoiceOp newChoice: condition among: choices
     ]
 
     parseSegmentOrder1 [
