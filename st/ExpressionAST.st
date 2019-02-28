@@ -595,9 +595,12 @@ ExpressionAST subclass: ASTIdentifier [
     ASTIdentifier class >> newIdentifier: id [
 	<category: 'instance creation'>
 	| value sch |
-	sch := DANMCurrentDesign value.
-	value := sch wires at: id ifAbsent: [nil].
-	value isNil ifTrue: [value := DANMWire newNamed: id inContext: sch].
+	(id isKindOf: DANMWire)
+	    ifTrue: [ value := id ]
+	    ifFalse: [
+		sch := DANMCurrentDesign value.
+		value := sch wires at: id ifAbsent: [nil].
+		value isNil ifTrue: [value := DANMWire newNamed: id inContext: sch]].
 	^self basicNewIdentifier: value
     ]
 

@@ -195,10 +195,11 @@ ExpressionAST subclass: ASTChoiceOp [
 		aStream nextPutAll: (choices at: i) printStringStyle: style ].
 	    aStream nextPut: $) ].
 	style == #HTML ifTrue: [
-	    aStream nextPutAll: 'Choices from 0 up:<br/><table  border="1"><tr><th>value</th></tr>'; nl.
+	    aStream nextPutAll: 'Choices:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
 	    1 to: choices size do: [:i | 
-		aStream nextPutAll: '<tr><td>%1</td></tr>' % 
-		    {(choices at: i) basicPrintStringStyle: #HTML}].
+		aStream nextPutAll: '<tr><td>%1</td><td>%2</td></tr>' % 
+		    {(conditions at: i) basicPrintStringStyle: #HTML.
+		     (choices at: i) basicPrintStringStyle: #HTML}].
 	    aStream nextPutAll: '</table>'; nl].	
 	^aStream contents
     ]
@@ -207,6 +208,21 @@ ExpressionAST subclass: ASTChoiceOp [
 ASTChoiceOp subclass: ASTOneHotChoiceOp [
     <comment: 'I model a mux, with one hot condition input'>
     <category: 'expression AST'>
+
+    ASTChoiceOp class >> newChoice: c among: cs [
+	<category: 'instance creation'>
+	|ce sch cw|
+	"condition must be an identifier"
+	ce := ExpressionAST newFrom: c.
+	(ce isKindOf: ASTIdentifier) ifFalse: [
+	    sch := DANMCurrentDesign value.
+	    name := sch uniqueWireNameLike: 'onehot'.
+	    cw := (DANMExpressionWire newNamed: name inContext: sch) expression: ce.
+	    ce := ASTIdentifier basicNewIdentifier: cw ].
+	^(super new)
+	    condition: ce;
+	    choices: (cs collect: [ :each | ExpressionAST newFrom: each ])
+    ]
 
     expectedChoicesCount [
 	<category: 'accessing'>
@@ -219,7 +235,7 @@ ASTChoiceOp subclass: ASTOneHotChoiceOp [
 	v = condition evaluate.
 	^ ((0 to: condition width - 1) collect: [ :i |
 	    (v bitAnd: (1 bitShift: i)) > 0
-	        ifTrue: [ choices at: i + 1 ]
+	        ifTrue: [ (choices at: i + 1) evaluate ]
 		ifFalse: [ 0 ]]) fold: [ :a :b |
 		    b bitOr: a ]
     ]
@@ -255,52 +271,8 @@ ASTChoiceOp subclass: ASTOneHotChoiceOp [
     ]
 
     inlined [
-	"a?b:c can be inlined. However, the extension a[1:0]?b:c:d:e must be treat
-	 differently"
+	"one hot choices are always inline"
 	^true
-    ]
-
-    printVerilogOn: aStream [
-	<category: 'printing'>
-	| deps |
-	    ifFalse: [^super printVerilogOn: aStream]
-	    ifTrue: [self printVerilogRegsOn: aStream].
-	deps := self dependencies.
-	DANMExpressionWire printDependencies: deps uniquify on: aStream.
-	self 
-	    printCoreVerilogOn: aStream
-	    indent: 8
-	    blocking: true
-    ]
-
-    printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping [
-	<category: 'printing'>
-	| s w e |
-	s := choices size.
-	s > 2 ifFalse: [
-	    ^super printCoreVerilogOn: aStream
-		   indent: num
-		   blocking: blocking
-		   wrapping: wrapping].
-	w := condition width.
-	aStream
-	    next: num put: $ ;
-	    nextPutAll: 'case (%1)' % {condition printStringStyle: #VERILOG}; nl.
-	"we make sure the case is full and parallel in check design, so no need to
-	 add synopsis comments"
-	0 to: s - 1 do: [ :i | 
-	    aStream
-		next: num + 4 put: $ ;
-		nextPutAll: '%1''d%2: ' % {w. i}; nl.
-		e := choices at: s - i.
-		e alias: alias.
-		e printCoreVerilogOn: aStream
-		  indent: num + 8
-		  blocking: blocking
-		  wrapping: false].
-	aStream
-	    next: num put: $ ;
-	    nextPutAll: 'endcase'; nl
     ]
 
     basicPrintStringStyle: style [
@@ -316,10 +288,11 @@ ASTChoiceOp subclass: ASTOneHotChoiceOp [
 			  b, '|', a ]].
 	style == #HTML ifTrue: [
 	    aStream := WriteStream on: String new.
-	    aStream nextPutAll: 'Choices from 0 up:<br/><table  border="1"><tr><th>value</th></tr>'; nl.
+	    aStream nextPutAll: 'One hot choices:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
 	    1 to: choices size do: [:i | 
-		aStream nextPutAll: '<tr><td>%1</td></tr>' % 
-		    {(choices at: i) basicPrintStringStyle: #HTML} ].
+		aStream nextPutAll: '<tr><td>%1[%2]</td><td>%3</td></tr>' % 
+		    {(conditions at: i) basicPrintStringStyle: #HTML. i.
+		     (choices at: i) basicPrintStringStyle: #HTML } ].
 	    aStream nextPutAll: '</table>'; nl.	
 	    ^aStream contents ]
     ]
@@ -419,9 +392,9 @@ ExpressionAST subclass: ASTBundleOp [
 	    aStream nextPut: $} ].
 	style == #HTML ifTrue: [
 	    aStream nextPutAll: 'Bundle from MSB down:<br/><table  border="1"><tr><th>value</th></tr>'; nl.
-	    1 to: choices size do: [:i | 
+	    items do: [:each | 
 		aStream nextPutAll: '<tr><td>%1</td></tr>' % 
-		    {(choices at: i) basicPrintStringStyle: #HTML}].
+		    {each basicPrintStringStyle: #HTML}].
 	    aStream nextPutAll: '</table>'; nl].	
 	^aStream contents
     ]
@@ -656,6 +629,75 @@ I cannot be sub expression to some other expression though. '>
 	    aStream nextPutAll: '}'].
 	^aStream contents
     ]
+]
+
+ASTIfsOp subclass: ASTOneHotIfsOp [
+    <comment: 'I model a mux, with one hot condition input'>
+    <category: 'expression AST'>
+    
+    isCombinatorial [
+	<category: 'basic'>
+	"one hot ifs are always combinatorial"
+	^true
+    ]
+
+    evaluate [
+	<category: 'basic'>
+	^ ((0 to: conditions size - 1) collect: [ :i |
+	    (conditions at: i + 1) evaluate > 0 
+	        ifTrue: [ (choices at: i + 1) evaluate ]
+		ifFalse: [ 0 ]]) fold: [ :a :b |
+		    b bitOr: a ]
+    ]
+
+    staticValue [
+	<category: 'basic'>
+	| vc v |
+	v := nil.
+	0 to: conditions size - 1 do: [ :i |
+	    vc := (conditions at: i + 1) staticValue.
+	    vc isNil ifTrue: [ ^nil ].
+	    vc > 0 ifTrue: [
+		v notNil ifTrue: [
+		    self error: 'conditions are not one hot' ].
+		v := (choices at: i + 1) staticValue ]].
+	^v
+    ]
+
+    optimize [
+	<category: 'basic'>
+	| v result w|
+	conditions := conditions collect: [ :each | each optimize ].
+	choices := choices collect: [:each | each optimize]
+    ]
+
+    inlined [
+	"one hot choices are always inline"
+	^true
+    ]
+
+    basicPrintStringStyle: style [
+	<category: 'printing'>
+	| aStream w|
+	(style == #NONE) | (style == #VERILOG) ifTrue: [
+	    w := self width.
+	    ^ ((0 to: choices size - 1) collect: [ :i |
+		'(%1[%2]?%3:%4d0)' %
+		    { condition printStringStyle: style. i.
+		      (choices at: i) printStringStyle: style. 
+		      w }]) fold: [ :a :b |
+			  b, '|', a ]].
+	style == #HTML ifTrue: [
+	    aStream := WriteStream on: String new.
+	    aStream nextPutAll: 'One hot choices:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
+	    1 to: choices size do: [:i | 
+		aStream nextPutAll: '<tr><td>%1[%2]</td><td>%3</td></tr>' % 
+		    {(conditions at: i) basicPrintStringStyle: #HTML. i.
+		     (choices at: i) basicPrintStringStyle: #HTML } ].
+	    aStream nextPutAll: '</table>'; nl.	
+	    ^aStream contents ]
+    ]
+
 ]
 
 ExpressionAST subclass: ASTCasesOp [
