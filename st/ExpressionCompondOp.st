@@ -181,18 +181,18 @@ ExpressionAST subclass: ASTChoiceOp [
 	aStream := WriteStream on: String new.
 	(style == #VERILOG) & self inlined not ifTrue: [
 	    self error: 'cannot print inline' ].
-	(style == #NONE) | (style == #VERILOG) ifTrue: [
+	(style == #NONE) | (style == #VERILOG) | self inlined ifTrue: [
 	    aStream nextPutAll: '(%1?' % {condition printStringStyle: style}.
 	    1 to: choices size do: [ :i | 
 		i == 1 ifFalse: [ aStream nextPut: $: ].
 		aStream nextPutAll: ((choices at: i) printStringStyle: style) ].
 	    aStream nextPut: $) ].
-	style == #HTML ifTrue: [
+	style == #HTML & self inlined not ifTrue: [
 	    aStream nextPutAll: 'Choices:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
 	    s := choices size.
 	    1 to: choices size do: [:i | 
 		aStream nextPutAll: '<tr><td>%1 == %2 </td><td>%3</td></tr>' % 
-		    {condition basicPrintStringStyle: #HTML. s + 1 - i. 
+		    {condition basicPrintStringStyle: #HTML. s - i.
 		     (choices at: i) basicPrintStringStyle: #HTML}].
 	    aStream nextPutAll: '</table>'; nl].	
 	^aStream contents
@@ -229,7 +229,7 @@ ASTChoiceOp subclass: ASTOneHotChoiceOp [
 	v = condition evaluate.
 	^ ((0 to: condition width - 1) collect: [ :i |
 	    (v bitAnd: (1 bitShift: i)) > 0
-	        ifTrue: [ (choices at: i + 1) evaluate ]
+	        ifTrue: [ (choices at: choices size - i) evaluate ]
 		ifFalse: [ 0 ]]) fold: [ :a :b |
 		    b bitOr: a ]
     ]
@@ -241,7 +241,7 @@ ASTChoiceOp subclass: ASTOneHotChoiceOp [
 	v isNil ifTrue: [ ^nil ].
 	v = 0 ifTrue: [ ^ 0 ].
 	0 to: condition width - 1 do: [ :i |
-	    v = (1 bitShift: i) ifTrue: [ ^ (choices at: i+1) staticValue ]].
+	    v = (1 bitShift: i) ifTrue: [ ^ (choices at: choices size - i) staticValue ]].
 	self error: 'condition is not one hot. it is %1' % {v}
     ]
 
@@ -252,12 +252,12 @@ ASTChoiceOp subclass: ASTOneHotChoiceOp [
 
     basicPrintStringStyle: style [
 	<category: 'printing'>
-	| aStream w|
+	| aStream w |
 	(style == #NONE) | (style == #VERILOG) ifTrue: [
 	    w := self width.
-	    ^ ((0 to: choices size - 1) collect: [ :i |
+	    ^ ((1 to: choices size) collect: [ :i |
 		'(%1[%2]?%3:%4d0)' %
-		    { condition printStringStyle: style. i.
+		    { condition printStringStyle: style. choices size - i.
 		      (choices at: i) printStringStyle: style. 
 		      w }]) fold: [ :a :b |
 			  b, '|', a ]].
@@ -266,7 +266,7 @@ ASTChoiceOp subclass: ASTOneHotChoiceOp [
 	    aStream nextPutAll: 'One hot choices:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
 	    1 to: choices size do: [:i | 
 		aStream nextPutAll: '<tr><td>%1[%2]</td><td>%3</td></tr>' % 
-		    {condition basicPrintStringStyle: #HTML. i.
+		    {condition basicPrintStringStyle: #HTML. choices size - i.
 		     (choices at: i) basicPrintStringStyle: #HTML } ].
 	    aStream nextPutAll: '</table>'; nl.	
 	    ^aStream contents ]
@@ -292,8 +292,8 @@ ExpressionAST subclass: ASTBundleOp [
 
     width [
 	<category: 'accessing'>
-	^ items fold: [ :a :b |
-	    b width + a width ]
+	^ items inject: 0 into: [ :r :a |
+	    r + a width ]
     ]
 
     items [
@@ -308,14 +308,14 @@ ExpressionAST subclass: ASTBundleOp [
 
     dependencies [
 	<category: 'accessing'>
-	^items fold: [ :a :b |
-	    a dependencies , b dependencies]
+	^items inject: #() into: [ :r :a |
+	    r , a dependencies]
     ]
 
     checkDesign [
 	<category: 'basic'>
-	^items fold: [ :a :b | 
-	    a checkDesign & b checkDesign ]
+	^items inject: true into: [ :r :a |
+	    r & a checkDesign ]
     ]
 
     context: c type: t [
@@ -361,8 +361,8 @@ ExpressionAST subclass: ASTBundleOp [
 	(style == #NONE) | (style == #VERILOG) ifTrue: [
 	    aStream nextPut: ${.
 	    1 to: items size do: [ :i | 
-		i == 1 ifFalse: [ aStream nextPut: $: ].
-		aStream nextPutAll: (items at: i) printStringStyle: style ].
+		i == 1 ifFalse: [ aStream nextPut: $, ].
+		aStream nextPutAll: ((items at: i) printStringStyle: style) ].
 	    aStream nextPut: $} ].
 	style == #HTML ifTrue: [
 	    aStream nextPutAll: 'Bundle from MSB down:<br/><table  border="1"><tr><th>value</th></tr>'; nl.
@@ -532,6 +532,8 @@ I cannot be sub expression to some other expression though. '>
     printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping [
 	<category: 'printing'>
 	| e c v |
+	self inlined ifTrue: [
+	    ^super printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping ].
 	wrapping ifTrue: [
 	    aStream
 		next: num - 2 put: $ ;
@@ -628,7 +630,7 @@ ASTIfsOp subclass: ASTOneHotIfsOp [
 	| aStream w|
 	(style == #NONE) | (style == #VERILOG) ifTrue: [
 	    w := self width.
-	    ^ ((0 to: choices size - 1) collect: [ :i |
+	    ^ ((1 to: choices size) collect: [ :i |
 		'(%1?%2:%3d0)' %
 		    { (conditions at: i) printStringStyle: style.
 		      (choices at: i) printStringStyle: style. 

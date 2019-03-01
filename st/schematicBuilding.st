@@ -177,18 +177,21 @@ DANMSchematic extend [
 
     let: encodedBus beEncoded: bus [
 	<category: 'connecting'>
-	|w|
-	w := (bus width log: 2) ceiling. 
+	|w be|
+	be := ExpressionAST newFrom: bus.
+	w := (be width log: 2) ceiling.
 	^self let: encodedBus be: (ASTOneHotChoiceOp
-            newChoice: bus
-	    among: ((0 to: bus width - 1) collect: [ :i |
+            newChoice: be
+	    among: ((be width - 1 to: 0 by: -1) collect: [ :i |
 		ASTConstant newConstant: i width: w ]))
     ]
 
     let: decodedBus beDecoded: bus [
 	<category: 'connecting'>
+	|be|
+	be := ExpressionAST newFrom: bus.
 	^self let: decodedBus be: (ASTBundleOp
-	    newFrom: ((0 to: (2 raisedTo: bus width) - 1) collect: [ :i |
+	    newFrom: ((((2 raisedTo: be width) - 1) to: 0 by: -1) collect: [ :i |
 		'%1==%2' % {bus. i} ]))
     ]
 
@@ -235,6 +238,16 @@ DANMSchematic extend [
 	^wire
     ]
 
+    let: wName beChoices: cs on: c [
+	<category: 'connecting'>
+	^self let: wName be: (ASTChoiceOp newChoice: c among: cs)
+    ]
+
+    let: wName beOneHotChoices: cs on: c [
+	<category: 'connecting'>
+	^self let: wName be: (ASTOneHotChoiceOp newChoice: c among: cs)
+    ]
+    
     let: wName beIfs: ifs [
 	<category: 'connecting'>
 	^self let: wName be: (ASTIfsOp newIfs: ifs)
@@ -242,7 +255,7 @@ DANMSchematic extend [
 
     let: wName beOneHotIfs: ifs [
 	<category: 'connecting'>
-	^self let: wName be: (ASTIfsOp newOneHotIfs: ifs)
+	^self let: wName be: (ASTOneHotIfsOp newIfs: ifs)
     ]
     
     let: wName beClockedIfs: ifs [
