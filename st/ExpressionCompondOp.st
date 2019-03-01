@@ -111,17 +111,9 @@ ExpressionAST subclass: ASTChoiceOp [
 	^nil
     ]
 
-    optimize [
-	<category: 'basic'>
-	| v result r |
-	condition := condition optimize.
+    optimizeDependencies [
 	choices := choices collect: [:each | each optimize].
-	v := condition staticValue.
-	v notNil ifTrue: [
-	    1 to: choices size do: [:i | 
-		r := choices at: i.
-		i == (choices size - v) ifTrue: [result := r] ifFalse: [r destroy]].
-	    result notNil ifTrue: [^result]]
+	condition := condition optimize
     ]
 
     inlined [
@@ -154,13 +146,14 @@ ExpressionAST subclass: ASTChoiceOp [
 
     printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping [
 	<category: 'printing'>
-	| w e |
+	|s w e |
 	self inlined ifTrue: [
 	    ^super printCoreVerilogOn: aStream
 		   indent: num
 		   blocking: blocking
 		   wrapping: wrapping].
 	w := condition width.
+	s := choices size.
 	aStream
 	    next: num put: $ ;
 	    nextPutAll: 'case (%1)' % {condition printStringStyle: #VERILOG}; nl.
@@ -184,7 +177,7 @@ ExpressionAST subclass: ASTChoiceOp [
     basicPrintStringStyle: style [
 	"not inlined verilog is covered elsewhere"
 	<category: 'printing'>
-	| aStream |
+	| s aStream |
 	aStream := WriteStream on: String new.
 	(style == #VERILOG) & self inlined not ifTrue: [
 	    self error: 'cannot print inline' ].
@@ -192,13 +185,14 @@ ExpressionAST subclass: ASTChoiceOp [
 	    aStream nextPutAll: '(%1?' % {condition printStringStyle: style}.
 	    1 to: choices size do: [ :i | 
 		i == 1 ifFalse: [ aStream nextPut: $: ].
-		aStream nextPutAll: (choices at: i) printStringStyle: style ].
+		aStream nextPutAll: ((choices at: i) printStringStyle: style) ].
 	    aStream nextPut: $) ].
 	style == #HTML ifTrue: [
 	    aStream nextPutAll: 'Choices:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
+	    s := choices size.
 	    1 to: choices size do: [:i | 
-		aStream nextPutAll: '<tr><td>%1</td><td>%2</td></tr>' % 
-		    {(conditions at: i) basicPrintStringStyle: #HTML.
+		aStream nextPutAll: '<tr><td>%1 == %2 </td><td>%3</td></tr>' % 
+		    {condition basicPrintStringStyle: #HTML. s + 1 - i. 
 		     (choices at: i) basicPrintStringStyle: #HTML}].
 	    aStream nextPutAll: '</table>'; nl].	
 	^aStream contents
@@ -251,25 +245,6 @@ ASTChoiceOp subclass: ASTOneHotChoiceOp [
 	self error: 'condition is not one hot. it is %1' % {v}
     ]
 
-    optimize [
-	<category: 'basic'>
-	| v result w|
-	condition := condition optimize.
-	choices := choices collect: [:each | each optimize].
-	v := condition staticValue.
-	w := self width.
-	v isNil ifTrue: [ ^self ].
-	condition destroy.
-	v = 0 ifTrue: [
-	    choices do: [ :each | each destroy ].
-	    ^ASTConstant newConstant: 0 width: w ].
-	0 to: condition width - 1 do: [ :i |
-	    v = (1 bitShift: i)
-                ifTrue: [ result := choices at: i+1 ]
-		ifFalse: [ (choices at: i+1) destroy ]].
-	self error: 'condition is not one hot. it is %1' % {v}
-    ]
-
     inlined [
 	"one hot choices are always inline"
 	^true
@@ -291,7 +266,7 @@ ASTChoiceOp subclass: ASTOneHotChoiceOp [
 	    aStream nextPutAll: 'One hot choices:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
 	    1 to: choices size do: [:i | 
 		aStream nextPutAll: '<tr><td>%1[%2]</td><td>%3</td></tr>' % 
-		    {(conditions at: i) basicPrintStringStyle: #HTML. i.
+		    {condition basicPrintStringStyle: #HTML. i.
 		     (choices at: i) basicPrintStringStyle: #HTML } ].
 	    aStream nextPutAll: '</table>'; nl.	
 	    ^aStream contents ]
@@ -368,10 +343,9 @@ ExpressionAST subclass: ASTBundleOp [
 	    (r bitShift: each width) + v ]
     ]
 
-    optimize [
+    optimizeDependencies [
 	<category: 'basic'>
-	items := items collect: [:each | each optimize]
-	^super optimize
+	items := items collect: [ :each | each optimize ]
     ]
 
     printAdditionalVerilogOn: aStream [
@@ -388,7 +362,7 @@ ExpressionAST subclass: ASTBundleOp [
 	    aStream nextPut: ${.
 	    1 to: items size do: [ :i | 
 		i == 1 ifFalse: [ aStream nextPut: $: ].
-		aStream nextPutAll: (choices at: i) printStringStyle: style ].
+		aStream nextPutAll: (items at: i) printStringStyle: style ].
 	    aStream nextPut: $} ].
 	style == #HTML ifTrue: [
 	    aStream nextPutAll: 'Bundle from MSB down:<br/><table  border="1"><tr><th>value</th></tr>'; nl.
@@ -526,32 +500,13 @@ I cannot be sub expression to some other expression though. '>
 	^nil
     ]
 
-    optimize [
-	<category: 'basic'>
-	| w last text c v ch |
-	text := self printString.
-	choices := choices collect: [:each | each optimize].
-	conditions := conditions collect: [:each | each optimize].
-	w := self width.
-	last := false.
-	1 to: conditions size do: [:i | 
-	    c := conditions at: i.
-	    ch := choices at: i.
-	    v := c staticValue.
-	    (last or: [v notNil and: [v = 0]]) ifTrue: [
-		c destroy.
-		ch destroy.
-		conditions at: i put: nil.
-		choices at: i put: nil].
-	    (v notNil and: [v > 0]) ifTrue: [last := true]].
-	choices := choices select: [:each | each notNil].
-	conditions := conditions select: [:each | each notNil].
-	choices size == 0 ifTrue: [^nil].
-	choices size == 1 ifTrue: [
-	    v := (conditions at: 1) staticValue.
-	    (v notNil and: [v > 0]) ifTrue: [
-		ch := choices at: 1.
-		^ch]]
+    optimizeDependencies [
+	choices := choices collect: [ :each | each optimize ].
+	conditions := conditions collect: [ :each | each optimize ]
+    ]
+
+    inlined [
+	^false
     ]
 
     printAdditionalVerilogOn: aStream [
@@ -563,15 +518,15 @@ I cannot be sub expression to some other expression though. '>
     printVerilogOn: aStream [
 	<category: 'printing'>
 	| deps |
-	self printVerilogRegsOn: aStream.
-	deps := conditions inject: #() into: [:list :each |
-	    list , each dependencies].
-	deps := choices inject: deps into: [:list :each |
-	    list , each dependencies].
+	self inlined 
+	    ifTrue: [^super printVerilogOn: aStream]
+	    ifFalse: [self printVerilogRegsOn: aStream].
+	deps := self dependencies.
 	DANMExpressionWire printDependencies: deps uniquify on: aStream.
-	self printCoreVerilogOn: aStream
-	     indent: 8
-	     blocking: true
+	self 
+	    printCoreVerilogOn: aStream
+	    indent: 8
+	    blocking: true
     ]
 
     printCoreVerilogOn: aStream indent: num blocking: blocking wrapping: wrapping [
@@ -664,35 +619,27 @@ ASTIfsOp subclass: ASTOneHotIfsOp [
 	^v
     ]
 
-    optimize [
-	<category: 'basic'>
-	| v result w|
-	conditions := conditions collect: [ :each | each optimize ].
-	choices := choices collect: [:each | each optimize]
-    ]
-
     inlined [
-	"one hot choices are always inline"
 	^true
     ]
-
+    
     basicPrintStringStyle: style [
 	<category: 'printing'>
 	| aStream w|
 	(style == #NONE) | (style == #VERILOG) ifTrue: [
 	    w := self width.
 	    ^ ((0 to: choices size - 1) collect: [ :i |
-		'(%1[%2]?%3:%4d0)' %
-		    { condition printStringStyle: style. i.
+		'(%1?%2:%3d0)' %
+		    { (conditions at: i) printStringStyle: style.
 		      (choices at: i) printStringStyle: style. 
 		      w }]) fold: [ :a :b |
 			  b, '|', a ]].
 	style == #HTML ifTrue: [
 	    aStream := WriteStream on: String new.
-	    aStream nextPutAll: 'One hot choices:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
+	    aStream nextPutAll: 'One hot ifs:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
 	    1 to: choices size do: [:i | 
-		aStream nextPutAll: '<tr><td>%1[%2]</td><td>%3</td></tr>' % 
-		    {(conditions at: i) basicPrintStringStyle: #HTML. i.
+		aStream nextPutAll: '<tr><td>%1</td><td>%2</td></tr>' % 
+		    {(conditions at: i) basicPrintStringStyle: #HTML.
 		     (choices at: i) basicPrintStringStyle: #HTML } ].
 	    aStream nextPutAll: '</table>'; nl.	
 	    ^aStream contents ]
@@ -853,34 +800,11 @@ I cannot be sub expression to some other expression though. '>
 	^nil
     ]
 
-    optimize [
+    optimizeDependencies [
 	<category: 'basic'>
-	| v w last result c ch |
-	w := self width.
 	subject := subject optimize.
-	v := subject staticValue.
-	last := false.
-	"it is possible that some choice is optimized to nil"
-	1 to: cases size do: [ :i | 
-	    c := (cases at: i) optimize.
-	    ch := (choices at: i) optimize.
-	    cases at: i put: c.
-	    choices at: i put: ch.
-	    ch isNil ifTrue: [cases at: i put: nil]].
-	choices := choices select: [:each | each notNil].
-	cases := cases select: [:each | each notNil].
-	cases size == 0 ifTrue: [^nil].
-	v isNil ifTrue: [^self].
-	1 to: cases size do: [ :i | 
-	    c := cases at: i.
-	    ch := choices at: i.
-	    last ifTrue: [
-		c destroy.
-		ch destroy].
-	    (c isKindOf: ASTDefault) | (c staticValue = v) ifTrue: [
-		result := ch.
-		last := true]].
-	result notNil ifTrue: [^result]
+	cases := cases collect: [ :each | each optimize ].
+	choices := choices collect: [ :each | each optimize ]
     ]
 
     printAdditionalVerilogOn: aStream [
@@ -894,10 +818,7 @@ I cannot be sub expression to some other expression though. '>
 	<category: 'printing'>
 	| deps |
 	self printVerilogRegsOn: aStream.
-	deps := cases inject: subject dependencies into: [:list :each |
-	    list , each dependencies].
-	deps := choices inject: deps into: [:list :each |
-	    list , each dependencies].
+	deps := self dependencies.
 	DANMExpressionWire printDependencies: deps uniquify on: aStream.
 	self printCoreVerilogOn: aStream
 	     indent: 8

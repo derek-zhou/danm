@@ -179,34 +179,19 @@ DANMSchematic extend [
 	<category: 'connecting'>
 	|w|
 	w := (bus width log: 2) ceiling. 
-	^ self let: encodedBus be:
-	    (ASTOneHotChoiceOp
-                newChoice: bus
-		among: ((0 to: bus width - 1) collect: [ :i |
-		    ASTConstant newConstant: i width: w ]))
+	^self let: encodedBus be: (ASTOneHotChoiceOp
+            newChoice: bus
+	    among: ((0 to: bus width - 1) collect: [ :i |
+		ASTConstant newConstant: i width: w ]))
     ]
 
     let: decodedBus beDecoded: bus [
 	<category: 'connecting'>
-	|exp wo|
-	wo := 2 raisedTo: bus width.
-	exp := ((0 to: wo - 1) collect: [ :i |
-	    '(bus==%1)' % {i}]) fold: [ :a :b |
-		b, ',', a ].
-	self let: decodedBus be: exp
+	^self let: decodedBus be: (ASTBundleOp
+	    newFrom: ((0 to: (2 raisedTo: bus width) - 1) collect: [ :i |
+		'%1==%2' % {bus. i} ]))
     ]
 
-    let: wName beParallelIfs: ifs [
-	<category: 'connecting'>
-	|exp|
-	exp := (ifs collect: [ :each |
-	    '((%1)?(%2):0)' %
-		{ExpressionAST newFrom: each key.
-		 ExpressionAST newFrom: each value}]) fold: [ :a :b |
-		b, '|', a ].
-	^self let: wName be: (ASTIfsOp newIfs: ifs)
-    ]
-    
     defaultClock: clk [
 	<category: 'connecting'>
 	self userDataAt: 'defaultClock' put: clk
@@ -255,6 +240,11 @@ DANMSchematic extend [
 	^self let: wName be: (ASTIfsOp newIfs: ifs)
     ]
 
+    let: wName beOneHotIfs: ifs [
+	<category: 'connecting'>
+	^self let: wName be: (ASTIfsOp newOneHotIfs: ifs)
+    ]
+    
     let: wName beClockedIfs: ifs [
 	<category: 'connecting'>
 	^self let: wName be: (ASTIfsOp newIfs: ifs) clockedBy: self defaultClock

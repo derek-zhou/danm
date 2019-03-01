@@ -108,6 +108,11 @@ Object subclass: ExpressionAST [
 	^self
     ]
 
+    optimizeDependencies [
+	<category: 'basic'>
+	^self
+    ]
+
     optimize [
 	"optimize myself, and return another (simpler) expression if possible, or
 	 self if no optimization can be found. Also if the result is not myself
@@ -115,6 +120,7 @@ Object subclass: ExpressionAST [
 	 reference to use the returned result instead"
 	<category: 'basic'>
 	| v w |
+	self optimizeDependencies.
 	v := self staticValue.
 	v notNil ifTrue: [
 	    w := self width.
