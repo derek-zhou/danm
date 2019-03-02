@@ -19,10 +19,10 @@ DANMBlackBox.st \
 DANMWire.st \
 DANMExpressionWire.st \
 DANMFlipflop.st \
-DANMAssertion.st \
 DANMMonostable.st \
 DANMDelayLine.st \
 DANMSchematic.st \
+DANMAssertion.st \
 DANMSimulator.st \
 DANMVCDDumper.st \
 schematicBuilding.st \

@@ -107,12 +107,6 @@ DANMEntity subclass: DANMBlackBox [
 	^true
     ]
 
-    hasAssertion [
-	"Whether I have assertion"
-	<category: 'accessing'>
-	^false
-    ]
-
     canBeFlatten [
 	"whether I can be flatten. black box cannot"
 	<category: 'accessing'>

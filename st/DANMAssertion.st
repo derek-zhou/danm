@@ -17,52 +17,154 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
-DANMExpressionWire subclass: DANMAssertion [
-    <comment: 'I am an assertion in simulation, the value has to be 
-as expected, otherwise simulation will abort'>
+DANMSchematic subclass: DANMAssertion [
+    <comment: 'I am an assertion in simulation. the input din has to be 1,
+ otherwise simulation will abort'>
     <category: 'DANM'>
 
-    isLoaded [
-	"supress unloaded warning for assertion"
-	<category: 'basic'>
+    reference [
+	<category: 'accessing'>
+	^nil
+    ]
+
+    referenceName [
+	<category: 'accessing'>
+	^'ASSERT'
+    ]
+
+    referencePath [
+	<category: 'accessing'>
+	^context referencePath
+    ]
+
+    canBeSynthesized [
+	"I cannot be synthesized"
+	<category: 'accessing'>
+	^false
+    ]
+
+    canBeFlatten [
+	"I cannot be flatten"
+	<category: 'accessing'>
+	^false
+    ]
+
+    silentTime [
+	<category: 'accessing'>
+	^100
+    ]
+
+    subpressDangleCheck [
+	"do not print warning for unloaded but driven wires/pins"
+	<category: 'check design'>
 	^true
     ]
 
-    flip [
-	<category: 'basic'>
-	super flip.
-	value == 0 ifTrue: [
-	    Transcript nextPutAll: 'Assertion %1 failed in %2!' % 
-		{entityName. self context fullPath}; nl.
-	    "in simulation the design is flattened, so context context is the
-	     simulator"
-	    (context context isKindOf: DANMSimulator) ifTrue: [
-		context context stop: self ]]
+    elaborate [
+	<category: 'accessing'>
+	wires notNil ifTrue: [^self].
+	DANMCurrentDesign use: self during: [
+	    self
+		clearInstances;
+		clearWires;
+		init]
     ]
 
-    nodeStyle [
-	<category: 'printing'>
-	^'[shape=diamond]'
+    destroy [
+	<category: 'accessing'>
+	context removeInstance: self.
+	context := nil
     ]
 
-    printOn: aStream [
-	<category: 'printing'>
-	aStream nextPutAll: '<%1> ' % {expression}
+    postProcess [
+	<category: 'accessing'>
+	"destory myself for synthesis"
+	self destroy
     ]
 
-    printHTMLHeadOn: aStream [
+    init [
+	<category: 'init'>
+	"I have just have one port"
+	self createPort: 'din'.
+	"this illegal has to be 0"
+	self let: 'illegal' be: '~din'
+    ]
+
+    printVerilogCoreOn: aStream [
+	"print the verilog meat for simple assertion"
 	<category: 'printing'>
+	self printWiresInVerilogOn: aStream.
 	aStream
-	    nextPutAll: '<h3><a name="WIRE_%1">Assertion %1</a></h3><ul>' % {entityName}; nl;
-	    nextPutAll: '<li>condition: %1</li>' % {expression printStringStyle: #HTML}; nl
+            nextPutAll: 'always @(illegal)'; nl;
+	    nextPutAll: '    if (($stime > %1)&&illegal) begin' %
+	    {self silentTime}; nl;
+	    nextPutAll: '        $display("Assertion %1 failed at %%d", $stime);' %
+	    {self fullPath}; nl;
+	    nextPutAll: '        $finish;'; nl
     ]
 
-    basicPrintVerilogOn: aStream [
-	<category: 'printing'>
-	super basicPrintVerilogOn: aStream.
-	aStream
-	    nextPutAll: '// synopsys translate_off'; nl;
-	    nextPutAll: '`ASSERT(%1)' % {self verilogName}; nl;
-	    nextPutAll: '// synopsys translate_on'; nl
+]
+
+DANMAssertion subclass: DANMAssertionOneHot [
+    <comment: 'the input din has to contains at most one 1,
+ otherwise simulation will abort'>
+    <category: 'DANM'>
+
+    referenceName [
+	<category: 'accessing'>
+	^'ASSERT_one_hot'
     ]
+
+    width [
+	(self hasParameter: 'width') ifFalse: [ ^2 ].
+	^self parameterValue: 'width'
+    ]
+
+    init [
+	<category: 'init'>
+	self width > 1 ifFalse: [
+	    self error: 'Width has to be more than 1' ].
+	"I have just have one port"
+	self createPort: 'din' width: self width.
+	0 to: self width - 1 do: [ :i |
+	    self let: 'din_or_except%1' % {i}
+		 be: ((((0 to: self width - 1) reject: [ :j |
+		     j = i ]) collect: [ :j |
+			 'din[%1]' % {j} ]) fold: [ :a :b |
+			     b, '|', a ])].
+	self let: 'illegal'
+	     beOneHotChoices: ((self width - 1 to: 0 by -1) collect: [ :i |
+		 'din_or_except%1' % {i} ])
+		 on: 'din'
+    ]
+
+]
+
+DANMAssertion subclass: DANMAssertionNoBitPattern [
+    <comment: 'the one bit input din cannot have a pattern as givven,
+ otherwise simulation will abort'>
+    <category: 'DANM'>
+
+    referenceName [
+	<category: 'accessing'>
+	^'ASSERT_no_bit_pattern'
+    ]
+
+    width [
+	(self hasParameter: 'width') ifFalse: [ ^3 ].
+	^self parameterValue: 'width'
+    ]
+
+    init [
+	<category: 'init'>
+	self
+	     createPort: 'clk';
+	     createPort: 'din';
+	     createPort: 'pattern' width: self width.
+
+	self let: 'shifter'
+	     beClocked: 'shift[%1:0],din' % {self width - 2}.
+	self let: 'illegal' be: '((shifter,din)==pattern)$clk'
+    ]
+
 ]

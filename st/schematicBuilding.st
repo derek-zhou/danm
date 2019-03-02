@@ -125,22 +125,53 @@ DANMSchematic extend [
 
     assert: exp [
 	<category: 'connecting'>
-	| wire e wName |
-	e := ExpressionAST newFrom: exp.
-	(e isKindOf: ASTIdentifier) 
-	    ifTrue: [wName := 'ASSERT_' , e identifier name]
-	    ifFalse: [wName := self uniqueWireNameLike: 'ASSERT'].
-	wire := DANMAssertion newNamed: wName inContext: self.
-	wire expression: e.
-	^wire
+	^self let: (self uniqueWireNameLike: 'ASSERT')
+	     beAssertion: exp
     ]
 
     let: wName beAssertion: exp [
 	<category: 'connecting'>
-	| wire e |
-	wire := DANMAssertion newNamed: wName inContext: self.
-	wire expression: (ExpressionAST newFrom: exp).
-	^wire
+	|iName inst|
+	iName := instances uniqueKeyLike: 'u_%1' % {wName}.
+	inst := DANMAssertion new.
+	self addInstance: inst byName: iName.
+	^self connect: {'%1/din' % {iName}} to: exp name: wName
+    ]
+
+    assertOneHot: exp [
+	<category: 'connecting'>
+	^self let: (self uniqueWireNameLike: 'ASSERT_one_hot')
+	      beAssertionOneHot: exp
+    ]
+
+    let: wName beAssertionOneHot: exp [
+	<category: 'connecting'>
+	|iName inst e|
+	iName := instances uniqueKeyLike: 'u_%1' % {wName}.
+	e := ExpressionAST newFrom: exp.
+	inst := (DANMAssertionOneHot new)
+	    setParameter: 'width' to: e width.
+	self addInstance: inst byName: iName.
+	^self connect: {'%1/din' % {iName}} to: e name: wName
+    ]
+
+    assertNoBitPattern: p clk: c on: s [
+	<category: 'connecting'>
+	^self let: (self uniqueWireNameLike: 'ASSERT_no_bit_pattern')
+	      beAssertionNoBitPattern: p clk: c on: s
+    ]
+
+    let: wName beAssertionNoBitPattern: p clk: c on: s [
+	<category: 'connecting'>
+	|iName inst e|
+	iName := instances uniqueKeyLike: 'u_%1' % {wName}.
+	e := ExpressionAST newFrom: p.
+	inst := (DANMAssertionOneHot new)
+	    setParameter: 'width' to: e width.
+	self addInstance: inst byName: iName.
+	self connect: {'%1/pattern' % {iName}} to: e.
+	self connect: {'%1/clk' % {iName}} to: c.
+	^self connect: {'%1/din' % {iName}} to: s name: 'wName'
     ]
 
     let: wName be: exp resetAfter: delay [
@@ -165,11 +196,16 @@ DANMSchematic extend [
 	<category: 'connecting'>
 	| wire e |
 	e := ExpressionAST newFrom: exp.
-	((e isKindOf: ASTIdentifier) and: [e identifier isPort not & e identifier isSystemNamed]) 
-	    ifTrue: [
+	(e isKindOf: ASTIdentifier) ifTrue: [
+	    (self containsGeneratedName: wName) ifTrue: [
+		"a = b while a is generated name, just return b"
+		e destroy.
+		self removeGeneratedName: wName.
+		^e identifier ].
+	    e identifier isPort not & e identifier isSystemNamed ifTrue: [
 		"a = b while b is not exposed, so just rename b to a"
 		e destroy.
-		^e identifier renameTo: wName].
+		^e identifier renameTo: wName]].
 	wire := DANMExpressionWire newNamed: wName inContext: self.
 	wire expression: e.
 	^wire
@@ -247,7 +283,7 @@ DANMSchematic extend [
 	<category: 'connecting'>
 	^self let: wName be: (ASTOneHotChoiceOp newChoice: c among: cs)
     ]
-    
+
     let: wName beIfs: ifs [
 	<category: 'connecting'>
 	^self let: wName be: (ASTIfsOp newIfs: ifs)
