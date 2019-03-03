@@ -131,11 +131,12 @@ DANMSchematic extend [
 
     let: wName beAssertion: exp [
 	<category: 'connecting'>
-	|iName inst|
-	iName := instances uniqueKeyLike: 'u_%1' % {wName}.
+	|w iName inst|
+	w := self let: wName be: exp.
+	iName := instances uniqueKeyLike: 'u_%1' % {w name}.
 	inst := DANMAssertion new.
 	self addInstance: inst byName: iName.
-	^self connect: {'%1/din' % {iName}} to: exp name: wName
+	^self connect: {'%1/din' % {iName}} name: w name
     ]
 
     assertOneHot: exp [
@@ -146,13 +147,13 @@ DANMSchematic extend [
 
     let: wName beAssertionOneHot: exp [
 	<category: 'connecting'>
-	|iName inst e|
-	iName := instances uniqueKeyLike: 'u_%1' % {wName}.
-	e := ExpressionAST newFrom: exp.
+	|w iName inst|
+	w := self let: wName be: exp.
+	iName := instances uniqueKeyLike: 'u_%1' % {w name}.
 	inst := (DANMAssertionOneHot new)
-	    setParameter: 'width' to: e width.
+	    setParameter: 'width' to: w width.
 	self addInstance: inst byName: iName.
-	^self connect: {'%1/din' % {iName}} to: e name: wName
+	^self connect: {'%1/din' % {iName}} name: w name
     ]
 
     assertNoBitPattern: p clk: c on: s [
@@ -163,15 +164,16 @@ DANMSchematic extend [
 
     let: wName beAssertionNoBitPattern: p clk: c on: s [
 	<category: 'connecting'>
-	|iName inst e|
-	iName := instances uniqueKeyLike: 'u_%1' % {wName}.
-	e := ExpressionAST newFrom: p.
+	|w ep iName inst|
+	w := self let: wName be: s.
+	ep := ExpressionAST newFrom: p.
+	iName := instances uniqueKeyLike: 'u_%1' % {w name}.
 	inst := (DANMAssertionOneHot new)
-	    setParameter: 'width' to: e width.
+	    setParameter: 'width' to: ep width.
 	self addInstance: inst byName: iName.
-	self connect: {'%1/pattern' % {iName}} to: e.
+	self connect: {'%1/pattern' % {iName}} to: ep.
 	self connect: {'%1/clk' % {iName}} to: c.
-	^self connect: {'%1/din' % {iName}} to: s name: 'wName'
+	^self connect: {'%1/din' % {iName}} name: w name
     ]
 
     let: wName be: exp resetAfter: delay [
@@ -211,6 +213,10 @@ DANMSchematic extend [
 	^wire
     ]
 
+    let: bundle beBundle: a [
+	^self let: bundle be: (ASTBundleOp newFrom: a)
+    ]
+
     let: encodedBus beEncoded: bus [
 	<category: 'connecting'>
 	|w be|
@@ -224,11 +230,14 @@ DANMSchematic extend [
 
     let: decodedBus beDecoded: bus [
 	<category: 'connecting'>
-	|be|
+	|w be|
 	be := ExpressionAST newFrom: bus.
-	^self let: decodedBus be: (ASTBundleOp
-	    newFrom: ((((2 raisedTo: be width) - 1) to: 0 by: -1) collect: [ :i |
-		'%1==%2' % {bus. i} ]))
+	w := be width.
+	"unused expression has to be destroyed"
+	be destroy.
+	^self let: decodedBus
+	      beBundle: ((((2 raisedTo: w) - 1) to: 0 by: -1) collect: [ :i |
+		'%1==%2' % {bus. i} ])
     ]
 
     defaultClock: clk [

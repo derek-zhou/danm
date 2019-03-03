@@ -99,8 +99,6 @@ DANMBlackBox extend [
 
 ]
 
-
-
 DANMSchematic extend [
 
     subpressDangleCheck [
@@ -217,6 +215,16 @@ DANMReplicatedSchematic extend [
     checkDesign [
 	<category: 'check design'>
 	self isPrimary ifTrue: [^super checkDesign].
+	^true
+    ]
+
+]
+
+DANMAssertion extend [
+
+    subpressDangleCheck [
+	"do not print warning for unloaded but driven wires/pins"
+	<category: 'check design'>
 	^true
     ]
 

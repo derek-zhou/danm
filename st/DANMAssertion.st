@@ -37,6 +37,11 @@ DANMSchematic subclass: DANMAssertion [
 	^context referencePath
     ]
 
+    type [
+	<category: 'accessing'>
+	^'assertion'
+    ]
+
     canBeSynthesized [
 	"I cannot be synthesized"
 	<category: 'accessing'>
@@ -52,12 +57,6 @@ DANMSchematic subclass: DANMAssertion [
     silentTime [
 	<category: 'accessing'>
 	^100
-    ]
-
-    subpressDangleCheck [
-	"do not print warning for unloaded but driven wires/pins"
-	<category: 'check design'>
-	^true
     ]
 
     elaborate [
@@ -126,15 +125,16 @@ DANMAssertion subclass: DANMAssertionOneHot [
 	    self error: 'Width has to be more than 1' ].
 	"I have just have one port"
 	self createPort: 'din' width: self width.
-	0 to: self width - 1 do: [ :i |
-	    self let: 'din_or_except%1' % {i}
-		 be: ((((0 to: self width - 1) reject: [ :j |
-		     j = i ]) collect: [ :j |
-			 'din[%1]' % {j} ]) fold: [ :a :b |
-			     b, '|', a ])].
+	self let: 'din_except0'
+	     be: 'din[%1:1]' % {self width - 1}.
+	self let: 'din_except%1' % {self width - 1}
+	     be: 'din[%1:0]' % {self width - 2}.
+	1 to: self width - 2 do: [ :i |
+	    self let: 'din_except%1' % {i} be: 'din[%1:%2],din[%3:0]' %
+		{self width - 1. i+1. i-1} ].
 	self let: 'illegal'
-	     beOneHotChoices: ((self width - 1 to: 0 by -1) collect: [ :i |
-		 'din_or_except%1' % {i} ])
+	     beOneHotChoices: ((self width - 1 to: 0 by: -1) collect: [ :i |
+		 '|din_except%1' % {i} ])
 		 on: 'din'
     ]
 
