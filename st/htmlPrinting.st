@@ -10,6 +10,11 @@ DANMBlackBox extend [
 	[self printHTMLOn: fs] ensure: [fs close]
     ]
 
+    hideInHTML [
+	<category: 'html-printing'>
+	^false
+    ]
+
     printHTMLOn: aStream [
 	<category: 'html-printing'>
 	self printHTMLHeaderOn: aStream.
@@ -27,6 +32,13 @@ DANMBlackBox extend [
 	    aStream nextPutAll: '<tr><td><a href="#WIRE_%1">%1</a></td><td>%2</td><td>%3</td></tr>' %
 		{p name. p direction asString. p width}; nl].
 	aStream nextPutAll: '</table><hr/>'; nl
+    ]
+
+    printHTMLSummaryOn: aStream [
+	<category: 'html-printing'>
+	aStream
+	    nextPutAll: '<tr><td>%1</td><td><a href="#INST_%1">instance</a></td><td><a href="%2/%1.html">blackbox</a></td></tr>' % 
+	    {entityName. context name}; nl
     ]
 
     printHTMLHeaderOn: aStream [
@@ -74,7 +86,7 @@ DANMBlackBox extend [
     printHTMLParametersOn: aStream [
 	<category: 'html-printing'>
 	aStream
-	    nextPutAll: '<h2>Parameters Summary</h2><table  border="1">'; nl;
+	    nextPutAll: '<li>Parameters:<table  border="1">'; nl;
 	    nextPutAll: '<tr><th>parameter name</th><th>value</th></tr>'; nl.
 	parameters keys asSortedCollection do: [:k | 
 	    aStream
@@ -158,7 +170,9 @@ DANMSchematic extend [
 	dir := File name: entityName.
 	dir exists ifFalse: [dir createDirectory].
 	Directory working: dir.
-	instances do: [:i | i generateHTML].
+	instances do: [:i |
+	    i hideInHTML ifFalse: [
+		i generateHTML]].
 	Directory working: '..'
     ]
 
@@ -176,10 +190,8 @@ DANMSchematic extend [
     printHTMLInstanceSummaryOn: aStream [
 	<category: 'html-printing'>
 	aStream nextPutAll: '<h2>Instance Summary</h2><table  border="1">'; nl.
-	instances asSortedCollection do: [:i | 
-	    aStream
-		nextPutAll: '<tr><td>%1</td><td><a href="#INST_%1">instance</a></td><td><a href="%2/%1.html">%3</a></td></tr>' % 
-		{i name. entityName. i type}; nl].
+	instances asSortedCollection do: [:i |
+	    i printHTMLSummaryOn: aStream ].
 	aStream nextPutAll: '</table><hr/>'; nl
     ]
 
@@ -187,12 +199,13 @@ DANMSchematic extend [
 	<category: 'html-printing'>
 	instances size = 0 ifTrue: [^self].
 	aStream nextPutAll: '<ul>'; nl.
-	instances asSortedCollection do: [ :i | 
-	    aStream
-		nextPutAll: '<li><a href="%1/%2.html">%2</a> (%3: %4)' % 
-		{self fullPath. i name. i type. i referenceName}; nl.
-	    i printHTMLHierOn: aStream.
-	    aStream nextPutAll: '</li>'; nl].
+	instances asSortedCollection do: [ :i |
+	    i hideInHTML ifFalse: [
+		aStream nextPutAll:
+		    '<li><a href="%1/%2.html">%2</a> (%3: %4)' %
+		    {self fullPath. i name. i type. i referenceName}; nl.
+		i printHTMLHierOn: aStream.
+		aStream nextPutAll: '</li>'; nl]].
 	aStream nextPutAll: '</ul>'; nl
     ]
 
@@ -214,6 +227,34 @@ DANMSchematic extend [
 	    w printHTMLOn: aStream.
 	    aStream nextPutAll: '</li>'; nl].
 	aStream nextPutAll: '</ul><hr/>'; nl
+    ]
+
+]
+
+DANMAssertion extend [
+
+    hideInHTML [
+	<category: 'html-printing'>
+	"assertion is hiden in html"
+	^true
+    ]
+
+    printHTMLSummaryOn: aStream [
+	<category: 'html-printing'>
+	aStream
+	    nextPutAll: '<tr><td>%1</td><td><a href="#INST_%1">instance</a></td><td><a href="#INST_%1">%2</a></td></tr>' % 
+	    {entityName. self referenceName}; nl
+    ]
+
+    printInstanceHTMLOn: aStream [
+	<category: 'html-printing'>
+	aStream
+	    nextPutAll: '<h3>Assertion <a name="INST_%1">%1</a>(%2)</h3>' %
+	    {entityName. self referenceName}; nl;
+	    nextPutAll: '<p>%1</p><ul>' % {self comment}; nl.
+	connections size > 0 ifTrue: [self printHTMLConnectionsOn: aStream].
+	parameters notNil ifTrue: [self printHTMLParametersOn: aStream].
+	aStream nextPutAll: '</ul>'; nl
     ]
 
 ]
