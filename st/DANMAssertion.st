@@ -29,7 +29,7 @@ DANMSchematic subclass: DANMAssertion [
 
     referenceName [
 	<category: 'accessing'>
-	^'ASSERT'
+	^'ASSERT_true'
     ]
 
     referencePath [
