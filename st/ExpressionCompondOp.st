@@ -17,6 +17,268 @@
     along with DANM.  If not, see <http://www.gnu.org/licenses/>.
 "
 
+ExpressionAST subclass: ASTBundleOp [
+    | items |
+    <comment: 'I bundle all wires together.'>
+    <category: 'expression AST'>
+
+    ASTBundleOp class >> newFrom: a [
+	<category: 'instance creation'>
+	^(super new)
+	    items: (a collect: [ :each | ExpressionAST newFrom: each ])
+    ]
+
+    clearAlias [
+	<category: 'accessing'>
+	super clearAlias.
+	items do: [:each | each clearAlias]
+    ]
+
+    width [
+	<category: 'accessing'>
+	^ items inject: 0 into: [ :r :a |
+	    r + a width ]
+    ]
+
+    items [
+	<category: 'accessing'>
+	^items
+    ]
+
+    items: a [
+	<category: 'accessing'>
+	items := a
+    ]
+
+    dependencies [
+	<category: 'accessing'>
+	^items inject: #() into: [ :r :a |
+	    r , a dependencies]
+    ]
+
+    checkDesign [
+	<category: 'basic'>
+	^items inject: true into: [ :r :a |
+	    a width = 0
+		ifTrue:  [ false ]
+		ifFalse: [ r & a checkDesign ]]
+    ]
+
+    context: c type: t [
+	<category: 'basic'>
+	items do: [:each | each context: c type: t]
+    ]
+
+    destroy [
+	<category: 'basic'>
+	items do: [:each | each destroy]
+    ]
+
+    evaluate [
+	<category: 'basic'>
+	^items inject: 0 into: [ :r :each |
+	    (r bitShift: each width) + each evalute ]
+    ]
+
+    staticValue [
+	<category: 'basic'>
+	|v|
+	^items inject: 0 into: [ :r :each |
+	    v := each staticValue.
+	    v isNil ifTrue: [ ^nil ].
+	    (r bitShift: each width) + v ]
+    ]
+
+    optimizeDependencies [
+	<category: 'basic'>
+	items := items collect: [ :each | each optimize ]
+    ]
+
+    printAdditionalVerilogOn: aStream [
+	<category: 'printing'>
+	items do: [:c | c printAdditionalVerilogOn: aStream]
+    ]
+
+    inlined [
+	"short bundle is inlined"
+	^items size <= 2
+    ]
+
+    basicPrintStringStyle: style [
+	<category: 'printing'>
+	| aStream |
+	aStream := WriteStream on: String new.
+	(style == #NONE) | (style == #VERILOG) | self inlined ifTrue: [
+	    aStream nextPut: ${.
+	    1 to: items size do: [ :i |
+		i == 1 ifFalse: [ aStream nextPut: $, ].
+		aStream nextPutAll: ((items at: i) printStringStyle: style) ].
+	    aStream nextPut: $} ].
+	style == #HTML & self inlined not ifTrue: [
+	    aStream nextPutAll: 'Bundle from MSB down:<br/><table  border="1"><tr><th>items</th></tr>'; nl.
+	    items do: [ :each |
+		aStream nextPutAll: '<tr><td>%1</td></tr>' %
+		    {each basicPrintStringStyle: #HTML}; nl ].
+	    aStream nextPutAll: '</table>'; nl].
+	^aStream contents
+    ]
+]
+
+ASTBundleOp subclass: ASTFoldedBundle [
+    <comment: 'I merge all wires together, using some infix op, which is communitive and reversible'>
+    <category: 'expression AST'>
+
+    ASTFoldedBundle class >> op [
+	<category: 'accessing'>
+	^self subclassResponsibility
+    ]
+
+    htmlType [
+	<category: 'accessing'>
+	^self subclassResponsibility
+    ]
+
+    width [
+	<category: 'accessing'>
+	^ (items at: 1) width
+    ]
+
+    "every item must have the same width"
+    checkDesign [
+	<category: 'basic'>
+	|w|
+	super checkDesign ifFalse: [
+	    ^false ].
+	w := self width.
+	^items inject: true into: [ :r :a |
+	    r & (a width = w) ]
+    ]
+
+    evaluate [
+	<category: 'basic'>
+	^self subclassResponsibility
+    ]
+
+    staticValue [
+	<category: 'basic'>
+	^self subclassResponsibility
+    ]
+
+    basicPrintStringStyle: style [
+	<category: 'printing'>
+	| aStream |
+	aStream := WriteStream on: String new.
+	(style == #NONE) | (style == #VERILOG) | self inlined ifTrue: [
+	    aStream nextPut: $(.
+	    1 to: items size do: [ :i |
+		i == 1 ifFalse: [ aStream nextPut: self class op ].
+		aStream nextPutAll: ((items at: i) printStringStyle: style) ].
+	    aStream nextPut: $) ].
+	style == #HTML & self inlined not ifTrue: [
+	    aStream nextPutAll: '%1<br/><table  border="1"><tr><th>items</th></tr>' %
+		{self htmlType}; nl.
+	    items do: [ :each |
+		aStream nextPutAll: '<tr><td>%1</td></tr>' %
+		    {each basicPrintStringStyle: #HTML}; nl ].
+	    aStream nextPutAll: '</table>'; nl].
+	^aStream contents
+    ]
+
+]
+
+ASTFoldedBundle subclass: ASTOredBundle [
+    <comment: 'I or all wires together'>
+    <category: 'expression AST'>
+
+    ASTOredBundle class >> op [
+	<category: 'accessing'>
+	^$|
+    ]
+
+    htmlType [
+	<category: 'accessing'>
+	^'Ored bundle:'
+    ]
+
+    evaluate [
+	<category: 'basic'>
+	^ items inject: 0 into: [ :r :a |
+	    r bitOr: a evaluate ]
+    ]
+
+    staticValue [
+	<category: 'basic'>
+	|v|
+	^ items inject: 0 into: [ :r :a |
+	    v := a staticValue.
+	    v isNil ifTrue: [ ^ nil ].
+	    r bitOr: v ]
+    ]
+
+]
+
+ASTFoldedBundle subclass: ASTAndedBundle [
+    <comment: 'I and all wires together'>
+    <category: 'expression AST'>
+
+    ASTAndedBundle class >> op [
+	<category: 'accessing'>
+	^$&
+    ]
+
+    htmlType [
+	<category: 'accessing'>
+	^'Anded bundle:'
+    ]
+
+    evaluate [
+	<category: 'basic'>
+	^ items inject: SmallInteger largest into: [ :r :a |
+	    r bitAnd: a evaluate ]
+    ]
+
+    staticValue [
+	<category: 'basic'>
+	|v|
+	^ items inject: SmallInteger largest into: [ :r :a |
+	    v := a staticValue.
+	    v isNil ifTrue: [ ^ nil ].
+	    r bitAnd: v ]
+    ]
+
+]
+
+ASTFoldedBundle subclass: ASTXoredBundle [
+    <comment: 'I xor all wires together'>
+    <category: 'expression AST'>
+
+    ASTXoredBundle class >> op [
+	<category: 'accessing'>
+	^$^
+    ]
+
+    htmlType [
+	<category: 'accessing'>
+	^'Xored bundle:'
+    ]
+
+    evaluate [
+	<category: 'basic'>
+	^ items inject: 0 into: [ :r :a |
+	    r bitXor: a evaluate ]
+    ]
+
+    staticValue [
+	<category: 'basic'>
+	|v|
+	^ items inject: 0 into: [ :r :a |
+	    v := a staticValue.
+	    v isNil ifTrue: [ ^ nil ].
+	    r bitXor: v ]
+    ]
+
+]
+
 ExpressionAST subclass: ASTChoiceOp [
     | condition choices |
     <comment: 'I model a mux, can be 2^n choices, n from 1 to many'>
@@ -194,181 +456,6 @@ ExpressionAST subclass: ASTChoiceOp [
 		aStream nextPutAll: '<tr><td>%1 == %2 </td><td>%3</td></tr>' % 
 		    {condition basicPrintStringStyle: #HTML. s - i.
 		     (choices at: i) basicPrintStringStyle: #HTML}].
-	    aStream nextPutAll: '</table>'; nl].	
-	^aStream contents
-    ]
-]
-
-ASTChoiceOp subclass: ASTOneHotChoiceOp [
-    <comment: 'I model a mux, with one hot condition input'>
-    <category: 'expression AST'>
-
-    ASTChoiceOp class >> newChoice: c among: cs [
-	<category: 'instance creation'>
-	|ce sch cw|
-	"condition must be an identifier"
-	ce := ExpressionAST newFrom: c.
-	(ce isKindOf: ASTIdentifier) ifFalse: [
-	    sch := DANMCurrentDesign value.
-	    name := sch uniqueWireNameLike: 'onehot'.
-	    cw := (DANMExpressionWire newNamed: name inContext: sch) expression: ce.
-	    ce := ASTIdentifier basicNewIdentifier: cw ].
-	^(super new)
-	    condition: ce;
-	    choices: (cs collect: [ :each | ExpressionAST newFrom: each ])
-    ]
-
-    expectedChoicesCount [
-	<category: 'accessing'>
-	^condition width
-    ]
-    
-    evaluate [
-	<category: 'basic'>
-	| v |
-	v = condition evaluate.
-	^ ((0 to: condition width - 1) collect: [ :i |
-	    (v bitAnd: (1 bitShift: i)) > 0
-	        ifTrue: [ (choices at: choices size - i) evaluate ]
-		ifFalse: [ 0 ]]) fold: [ :a :b |
-		    b bitOr: a ]
-    ]
-
-    staticValue [
-	<category: 'basic'>
-	| v |
-	v := condition staticValue.
-	v isNil ifTrue: [ ^nil ].
-	v = 0 ifTrue: [ ^ 0 ].
-	0 to: condition width - 1 do: [ :i |
-	    v = (1 bitShift: i) ifTrue: [ ^ (choices at: choices size - i) staticValue ]].
-	self error: 'condition is not one hot. it is %1' % {v}
-    ]
-
-    inlined [
-	"one hot choices are always inline"
-	^true
-    ]
-
-    basicPrintStringStyle: style [
-	<category: 'printing'>
-	| aStream w |
-	(style == #NONE) | (style == #VERILOG) ifTrue: [
-	    w := self width.
-	    ^ ((1 to: choices size) collect: [ :i |
-		'(%1[%2]?%3:%4d0)' %
-		    { condition printStringStyle: style. choices size - i.
-		      (choices at: i) printStringStyle: style. 
-		      w }]) fold: [ :a :b |
-			  b, '|', a ]].
-	style == #HTML ifTrue: [
-	    aStream := WriteStream on: String new.
-	    aStream nextPutAll: 'One hot choices:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
-	    1 to: choices size do: [:i | 
-		aStream nextPutAll: '<tr><td>%1[%2]</td><td>%3</td></tr>' % 
-		    {condition basicPrintStringStyle: #HTML. choices size - i.
-		     (choices at: i) basicPrintStringStyle: #HTML } ].
-	    aStream nextPutAll: '</table>'; nl.	
-	    ^aStream contents ]
-    ]
-]
-
-ExpressionAST subclass: ASTBundleOp [
-    | items |
-    <comment: 'I bundle all wires together.'>
-    <category: 'expression AST'>
-
-    ASTBundleOp class >> newFrom: a [
-	<category: 'instance creation'>
-	^(super new)
-	    items: (a collect: [ :each | ExpressionAST newFrom: each ])
-    ]
-
-    clearAlias [
-	<category: 'accessing'>
-	super clearAlias.
-	items do: [:each | each clearAlias]
-    ]
-
-    width [
-	<category: 'accessing'>
-	^ items inject: 0 into: [ :r :a |
-	    r + a width ]
-    ]
-
-    items [
-	<category: 'accessing'>
-	^items
-    ]
-
-    items: a [
-	<category: 'accessing'>
-	items := a
-    ]
-
-    dependencies [
-	<category: 'accessing'>
-	^items inject: #() into: [ :r :a |
-	    r , a dependencies]
-    ]
-
-    checkDesign [
-	<category: 'basic'>
-	^items inject: true into: [ :r :a |
-	    r & a checkDesign ]
-    ]
-
-    context: c type: t [
-	<category: 'basic'>
-	items do: [:each | each context: c type: t]
-    ]
-
-    destroy [
-	<category: 'basic'>
-	items do: [:each | each destroy]
-    ]
-
-    evaluate [
-	<category: 'basic'>
-	^items inject: 0 into: [ :r :each |
-	    (r bitShift: each width) + each evalute ]
-    ]
-
-    staticValue [
-	<category: 'basic'>
-	|v|
-	^items inject: 0 into: [ :r :each |
-	    v := each staticValue.
-	    v isNil ifTrue: [ ^nil ].
-	    (r bitShift: each width) + v ]
-    ]
-
-    optimizeDependencies [
-	<category: 'basic'>
-	items := items collect: [ :each | each optimize ]
-    ]
-
-    printAdditionalVerilogOn: aStream [
-	<category: 'printing'>
-	items do: [:c | c printAdditionalVerilogOn: aStream]
-    ]
-
-    basicPrintStringStyle: style [
-	"not inlined verilog is covered elsewhere"
-	<category: 'printing'>
-	| aStream |
-	aStream := WriteStream on: String new.
-	(style == #NONE) | (style == #VERILOG) ifTrue: [
-	    aStream nextPut: ${.
-	    1 to: items size do: [ :i | 
-		i == 1 ifFalse: [ aStream nextPut: $, ].
-		aStream nextPutAll: ((items at: i) printStringStyle: style) ].
-	    aStream nextPut: $} ].
-	style == #HTML ifTrue: [
-	    aStream nextPutAll: 'Bundle from MSB down:<br/><table  border="1"><tr><th>value</th></tr>'; nl.
-	    items do: [:each | 
-		aStream nextPutAll: '<tr><td>%1</td></tr>' % 
-		    {each basicPrintStringStyle: #HTML}].
 	    aStream nextPutAll: '</table>'; nl].	
 	^aStream contents
     ]
@@ -586,67 +673,6 @@ I cannot be sub expression to some other expression though. '>
 	    aStream nextPutAll: '}'].
 	^aStream contents
     ]
-]
-
-ASTIfsOp subclass: ASTOneHotIfsOp [
-    <comment: 'I model a mux, with one hot condition input'>
-    <category: 'expression AST'>
-    
-    isCombinatorial [
-	<category: 'basic'>
-	"one hot ifs are always combinatorial"
-	^true
-    ]
-
-    evaluate [
-	<category: 'basic'>
-	^ ((0 to: conditions size - 1) collect: [ :i |
-	    (conditions at: i + 1) evaluate > 0 
-	        ifTrue: [ (choices at: i + 1) evaluate ]
-		ifFalse: [ 0 ]]) fold: [ :a :b |
-		    b bitOr: a ]
-    ]
-
-    staticValue [
-	<category: 'basic'>
-	| vc v |
-	v := nil.
-	0 to: conditions size - 1 do: [ :i |
-	    vc := (conditions at: i + 1) staticValue.
-	    vc isNil ifTrue: [ ^nil ].
-	    vc > 0 ifTrue: [
-		v notNil ifTrue: [
-		    self error: 'conditions are not one hot' ].
-		v := (choices at: i + 1) staticValue ]].
-	^v
-    ]
-
-    inlined [
-	^true
-    ]
-    
-    basicPrintStringStyle: style [
-	<category: 'printing'>
-	| aStream w|
-	(style == #NONE) | (style == #VERILOG) ifTrue: [
-	    w := self width.
-	    ^ ((1 to: choices size) collect: [ :i |
-		'(%1?%2:%3d0)' %
-		    { (conditions at: i) printStringStyle: style.
-		      (choices at: i) printStringStyle: style. 
-		      w }]) fold: [ :a :b |
-			  b, '|', a ]].
-	style == #HTML ifTrue: [
-	    aStream := WriteStream on: String new.
-	    aStream nextPutAll: 'One hot ifs:<br/><table  border="1"><tr><th>condition</th><th>value</th></tr>'; nl.
-	    1 to: choices size do: [:i | 
-		aStream nextPutAll: '<tr><td>%1</td><td>%2</td></tr>' % 
-		    {(conditions at: i) basicPrintStringStyle: #HTML.
-		     (choices at: i) basicPrintStringStyle: #HTML } ].
-	    aStream nextPutAll: '</table>'; nl.	
-	    ^aStream contents ]
-    ]
-
 ]
 
 ExpressionAST subclass: ASTCasesOp [

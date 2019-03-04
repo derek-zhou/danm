@@ -168,7 +168,7 @@ DANMSchematic extend [
 	w := self let: wName be: s.
 	ep := ExpressionAST newFrom: p.
 	iName := instances uniqueKeyLike: 'u_%1' % {w name}.
-	inst := (DANMAssertionOneHot new)
+	inst := (DANMAssertionNoBitPattern new)
 	    setParameter: 'width' to: ep width.
 	self addInstance: inst byName: iName.
 	self connect: {'%1/pattern' % {iName}} to: ep.
@@ -215,29 +215,6 @@ DANMSchematic extend [
 
     let: bundle beBundle: a [
 	^self let: bundle be: (ASTBundleOp newFrom: a)
-    ]
-
-    let: encodedBus beEncoded: bus [
-	<category: 'connecting'>
-	|w be|
-	be := ExpressionAST newFrom: bus.
-	w := (be width log: 2) ceiling.
-	^self let: encodedBus be: (ASTOneHotChoiceOp
-            newChoice: be
-	    among: ((be width - 1 to: 0 by: -1) collect: [ :i |
-		ASTConstant newConstant: i width: w ]))
-    ]
-
-    let: decodedBus beDecoded: bus [
-	<category: 'connecting'>
-	|w be|
-	be := ExpressionAST newFrom: bus.
-	w := be width.
-	"unused expression has to be destroyed"
-	be destroy.
-	^self let: decodedBus
-	      beBundle: ((((2 raisedTo: w) - 1) to: 0 by: -1) collect: [ :i |
-		'%1==%2' % {bus. i} ])
     ]
 
     defaultClock: clk [
@@ -290,7 +267,17 @@ DANMSchematic extend [
 
     let: wName beOneHotChoices: cs on: c [
 	<category: 'connecting'>
-	^self let: wName be: (ASTOneHotChoiceOp newChoice: c among: cs)
+	|be sch name bw|
+	be := ExpressionAST newFrom: c.
+	name := c.
+	(be isKindOf: ASTIdentifier) ifFalse: [
+	    sch := DANMCurrentDesign value.
+	    name := sch uniqueWireNameLike: 'onehot'.
+	    bw := (DANMExpressionWire newNamed: name inContext: sch) expression: be.
+	    be := ASTIdentifier basicNewIdentifier: bw ].
+	^self let: wName
+	      be: (ASTOredBundle newFrom: ((0 to: be width - 1) collect: [ :i |
+		  '%1[%2]?(%3):0' % {name. i. cs at: i + 1} ]))
     ]
 
     let: wName beIfs: ifs [
@@ -300,9 +287,33 @@ DANMSchematic extend [
 
     let: wName beOneHotIfs: ifs [
 	<category: 'connecting'>
-	^self let: wName be: (ASTOneHotIfsOp newIfs: ifs)
+	^self let: wName be: (ASTOredBundle newFrom: (ifs collect: [ :each |
+	    '%1?%2:0' % {each key. each value} ]))
     ]
     
+    let: encodedBus beEncoded: bus [
+	<category: 'connecting'>
+	|be w|
+	be := ExpressionAST newFrom: bus.
+	w := (be width log: 2) ceiling.
+	^self let: encodedBus
+	      beOneHotChoices: ((0 to: be width - 1) collect: [ :i |
+		  '%1d%2' % {w. i} ])
+	      on: be
+    ]
+
+    let: decodedBus beDecoded: bus [
+	<category: 'connecting'>
+	|w be|
+	be := ExpressionAST newFrom: bus.
+	w := be width.
+	"unused expression has to be destroyed"
+	be destroy.
+	^self let: decodedBus
+	      beBundle: ((((2 raisedTo: w) - 1) to: 0 by: -1) collect: [ :i |
+		'%1==%2' % {bus. i} ])
+    ]
+
     let: wName beClockedIfs: ifs [
 	<category: 'connecting'>
 	^self let: wName be: (ASTIfsOp newIfs: ifs) clockedBy: self defaultClock

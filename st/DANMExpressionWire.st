@@ -341,8 +341,7 @@ evaluate to nil I default to the default expression which cannot be nil'>
     destroy [
 	<category: 'basic'>
 	default destroy.
-	super destroy
-    ]
+	super destr    ]
 
     printOn: aStream [
 	<category: 'printing'>

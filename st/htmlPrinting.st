@@ -170,9 +170,7 @@ DANMSchematic extend [
 	dir := File name: entityName.
 	dir exists ifFalse: [dir createDirectory].
 	Directory working: dir.
-	instances do: [:i |
-	    i hideInHTML ifFalse: [
-		i generateHTML]].
+	instances do: [:i | i generateHTML].
 	Directory working: '..'
     ]
 
@@ -242,15 +240,15 @@ DANMAssertion extend [
     printHTMLSummaryOn: aStream [
 	<category: 'html-printing'>
 	aStream
-	    nextPutAll: '<tr><td>%1</td><td><a href="#INST_%1">instance</a></td><td><a href="#INST_%1">%2</a></td></tr>' % 
-	    {entityName. self referenceName}; nl
+	    nextPutAll: '<tr><td>%1</td><td><a href="#INST_%1">instance</a></td><td><a href="%2/%1.html">%3</a></td></tr>' % 
+	    {entityName. context name. self referenceName}; nl
     ]
 
     printInstanceHTMLOn: aStream [
 	<category: 'html-printing'>
 	aStream
-	    nextPutAll: '<h3>Assertion <a name="INST_%1">%1</a>(%2)</h3>' %
-	    {entityName. self referenceName}; nl;
+	    nextPutAll: '<h3>Assertion <a name="INST_%1">%1</a>(%2) <a href="%3/%1.html">%4</a></h3>' %
+	    {entityName. self referenceName. context name. self type}; nl;
 	    nextPutAll: '<p>%1</p><ul>' % {self comment}; nl.
 	connections size > 0 ifTrue: [self printHTMLConnectionsOn: aStream].
 	parameters notNil ifTrue: [self printHTMLParametersOn: aStream].

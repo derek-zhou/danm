@@ -133,7 +133,7 @@ DANMAssertion subclass: DANMAssertionOneHot [
 	    self let: 'din_except%1' % {i} be: 'din[%1:%2],din[%3:0]' %
 		{self width - 1. i+1. i-1} ].
 	self let: 'illegal'
-	     beOneHotChoices: ((self width - 1 to: 0 by: -1) collect: [ :i |
+	     beOneHotChoices: ((0 to: self width - 1) collect: [ :i |
 		 '|din_except%1' % {i} ])
 		 on: 'din'
     ]
