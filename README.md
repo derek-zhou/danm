@@ -30,7 +30,9 @@ smalltalk script like:
 	s1 generateHTMLAsTop.
 	"write one single hierachical verilog file, for external simulation"
 	s1 generateFullVerilogTo: '%1.v' % {s1 name}.
-	"flattening, for synthesis or DANM simulation"
+	"postprocess, this give each schematic a chance to do something, usually for synthesis"
+	s1 postprocess.
+	"flattening, for synthesis"
 	s1 flattenAll.
 	"optional, simple optimization step. this will not remove dangling signals"
 	s1 optimizeNoTrim.
@@ -39,6 +41,7 @@ smalltalk script like:
 	"write one single flatten verilog file, for synthesis run"
 	s1 generateFullVerilogTo: '%1_flat.v' % {s1 name}.
 
-You can put everything in a Makefile as well.
+You can put everything in a Makefile as well. For detail documentation, please refer to the doc directory. 
+
 
 
