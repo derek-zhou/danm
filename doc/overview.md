@@ -154,4 +154,4 @@ value, so you can define a get accessor method:
 # Summary #
 
 With the above, you can do basic bottom-up hierachical design using
-danm. The next section will deal with behavioral RTL design.
+danm. The next article will deal with behavioral RTL design.
