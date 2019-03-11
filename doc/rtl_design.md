@@ -43,13 +43,13 @@ complex verilog structures.
 The purpose of an expression is to drive a wire. In this case the wire
 has the same width as the width of the expression, and can drive pins,
 ports, or participate in expression for other wires via an identifier
-to itself.
+to itself. The most basic usage for expression is to assign it to a
+wire:
 
-## assertion ##
-
-An assertion is a schematic module that has no outputs. It has
-expression inside and the generated verilog contains statements to
-stop the simulation if certain condition is met.
+	self let: 'wire1' be: 'wire0^wire2'.
+	
+There are much more ways to do similiar things or more advance things,
+please chack the 'schematic_building.st' source code.
 
 ## sequential elements ##
 
@@ -57,13 +57,95 @@ The only 2 sequential elements allowed are flops and latches. They are
 also expressions. They have to be constructed explicitly. No more
 inferred latch.
 
-# usage #
+# opertors #
 
-The most basic usage for expression is to assign it to a wire:
+The most basic expressions are identifiers and constants. To build
+more complex operators, you need to use operators. 
 
-	self let: 'wire1' be: 'wire0^wire2'.
+## unary operators ##
+
+These operators take one operand. In string form you write the opeator
+in front of the operand. They also have the highest priority.
+
+ * ~ bit invert
+ * | or bus
+ * & and bus
+ * ^ xor bus
+ 
+They have the same meaning as in verilog.
+
+## binary operators ##
+
+These operator takes 2 operands, and is written as infix. They has
+second to highest priority in evaluation.
+
+ * &|^
+ * +-
+ * <>=
+ 
+They have the same meaning as in verilog. DANM also defines a few
+extras:
+
+ * , concatenate. so you can write '(a,b)' instead of '{a,b}' 
+ * $ flop. 'a$clk' is a flop after a on posedge clk
+ * @ latch. 'a@clk' is a D-latch after a with positive clk
+ 
+## compound operators ##
+
+DANM also defined a few operators that tkae 3 or more operands. 
+
+### choice operator ###
+
+For example:
+
+    'a?b:c'
+
+a can be more than 1 bit wide. If a is 2 bit wide, you can write:
+
+    'a?b:c:d:e'
 	
-There are much more ways to do similiar things or more advance things,
-please chack the 'schematic_building.st' source code.
+DANM will generate legal verilog based on what you mean.
+
+### if operator ###
+
+Often you need to write if ... else if ... else if ... else. For that
+you can write an array of associations:
+
+    { 'a' -> 'x'.
+	  'b' -> 'y'.
+	  1 -> 'z' }
+
+And it can be nested. 
+
+### case operator ###
+
+A case statement can also be expressed as an array of association:
+
+	self let: 'x' beCases: 
+		{ '0' -> 'x0'.
+		  '1' -> 'x1'.
+		  nil -> 'x2' } on: 'con'.
+		  
+You cannot nest cases though. 
+
+# assertion #
+
+An assertion is a schematic module that has no outputs. It has
+expression inside and the generated verilog contains statements to
+stop the simulation if certain condition is met. For example:
+
+	self assert: '~vld|rdy'.
+
+There are a few more assertion defined in danm, or you can subclass
+and define more. Check the source code in DANMAssertion.st
+
+# advance usages #
+
+Keep in mind that youe schematic is a smalltalk class; you have all
+the power of smalltalk in your disposal. There is some examples
+included in DANM that show case the expressiveness of DANM; however
+that is only a small part of the possibilities. 
 
 
+
+	
