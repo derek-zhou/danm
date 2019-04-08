@@ -99,7 +99,8 @@ DANMSchematic subclass: DANMAssertion [
 	    {self silentTime}; nl;
 	    nextPutAll: '        $display("Assertion %1 failed at %%d", $stime);' %
 	    {self fullPath}; nl;
-	    nextPutAll: '        $finish;'; nl
+	    nextPutAll: '        $finish;'; nl;
+	    nextPutAll: '    end'; nl
     ]
 
 ]
