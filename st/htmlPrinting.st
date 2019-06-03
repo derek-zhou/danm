@@ -37,8 +37,8 @@ DANMBlackBox extend [
     printHTMLSummaryOn: aStream [
 	<category: 'html-printing'>
 	aStream
-	    nextPutAll: '<tr><td>%1</td><td><a href="#INST_%1">instance</a></td><td><a href="%2/%1.html">blackbox</a></td></tr>' % 
-	    {entityName. context name}; nl
+	    nextPutAll: '<tr><td>%1</td><td><a href="#INST_%1">instance</a></td><td><a href="%2/%1.html">%3</a></td></tr>' %
+	    {entityName. context name. self type}; nl
     ]
 
     printHTMLHeaderOn: aStream [
