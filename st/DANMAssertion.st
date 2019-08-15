@@ -97,7 +97,7 @@ DANMSchematic subclass: DANMAssertion [
             nextPutAll: 'always @(illegal)'; nl;
 	    nextPutAll: '    if (($stime > %1)&&illegal) begin' %
 	    {self silentTime}; nl;
-	    nextPutAll: '        $display("Assertion %1 failed at %%d", $stime);' %
+	    nextPutAll: '        $fdisplay(32''h80000002, "Assertion %1 failed at %%d", $stime);' %
 	    {self fullPath}; nl;
 	    nextPutAll: '        $finish;'; nl;
 	    nextPutAll: '    end'; nl
