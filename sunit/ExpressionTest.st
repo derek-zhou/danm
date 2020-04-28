@@ -1,29 +1,22 @@
 TestCase subclass: ExpressionTest [
     <comment: 'test for expression parsing and evaluating'>
-    <category: ''>
+
+    expressionEvaluateString: str expect: v [
+	|e1|
+	e1 := ExpressionAST newFrom: str.
+	Transcript nextPutAll: 'evaluate %1 to %2' % {e1. e1 evaluate}; nl.
+	self should: [e1 evaluate == v]
+    ]
 
     testTruncate [
-	<category: 'tests'>
-	"4d23 should be truncated to 4 bit which is 7"
-	| e1 |
-	e1 := ExpressionAST newFrom: '1+4d23'.
-	Transcript nextPutAll: 'evaluate %1 to %2' % {e1. e1 evaluate}; nl.
-	self should: [e1 evaluate == 8]
+	self expressionEvaluateString: '1+4d23' expect: 8
     ]
 
     testExtract [
-	<category: 'tests'>
-	| e1 |
-	e1 := ExpressionAST newFrom: '(1+6d23)[3:1]'.
-	Transcript nextPutAll: 'evaluate %1 to %2' % {e1. e1 evaluate}; nl.
-	self should: [e1 evaluate == 4]
+	self expressionEvaluateString: '(1+6d23)[3:1]' expect: 4
     ]
 
     testGeneralExtract [
-	<category: 'tests'>
-	| e1 |
-	e1 := ExpressionAST newFrom: '6d23[3:0:-2]'.
-	Transcript nextPutAll: 'evaluate %1 to %2' % {e1. e1 evaluate}; nl.
-	self should: [e1 evaluate == 1]
+	self expressionEvaluateString: '6d23[3:0:-2]' expect: 1
     ]
 ]

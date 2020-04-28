@@ -24,9 +24,9 @@ Object subclass: SimpleExprNode [
     SimpleExprNode class >> promote: arg [
 	<category: 'instance creation'>
 	(arg isKindOf: Integer) ifTrue: [^SimpleExprConstant newConstant: arg].
-	(arg isKindOf: String) ifTrue: [^#SimpleExprIdentifier newIdentifier: arg].
+	(arg isKindOf: String) ifTrue: [^SimpleExprIdentifier newIdentifier: arg].
 	(arg isKindOf: self) ifTrue: [^arg].
-	self error: 'Can promote %1, which is a %2' % {arg. arg class}
+	self error: 'Cannot promote %1, which is a %2' % {arg. arg class}
     ]
 
     optimize [
