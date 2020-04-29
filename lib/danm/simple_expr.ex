@@ -10,6 +10,7 @@ defmodule Danm.SimpleExpr do
   evaluate ast without identifier map
   """
   def eval(n), do: eval(n, in: %{})
+
   @doc """
   eval(ast, in: dict)
   evaluate ast with identifier map in: dict
@@ -25,22 +26,32 @@ defmodule Danm.SimpleExpr do
   def eval({:rs,  l, r}, in: dict), do: eval(l, in: dict) >>> eval(r, in: dict)
 
   @doc """
+  valid?(ast)
+  check ast without identifier map
+  """
+  def valid?(ast), do: valid?(ast, in: %{})
+
+  @doc """
+  valid?(ast, in: dict)
+  check ast with identifier map in: dict
+  """
+  def valid?(n, in: _) when is_integer(n), do: true
+  def valid?(s, in: dict) when is_binary(s), do: Map.has_key?(dict, s)
+  def valid?({_, l, r}, in: dict), do: valid?(l, in: dict) and valid?(r, in: dict)
+
+  @doc """
   ast_string(ast)
   return a string representation of ast
   """
   def ast_string(n) when is_integer(n), do: to_string(n)
   def ast_string(s) when is_binary(s), do: s
-
-  def ast_string({op, l, r}) do
-    op_table = %{add: "+",
-		 sub: "-",
-		 mul: "*",
-		 div: "/",
-		 rem: "%",
-		 ls: "<<",
-		 rs: ">>"}
-    "(#{ast_string(l)} #{Map.fetch!(op_table, op)} #{ast_string(r)})"
-  end
+  def ast_string({:add, l, r}), do: "(#{ast_string(l)} + #{ast_string(r)})"
+  def ast_string({:sub, l, r}), do: "(#{ast_string(l)} - #{ast_string(r)})"
+  def ast_string({:mul, l, r}), do: "(#{ast_string(l)} * #{ast_string(r)})"
+  def ast_string({:div, l, r}), do: "(#{ast_string(l)} / #{ast_string(r)})"
+  def ast_string({:rem, l, r}), do: "(#{ast_string(l)} % #{ast_string(r)})"
+  def ast_string({:ls,  l, r}), do: "(#{ast_string(l)} << #{ast_string(r)})"
+  def ast_string({:rs,  l, r}), do: "(#{ast_string(l)} >> #{ast_string(r)})"
 
   @doc """
   optimize(ast)
@@ -76,7 +87,7 @@ defmodule Danm.SimpleExpr do
 
   @doc """
   parse(str)
-  parse the str without identifier dict
+  parse the str
   3 orders of operator precedance:
 
    1. * / %
@@ -84,35 +95,23 @@ defmodule Danm.SimpleExpr do
    3. << >>
 
   """
-  def parse(s), do: parse(s, with: %{})
-
-  @doc """
-  parse(str with: dict)
-  parse the str with identifier dict
-  3 orders of operator precedance:
-
-   1. * / %
-   2. + -
-   3. << >>
-
-  """
-  def parse(s, with: dict) do
-    {e, s} = parse_order1(s, with: dict)
+  def parse(s) do
+    {e, s} = parse_order1(s)
     if String.length(s) > 0, do: raise "Garbage at the end: #{s}"
     e
   end
 
-  defp parse_order1(s, with: dict) do
-    {l, s} = parse_order2(s, with: dict)
-    parse_order1_chain(s, inject: l, with: dict)
+  defp parse_order1(s) do
+    {l, s} = parse_order2(s)
+    parse_order1_chain(s, inject: l)
   end
 
-  defp parse_order1_chain(s, inject: term, with: dict) do
+  defp parse_order1_chain(s, inject: term) do
     case parse_order1_op(s) do
       {:error, s} -> {term, s}
       {o, s} ->
-	{l, s} = parse_order2(s, with: dict)
-	parse_order1_chain(s, inject: {o, term, l}, with: dict)
+	{l, s} = parse_order2(s)
+	parse_order1_chain(s, inject: {o, term, l})
     end
   end
 
@@ -124,17 +123,17 @@ defmodule Danm.SimpleExpr do
     end
   end
 
-  defp parse_order2(s, with: dict) do
-    {l, s} = parse_order3(s, with: dict)
-    parse_order2_chain(s, inject: l, with: dict)
+  defp parse_order2(s) do
+    {l, s} = parse_order3(s)
+    parse_order2_chain(s, inject: l)
   end
 
-  defp parse_order2_chain(s, inject: term, with: dict) do
+  defp parse_order2_chain(s, inject: term) do
     case parse_order2_op(s) do
       {:error, s} -> {term, s}
       {o, s} ->
-	{l, s} = parse_order3(s, with: dict)
-	parse_order2_chain(s, inject: {o, term, l}, with: dict)
+	{l, s} = parse_order3(s)
+	parse_order2_chain(s, inject: {o, term, l})
     end
   end
 
@@ -146,17 +145,17 @@ defmodule Danm.SimpleExpr do
     end
   end
 
-  defp parse_order3(s, with: dict) do
-    {l, s} = parse_factor(s, with: dict)
-    parse_order3_chain(s, inject: l, with: dict)
+  defp parse_order3(s) do
+    {l, s} = parse_factor(s)
+    parse_order3_chain(s, inject: l)
   end
 
-  defp parse_order3_chain(s, inject: term, with: dict) do
+  defp parse_order3_chain(s, inject: term) do
     case parse_order3_op(s) do
       {:error, s} -> {term, s}
       {o, s} ->
-	{l, s} = parse_factor(s, with: dict)
-	parse_order3_chain(s, inject: {o, term, l}, with: dict)
+	{l, s} = parse_factor(s)
+	parse_order3_chain(s, inject: {o, term, l})
     end
   end
 
@@ -169,34 +168,26 @@ defmodule Danm.SimpleExpr do
     end
   end
 
-  defp parse_factor(s, with: dict) do
+  defp parse_factor(s) do
     case String.trim_leading(s) do
-      "(" <> s -> parse_paren(s, with: dict)
+      "(" <> s -> parse_paren(s)
       s ->
 	case Integer.parse(s) do
 	  {n, s} when is_integer(n) -> {n, s}
-	  :error -> parse_identifier(s, with: dict)
+	  :error -> parse_identifier(s)
 	end
     end
   end
 
-  defp parse_paren(s, with: dict) do
-    {e, s} = parse_order1(s, with: dict)
+  defp parse_paren(s) do
+    {e, s} = parse_order1(s)
     case String.trim_leading(s) do
       ")" <> s -> {e, s}
       s -> raise "Expect ), got: #{s}"
     end
   end
 
-  defp parse_identifier(s, with: dict) do
-    {first, rest} = parse_identifier_token(s)
-    case Map.fetch(dict, first) do
-      {:ok, _} -> {first, rest}
-      _ -> raise "Unknown identifier #{first}"
-    end
-  end
-
-  defp parse_identifier_token(s) do
+  defp parse_identifier(s) do
     case Regex.run(~r/^(\w+)(.*)/, s) do
       [_, first, rest] -> {first, rest}
       _ -> raise "Cannot find identifier in #{s}"
