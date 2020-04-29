@@ -29,4 +29,8 @@ defmodule Danm.SimpleExprTest do
     parse_success "(b-a)*c", with: %{"a"=>-2, "b"=>3, "c"=>5}, expect: 25
   end
 
+  test "long chain" do
+    parse_success "5-3-2-1-7", with: %{}, expect: -8
+  end
+
 end

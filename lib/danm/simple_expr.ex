@@ -104,17 +104,15 @@ defmodule Danm.SimpleExpr do
 
   defp parse_order1(s, with: dict) do
     {l, s} = parse_order2(s, with: dict)
-    {chain, s} = parse_order1_chain(s, with: dict)
-    {Enum.reduce(chain, l, &({elem(&1, 0), &2, elem(&1, 1)})), s}
+    parse_order1_chain(s, inject: l, with: dict)
   end
 
-  defp parse_order1_chain(s, with: dict) do
+  defp parse_order1_chain(s, inject: term, with: dict) do
     case parse_order1_op(s) do
-      {:error, s} -> {[], s}
+      {:error, s} -> {term, s}
       {o, s} ->
 	{l, s} = parse_order2(s, with: dict)
-	{chain, s} = parse_order1_chain(s, with: dict)
-	{[{o, l}] ++ chain, s}
+	parse_order1_chain(s, inject: {o, term, l}, with: dict)
     end
   end
 
@@ -128,17 +126,15 @@ defmodule Danm.SimpleExpr do
 
   defp parse_order2(s, with: dict) do
     {l, s} = parse_order3(s, with: dict)
-    {chain, s} = parse_order2_chain(s, with: dict)
-    {Enum.reduce(chain, l, &({elem(&1, 0), &2, elem(&1, 1)})), s}
+    parse_order2_chain(s, inject: l, with: dict)
   end
 
-  defp parse_order2_chain(s, with: dict) do
+  defp parse_order2_chain(s, inject: term, with: dict) do
     case parse_order2_op(s) do
-      {:error, s} -> {[], s}
+      {:error, s} -> {term, s}
       {o, s} ->
 	{l, s} = parse_order3(s, with: dict)
-	{chain, s} = parse_order2_chain(s, with: dict)
-	{[{o, l}] ++ chain, s}
+	parse_order2_chain(s, inject: {o, term, l}, with: dict)
     end
   end
 
@@ -152,17 +148,15 @@ defmodule Danm.SimpleExpr do
 
   defp parse_order3(s, with: dict) do
     {l, s} = parse_factor(s, with: dict)
-    {chain, s} = parse_order3_chain(s, with: dict)
-    {Enum.reduce(chain, l, &({elem(&1, 0), &2, elem(&1, 1)})), s}
+    parse_order3_chain(s, inject: l, with: dict)
   end
 
-  defp parse_order3_chain(s, with: dict) do
+  defp parse_order3_chain(s, inject: term, with: dict) do
     case parse_order3_op(s) do
-      {:error, s} -> {[], s}
+      {:error, s} -> {term, s}
       {o, s} ->
 	{l, s} = parse_factor(s, with: dict)
-	{chain, s} = parse_order3_chain(s, with: dict)
-	{[{o, l}] ++ chain, s}
+	parse_order3_chain(s, inject: {o, term, l}, with: dict)
     end
   end
 
