@@ -140,7 +140,7 @@ ASTBundleOp subclass: ASTFoldedBundle [
 
     width [
 	<category: 'accessing'>
-	^ (items at: 1) width
+	^items inject: 0 into: [:m :c | m max: c width]
     ]
 
     "every item must have the same width"

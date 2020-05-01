@@ -44,6 +44,17 @@ Object subclass: ExpressionParser [
 	stream := s
     ]
 
+"
+orders of operator precedance:
+
+   1. dub (*) extract[::]
+   2. unary operator
+   4. binary operators with 2 chars: == != >= <= && || ^^
+   3. binary operator with single char: +-&|^,><
+   5, ?::
+
+   The above order is important, so that a && b will be (a && b) not (a & (&b))
+"
     parse [
 	<category: 'parsing'>
 	| e |
