@@ -154,10 +154,10 @@ SimpleExprNode subclass: SimpleExprAST [
 	    op := self class op.
 	    arg := right value.
 	    (arg == 0 and: [op = '+' | (op = '-') | (op = '<<') | (op = '>>')]) ifTrue: [ ^left ].
-		(arg == 1 and: [op = '*' | (op = '/')]) ifTrue: [ ^left ].
-		temp := left merge: self class op with: right value.
-		temp isNil ifTrue: [ ^self ].
-		^temp].
+	    (arg == 1 and: [op = '*' | (op = '/')]) ifTrue: [ ^left ].
+	    temp := left merge: self class op with: right value.
+	    temp isNil ifTrue: [ ^self ].
+	    ^temp].
 	^self
     ]
 

@@ -65,23 +65,46 @@ defmodule Danm.SimpleExpr do
     if is_integer(l) and is_integer(r) do
       eval({op, l, r})
     else
-      case {op, l, r} do
-	{:add, 0, x} -> x
-	{:add, x, 0} -> x
-	{:sub, x, 0} -> x
-	{:mul, 0, _} -> 0
-	{:mul, _, 0} -> 0
-	{:mul, 1, x} -> x
-	{:mul, x, 1} -> x
-	{:div, 0, _} -> 0
-	{:div, x, 1} -> x
-	{:rem, 0, _} -> 0
-	{:ls,  0, _} -> 0
-	{:ls,  x, 0} -> x
-	{:rs,  0, _} -> 0
-	{:rs,  x, 0} -> x
-	_ -> {op, l, r}
-      end
+      {op, l, r}
+      |> try_swap()
+      |> merge()
+      |> short_circuit()
+    end
+  end
+
+  defp short_circuit({op, l, r}) do
+    case {op, l, r} do
+      {:add, x, 0} -> x
+      {:sub, x, 0} -> x
+      {:mul, _, 0} -> 0
+      {:mul, x, 1} -> x
+      {:div, 0, _} -> 0
+      {:div, x, 1} -> x
+      {:rem, 0, _} -> 0
+      {:ls,  0, _} -> 0
+      {:ls,  x, 0} -> x
+      {:rs,  0, _} -> 0
+      {:rs,  x, 0} -> x
+      _ -> {op, l, r}
+    end
+  end
+
+
+  defp try_swap({op, l, r}) do
+    if is_integer(l) and !is_integer(r) and (op == :add or op == :mul) do
+      {op, r, l}
+    else
+      {op, l, r}
+    end
+  end
+
+  defp merge({op, l, r}) do
+    case {op, l, r} do
+      {:add, {:add, ll, lr}, r} when is_integer(lr) and is_integer(r) -> {:add, ll, lr + r}
+      {:add, {:sub, ll, lr}, r} when is_integer(lr) and is_integer(r) -> {:add, ll, r - lr}
+      {:sub, {:add, ll, lr}, r} when is_integer(lr) and is_integer(r) -> {:add, ll, lr - r}
+      {:sub, {:sub, ll, lr}, r} when is_integer(lr) and is_integer(r) -> {:sub, ll, lr + r}
+      _ -> {op, l, r}
     end
   end
 

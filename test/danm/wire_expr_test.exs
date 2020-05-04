@@ -21,8 +21,10 @@ defmodule Danm.WireExprTest do
   test "operator priority", do: parse_success("d&a&&b", expect: "(d & (a && b))")
 
   test "bin, dec, hex and oct" do
-    parse_success("3d12,5b111,6o76,7h3F",
+    parse_success(
+      "3d12,5b111,6o76,7h3F",
       expect: "(((3'd12 , 5'd7) , 6'd62) , 7'd63)")
+
   end
     
 end
