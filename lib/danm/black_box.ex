@@ -6,27 +6,78 @@ defmodule Danm.BlackBox do
   alias Danm.SimpleExpr
   
   defstruct name: nil,
-    attrs: %{},
+    comment: "",
     ports: %{},
     params: %{}
 
   # simple accessors
   def set_name(b, n), do: %{b | name: n}
-  def set_attr(b, n, to: v), do: %{b | attrs: Map.put(b.attrs, n, v)}
-  def drop_attr(b, n), do: %{b | attrs: Map.pop(b.attrs, n)}
-  def set_param(b, n, to: v), do: %{b | params: Map.put(b.params, n, v)}
-  def drop_param(b, n), do: %{b | params: Map.pop(b.params, n)}
-  def add_port(b, n, dir: dir, width: w), do: %{b | ports: Map.put(b.ports, n, {dir, w})}
+  def set_comment(b, n), do: %{b | comment: n}
+  def set_parameter(b, n, to: v), do: %{b | params: Map.put(b.params, n, v)}
+  def drop_parameter(b, n), do: %{b | params: Map.pop(b.params, n)}
+  def set_port(b, n, dir: dir, width: w), do: %{b | ports: Map.put(b.ports, n, {dir, w})}
+  def drop_port(b, n), do: %{b | ports: Map.pop(b.ports, n)}
 
+  @doc """
+  resolve
+  resolve parameters and port width to their value
+  """
+  def resolve(b) do
+    b
+    |> resolve_parameter()
+    |> resolve_port_width()
+  end
+
+  @doc """
+  whether the box is fully resolved, ie. all parameter and port width are integers
+  """
+  def resolved?(b) do
+    Enum.reduce(b.params, true, fn {_, v}, a ->
+      a and is_integer(v) end) and
+    Enum.reduce(b.ports, true, fn {_, {_, w}}, a ->
+      a and is_integer(w) end)
+  end
+  
+  defp eval_expr(e, in: dict) do
+    case e do
+      n when is_integer(n) -> {n, 0}
+      e -> case SimpleExpr.eval(e, in: dict) do
+	     n when is_integer(n) -> {n, 1}
+	     e -> {e, 0}
+	   end
+    end
+  end
+  
+  defp resolve_parameter(b) do
+    {map, sum} = Enum.reduce(b.params, {%{}, 0}, fn {k, v}, {map, sum} ->
+      {v, x} = eval_expr(v, in: b.params) 
+      {Map.put(map, k, v), sum + x}
+    end)
+    b = %{b | params: map}
+    if sum > 0, do: resolve_parameter(b), else: b
+  end
+
+  defp resolve_port_width(b) do
+    {map, sum} = Enum.reduce(b.ports, {%{}, 0}, fn {k, {dir, w}}, {map, sum} ->
+      {w, x} = eval_expr(w, in: b.params) 
+      {Map.put(map, k, {dir, w}), sum + x}
+    end)
+    b = %{b | ports: map}
+    if sum > 0, do: resolve_port_width(b), else: b
+  end    
+      
   @doc """
   parse_verilog(path)
   parse a verilog module from the path, return the blackbox
   """
   def parse_verilog(path) do
-    file = File.open!(path, [:read, :utf8])
-    {_, box, _, _} = parse_module(file)
-    File.close(file)
-    box
+    case File.open(path, [:read, :utf8]) do
+      {:ok, file} ->
+	{_, box, _, _} = parse_module(file)
+	File.close(file)
+	box
+      {:error, _} -> nil
+    end
   end
   
   # we pass along the parser state, a tuple of {state, box, line, buffer}
@@ -67,7 +118,7 @@ defmodule Danm.BlackBox do
   defp parse_skip_in_comment({state, box, line, buffer}, f) do
     if state == :init and String.first(buffer) == "*" do
       {line, buffer, comment} = capture_doc({line, buffer}, f, inject: "")
-      {state, set_attr(box, :comment, to: comment), line, buffer}
+      {state, set_comment(box, comment), line, buffer}
     else
       case String.split(buffer, "*/", parts: 2) do
 	[_, second] -> {state, box, line, second}
@@ -161,7 +212,7 @@ defmodule Danm.BlackBox do
   defp parse_parameter({state, box, line, buffer}) do
     # parse identifer = expr;
     case Regex.run(~r/^(\w+)\s*=\s*(.*);(.*)$/U, buffer) do
-      [_, id, exp, rest] -> {state, set_param(box, id, to: SimpleExpr.parse(exp)), line, rest}
+      [_, id, exp, rest] -> {state, set_parameter(box, id, to: SimpleExpr.parse(exp)), line, rest}
       _ -> raise "Cannot find valid statement in: #{buffer} at line no: #{line}"
     end
   end
@@ -170,12 +221,12 @@ defmodule Danm.BlackBox do
     # parse [expr:0] identifer, identifier, ...;
     {w, buffer} =
       case Regex.run(~r/^\[(.*):0\](.*)$/U, buffer) do
-	  [_, exp, rest ] -> {SimpleExpr.optimize(SimpleExpr.parse(exp <> "+1")), rest}
+	[_, exp, rest ] -> {SimpleExpr.optimize(SimpleExpr.parse(exp <> "+1")), rest}
 	_ -> {1, buffer}
       end
     {state, box, line, buffer} = parse_skip_spaces({state, box, line, buffer}, f)
     {list, line, buffer} = parse_id_list({[], line, buffer}, f)
-    box = List.foldl(list, box, fn p, b -> add_port(b, p, dir: dir, width: w) end) 
+    box = List.foldl(list, box, fn p, b -> set_port(b, p, dir: dir, width: w) end) 
     {state, box, line, buffer}
     |> parse_expect_string(";")
     |> parse_skip_spaces(f)
