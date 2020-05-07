@@ -152,8 +152,6 @@ DANMSchematic extend [
 	    nextPutAll: '<p><a href="hierarchy.html">Hierarchy</a> | <a href="%1.html">Top</a></p>' %
 	    {self name}; nl;
 	    nextPutAll: '<h1>Module Hierarchy</h1>'; nl;
-	    nextPutAll: '<a href="%1.html">%1</a> (%2: %3)' % 
-	    {self name. self type. self referenceName}; nl;
 	    nextPutAll: '<div id="tree">'; nl.
 	self printHTMLHierOn: aStream.
 	aStream

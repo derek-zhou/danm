@@ -177,12 +177,17 @@ Object subclass: DANMLibrary [
 
     DANMLibrary class >> moduleByName: mName fromPaths: ps [
 	<category: 'accessing'>
+	^self moduleByName: mName fromPaths: ps with: nil
+    ]
+
+    DANMLibrary class >> moduleByName: mName fromPaths: ps with: params [
+	<category: 'accessing'>
 	| mod |
 	sharedLibrary := self new init.
 	sharedLibrary paths: ps.
-	mod := (sharedLibrary moduleByName: mName)
-		    name: 'top';
-		    elaborate.
+	mod := (sharedLibrary moduleByName: mName) name: 'top'.
+	params notNil ifTrue: [ mod setParameters: params ].
+	mod elaborate.
 	sharedLibrary := nil.
 	^mod
     ]
