@@ -8,8 +8,12 @@ defmodule Danm.Schematic.RrArbiter do
 
   import Danm.Schematic
 
-  def build do
-    %Danm.Schematic{name: "rr_arbiter"}
+  defp width(s) do
+    s.params[:width] || 8
+  end
+
+  def build(s) do
+    s
   end
   
 end

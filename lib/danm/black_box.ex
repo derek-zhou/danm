@@ -15,6 +15,7 @@ defmodule Danm.BlackBox do
   def set_comment(b, n), do: %{b | comment: n}
   def set_parameter(b, n, to: v), do: %{b | params: Map.put(b.params, n, v)}
   def drop_parameter(b, n), do: %{b | params: Map.pop(b.params, n)}
+  def merge_parameters(b, d), do: %{b | params: Map.merge(b.params, d)}
   def set_port(b, n, dir: dir, width: w), do: %{b | ports: Map.put(b.ports, n, {dir, w})}
   def drop_port(b, n), do: %{b | ports: Map.pop(b.ports, n)}
 

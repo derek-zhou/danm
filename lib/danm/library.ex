@@ -4,6 +4,7 @@ defmodule Danm.Library do
   """
 
   alias Danm.BlackBox
+  alias Danm.Schematic
   
   use Agent
 
@@ -57,7 +58,7 @@ defmodule Danm.Library do
 	case Enum.find_value(l.elixir_path, fn p ->
 	      try do
 		[ {m, _} | _ ] = Code.compile_file("#{name}.exs", p)
-		m
+		%Schematic{name: name, module: m}
 	      rescue
 		Code.LoadError -> nil
 	      end
