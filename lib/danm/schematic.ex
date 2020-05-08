@@ -12,9 +12,12 @@ defmodule Danm.Schematic do
   blackbox. 
   wires is a map of wires, keyed by wire name. Each wire is a list of tuples of:
   {i_name, p_name}, where i_name/p_name is connected instance name and port name
+  in the case of a wire is also connected to a port, the i_name is :self, p_name has to be
+  the same as the wire name in this case
   module is the elixir module that it is defined in
   """
   defstruct name: nil,
+    src: "",
     ports: %{},
     params: %{},
     insts: %{},
@@ -35,7 +38,37 @@ defmodule Danm.Schematic do
   def elaborate(s) do
     case s.__struct__ do
       Danm.BlackBox -> BlackBox.resolve(s)
-      Danm.Schematic -> Function.capture(s.module, :build, 1).(s)
+      Danm.Schematic ->
+	if function_exported?(s.module, :build, 1) do
+	  apply(s.module, :build, [s])
+	else
+	  s
+	end
+    end
+  end
+
+  @doc """
+  return the doc string of the design
+  """
+  def doc_string(s) do
+    case s.__struct__ do
+      Danm.BlackBox -> s.comment
+      Danm.Schematic ->
+	if function_exported?(s.module, :doc_string, 1) do
+	  apply(s.module, :doc_string, [s])
+	else
+	  "description forth coming"
+	end
+    end
+  end
+
+  @doc """
+  return the type string of the design
+  """
+  def type_string(s) do
+    case s.__struct__ do
+      Danm.BlackBox -> "blackbox: " <> s.name
+      Danm.Schematic -> "schematic: " <> s.name
     end
   end
 
@@ -74,7 +107,7 @@ defmodule Danm.Schematic do
     else
       s
       |> BlackBox.set_port(name, dir: :input, width: options[:width] || 1)
-      |> set_wire(name, conns: [:input])
+      |> set_wire(name, conns: [{:self, name}])
     end
   end
 
@@ -142,19 +175,34 @@ defmodule Danm.Schematic do
   defp inspect_wire(s, name) do
     Enum.reduce(s.wires[name], {0, 0, 1},
       fn {ins, port}, {drivers, loads, width} ->
-	case s.insts[ins].ports[port] do
-	  {dir, n} ->
-	    {drivers + driver_count(dir),
-	     loads + load_count(dir),
-	     max(n, width)}
-	end
+	{dir, w} = case ins do
+		     :self -> s.ports[port]
+		     _ -> s.insts[ins].ports[port]
+		   end
+	{drivers + driver_count(dir), loads + load_count(dir), max(w, width)}
       end)
+  end
+
+  @doc ~S"""
+  produce a map of w_name -> width for the design
+  """
+  def wire_width_map(s) do
+    Map.new(s.wires, fn {w_name, conns} -> {w_name, width_of_conns(s, conns)} end)
+  end
+
+  defp width_of_conns(s, conns) do
+    Enum.reduce_while(conns, 1, fn {ins, port}, width ->
+      case ins do
+	:self -> {:halt, elem(s.ports[port], 1)}
+	_ -> {:cont, max(width, elem(s.insts[ins].ports[port], 1))}
+      end
+    end)
   end
 
   defp force_expose(s, name, dir: dir, width: width) do
     s
     |> BlackBox.set_port(name, dir: dir, width: width)
-    |> merge_wire(name, conns: [dir])
+    |> merge_wire(name, conns: [{:self, name}])
   end
 
   @doc ~S"""
@@ -164,44 +212,41 @@ defmodule Danm.Schematic do
   def auto_connect(s) do
     # set of unique port name
     set = Enum.reduce(s.insts, MapSet.new(), fn {_, inst}, set ->
-      MapSet.union(set, Enum.reduce(inst.ports, MapSet.new(), fn {p_name, _}, set ->
-	    MapSet.put(set, p_name)
-	  end))
+      inst.ports |> Map.keys() |> MapSet.new() |> MapSet.union(set)
     end)
-    # map of pin -> w_name
-    map = Enum.reduce(s.wires, %{}, fn {w_name, conns}, map ->
-      Map.merge(map, Enum.reduce(conns, %{}, fn each, map ->
-	    case each do
-	      {ins, port} -> Map.put(map, "#{ins}/#{port}", w_name)
-	      _ -> map
-	    end
-	  end))
-    end)
+    map = pin_to_wire_map(s)
     # do auto connect for each unique port name, with pin -> w_name map as an aid
     Enum.reduce(set, s, fn p_name, s -> auto_connect(s, p_name, map) end)
   end
 
+  @doc ~S"""
+  produce a map of pin -> w_name for the design
+  """
+  def pin_to_wire_map(s) do
+    Enum.reduce(s.wires, %{}, fn {w_name, conns}, map ->
+      conns
+      |> Enum.map(fn {ins, port} -> {"#{ins}/#{port}", w_name} end)
+      |> Map.new()
+      |> Map.merge(map)
+    end)
+  end
+
   defp auto_connect(s, name, pw_map) do
-    {drivers, _, width} = if Map.has_key?(s.wires, name) do
-      inspect_wire(s, name)
-    else
-      {0, 0, 0}
-    end
+    {drivers, _, width} = case Map.has_key?(s.wires, name) do
+			    true -> inspect_wire(s, name)
+			    false -> {0, 0, 0}
+			  end
     # in the following loop, i try to find out all pins with this name and not connected,
     # driver count, width. I set width to -1 if width does not matcch 
     {drivers, width, pins} = Enum.reduce(s.insts, {drivers, width, []},
       fn {i_name, inst}, {drivers, width, list} ->
-	if Map.has_key?(pw_map, "#{i_name}/#{name}") do
-	  # already connected, skip
-	  {drivers, width, list}
-	else
-	  case inst.ports[name] do
-	    nil -> {drivers, width, list}
-	    {dir, w} ->
-	      {drivers + driver_count(dir),
-	       common_width(width, w),
-	       [ {i_name, name} | list ]}
-	  end
+	cond do
+	  Map.has_key?(pw_map, "#{i_name}/#{name}") -> {drivers, width, list}
+	  !Map.has_key?(inst.ports, name) -> {drivers, width, list}
+	  {dir, w} = inst.ports[name] ->
+	    {drivers + driver_count(dir),
+	     common_width(width, w),
+	     [ {i_name, name} | list ]}
 	end
       end)
     cond do

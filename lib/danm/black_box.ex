@@ -7,6 +7,7 @@ defmodule Danm.BlackBox do
   
   defstruct name: nil,
     comment: "",
+    src: "",
     ports: %{},
     params: %{}
 
@@ -74,7 +75,8 @@ defmodule Danm.BlackBox do
   def parse_verilog(path) do
     case File.open(path, [:read, :utf8]) do
       {:ok, file} ->
-	{_, box, _, _} = parse_module(file)
+	box = %Danm.BlackBox{src: path}
+	{_, box, _, _} = parse_module(box, file)
 	File.close(file)
 	box
       {:error, _} -> nil
@@ -82,8 +84,8 @@ defmodule Danm.BlackBox do
   end
   
   # we pass along the parser state, a tuple of {state, box, line, buffer}
-  defp parse_module(f) do
-    {:init, %Danm.BlackBox{}, 1, get_line!(f)}
+  defp parse_module(box, f) do
+    {:init, box, 1, get_line!(f)}
     |> parse_skip_spaces(f)
     |> parse_expect_string("module")
     |> parse_skip_spaces(f)

@@ -58,7 +58,7 @@ defmodule Danm.Library do
 	case Enum.find_value(l.elixir_path, fn p ->
 	      try do
 		[ {m, _} | _ ] = Code.compile_file("#{name}.exs", p)
-		%Schematic{name: name, module: m}
+		%Schematic{name: name, module: m, src: "#{p}/#{name}.exs"}
 	      rescue
 		Code.LoadError -> nil
 	      end

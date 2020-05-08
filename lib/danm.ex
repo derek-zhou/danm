@@ -6,6 +6,15 @@ defmodule Danm do
   alias Danm.Library
   alias Danm.Schematic
   alias Danm.BlackBox
+  alias Danm.HtmlPrinting
+
+  @doc ~S"""
+  generate a full set of html files
+  """
+  def generate_html_as_top(s, in: dir) do
+    HtmlPrinting.generate_html_hier(s, in: dir)
+    HtmlPrinting.generate_html(s, as: "top", in: dir)
+  end
 
   @doc ~S"""
   build the design with "name" from top down
@@ -26,8 +35,6 @@ defmodule Danm do
   end
 
   # small helper function to keep the chain going
-  defp wrap(a, _) do
-    a
-  end
+  defp wrap(a, _), do: a
 
 end

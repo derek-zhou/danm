@@ -90,9 +90,9 @@ DANMBlackBox extend [
 	    nextPutAll: '<tr><th>parameter name</th><th>value</th></tr>'; nl.
 	parameters keys asSortedCollection do: [:k | 
 	    aStream
-		nextPutAll: '<tr><td><a name="PARAM_%1">%1</a></td><td>%2</td></tr>' % 
+		nextPutAll: '<tr><td>%1</td><td>%2</td></tr>' %
 		{k. (parameters at: k) printStringStyle: #HTML}; nl].
-	aStream nextPutAll: '</table>'; nl
+	aStream nextPutAll: '</table></li>'; nl
     ]
 
     printInstanceHTMLOn: aStream [
