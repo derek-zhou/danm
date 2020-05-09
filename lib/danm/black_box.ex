@@ -75,7 +75,7 @@ defmodule Danm.BlackBox do
   def parse_verilog(path) do
     case File.open(path, [:read, :utf8]) do
       {:ok, file} ->
-	box = %Danm.BlackBox{src: path}
+	box = %__MODULE__{src: path}
 	{_, box, _, _} = parse_module(box, file)
 	File.close(file)
 	box

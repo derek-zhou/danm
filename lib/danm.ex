@@ -7,6 +7,14 @@ defmodule Danm do
   alias Danm.Schematic
   alias Danm.BlackBox
   alias Danm.HtmlPrinting
+  alias Danm.VerilogPrinting
+
+  @doc ~S"""
+  generate a single verilog file that have everything
+  """
+  def generate_full_verilog(s, in: dir) do
+    VerilogPrinting.generate_full_verilog(s, in: dir)
+  end
 
   @doc ~S"""
   generate a full set of html files
