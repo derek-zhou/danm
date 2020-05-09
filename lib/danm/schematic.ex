@@ -37,7 +37,7 @@ defmodule Danm.Schematic do
   """
   def elaborate(s) do
     case s.__struct__ do
-      Danm.BlackBox -> BlackBox.resolve(s)
+      BlackBox -> BlackBox.resolve(s)
       __MODULE__ ->
 	if function_exported?(s.module, :build, 1) do
 	  apply(s.module, :build, [s])
@@ -52,7 +52,7 @@ defmodule Danm.Schematic do
   """
   def doc_string(s) do
     case s.__struct__ do
-      Danm.BlackBox -> s.comment
+      BlackBox -> s.comment
       __MODULE__ ->
 	if function_exported?(s.module, :doc_string, 1) do
 	  apply(s.module, :doc_string, [s])
@@ -67,7 +67,7 @@ defmodule Danm.Schematic do
   """
   def type_string(s) do
     case s.__struct__ do
-      Danm.BlackBox -> "blackbox: " <> s.name
+      BlackBox -> "blackbox: " <> s.name
       __MODULE__ -> "schematic: " <> s.name
     end
   end

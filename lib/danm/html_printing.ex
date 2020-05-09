@@ -4,6 +4,7 @@ defmodule Danm.HtmlPrinting do
   """
 
   alias Danm.Schematic
+  alias Danm.BlackBox
 
   @doc ~S"""
   generate a hier index to the set of html files
@@ -37,7 +38,7 @@ defmodule Danm.HtmlPrinting do
   print html fragment that contains hier index to f
   """
   def print_html_hier(s, f, as: hier) do
-    if s.__struct__ == Danm.Schematic and !Enum.empty?(s.insts) do
+    if s.__struct__ == Schematic and !Enum.empty?(s.insts) do
       IO.write(f, "<ul>\n")
       Enum.each(s.insts, fn {i_name, inst} ->
 	IO.write(f, ~s"""
@@ -55,7 +56,7 @@ defmodule Danm.HtmlPrinting do
   generate html for myself and everything below
   """
   def generate_html(s, as: hier, in: dir) do
-    if s.__struct__ == Danm.Schematic and !Enum.empty?(s.insts) do
+    if s.__struct__ == Schematic and !Enum.empty?(s.insts) do
       File.mkdir("#{dir}/#{hier}")
       Enum.each(s.insts, fn {i_name, inst} ->
 	generate_html(inst, as: "#{hier}/#{i_name}", in: dir)
@@ -71,7 +72,7 @@ defmodule Danm.HtmlPrinting do
     f = File.open!("#{dir}/#{hier}.html", [:write, :utf8])
     print_html_header(s, f, as: hier)
     print_html_ports(s, f)
-    if s.__struct__ == Danm.Schematic and !Enum.empty?(s.insts) do
+    if s.__struct__ == Schematic and !Enum.empty?(s.insts) do
       print_html_instance_summary(s, f, as: hier)
       map = Schematic.pin_to_wire_map(s)
       IO.write(f, "<ul>\n")
@@ -205,16 +206,16 @@ defmodule Danm.HtmlPrinting do
   defp print_html_wires(s, f, as: hier) do
     {self_module, up_module} = get_self_and_up_module(hier)
     count = case s.__struct__ do
-	      Danm.BlackBox -> Enum.count(s.ports)
-	      Danm.Schematic -> Enum.count(s.wires)
+	      BlackBox -> Enum.count(s.ports)
+	      Schematic -> Enum.count(s.wires)
 	    end
     IO.write(f, "<h2>#{count} wires</h2><ul>\n")
     case s.__struct__ do
-      Danm.BlackBox ->
+      BlackBox ->
 	Enum.each(s.ports, fn {p_name, port} ->
 	  print_html_port(port, f, as: p_name, self: self_module, up: up_module)
 	end)
-      Danm.Schematic ->
+      Schematic ->
 	map = Schematic.wire_width_map(s)
 	Enum.each(s.wires, fn {w_name, conns} ->
 	  conns

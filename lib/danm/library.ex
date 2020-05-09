@@ -19,7 +19,7 @@ defmodule Danm.Library do
   def start_link(vp, ep) do
     Agent.start_link(
       fn ->
-	%Danm.Library{verilog_path: vp, elixir_path: ep}
+	%__MODULE__{verilog_path: vp, elixir_path: ep}
       end, name: __MODULE__)
   end
 
