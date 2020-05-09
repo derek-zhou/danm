@@ -38,7 +38,7 @@ defmodule Danm do
     |> wrap(Library.start_link(options[:verilog_path] || [], options[:elixir_path] || []))
     |> Library.load_module()
     |> BlackBox.merge_parameters(options[:parameters] || %{})
-    |> Schematic.elaborate()
+    |> Library.build_module()
     |> wrap(Library.stop())
   end
 

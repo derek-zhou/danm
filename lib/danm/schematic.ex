@@ -36,6 +36,7 @@ defmodule Danm.Schematic do
   call elaborate for all sub modules
   """
   def elaborate(s) do
+    IO.write("elaborating #{s.name}\n")
     case s.__struct__ do
       BlackBox -> BlackBox.resolve(s)
       __MODULE__ ->
@@ -84,7 +85,7 @@ defmodule Danm.Schematic do
     m = name
     |> Library.load_module()
     |> BlackBox.merge_parameters(options[:parameters] || %{})
-    |> elaborate()
+    |> Library.build_module()
 
     i_name = options[:as] || "u_#{name}"
     if Map.has_key?(s.insts, i_name) do

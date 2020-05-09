@@ -11,7 +11,8 @@ defmodule Danm.Library do
   defstruct verilog_path: [],
     black_boxes: %{},
     elixir_path: [],
-    schematics: %{}
+    schematics: %{},
+    build_cache: %{}
 
   defp set_black_box(l, n, to: b), do: %{l | black_boxes: Map.put(l.black_boxes, n, b)}
   defp set_schematic(l, n, to: s), do: %{l | schematics: Map.put(l.schematics, n, s)}
@@ -90,6 +91,23 @@ defmodule Danm.Library do
     case Agent.get_and_update(__MODULE__, __MODULE__, :load_module, [name]) do
       nil -> raise "Module by the name of #{name} is not found"
       b -> b
+    end
+  end
+
+  defp module_to_key(s), do: {s.name, s.params}
+
+  @doc """
+  build the module with the shared library
+  """
+  def build_module(m) do
+    key = module_to_key(m)
+    # I cannot use get_and_update because elaborate may call the agent again
+    case Agent.get(__MODULE__, fn l -> l.build_cache[key] end) do
+      nil ->
+	s = Schematic.elaborate(m)
+	Agent.update(__MODULE__, fn l -> %{l | build_cache: Map.put(l.build_cache, key, s)} end)
+	s
+      s -> s
     end
   end
 
