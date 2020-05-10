@@ -48,19 +48,17 @@ defmodule Danm.VerilogPrinting do
   end
 
   defp unique_name_like(name, from: dict) do
-    if Map.has_key?(dict, name) do
-      unique_name_like(name, from: dict, salt: 1)
-    else
-      name
+    cond do
+      Map.has_key?(dict, name) -> unique_name_like(name, from: dict, salt: 1)
+      true -> name
     end
   end
 
   defp unique_name_like(name, from: dict, salt: s) do
     salted = "#{name}_#{s}"
-    if Map.has_key?(dict, salted) do
-      unique_name_like(name, from: dict, salt: s + 1)
-    else
-      salted
+    cond do
+      Map.has_key?(dict, salted) -> unique_name_like(name, from: dict, salt: s + 1)
+      true -> salted
     end
   end
 

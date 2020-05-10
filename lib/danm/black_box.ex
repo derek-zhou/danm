@@ -34,10 +34,8 @@ defmodule Danm.BlackBox do
   whether the box is fully resolved, ie. all parameter and port width are integers
   """
   def resolved?(b) do
-    Enum.reduce(b.params, true, fn {_, v}, a ->
-      a and is_integer(v) end) and
-    Enum.reduce(b.ports, true, fn {_, {_, w}}, a ->
-      a and is_integer(w) end)
+    Enum.reduce(b.params, true, fn {_, v}, a -> a and is_integer(v) end) and
+    Enum.reduce(b.ports, true, fn {_, {_, w}}, a -> a and is_integer(w) end)
   end
   
   defp eval_expr(e, in: dict) do
@@ -119,14 +117,15 @@ defmodule Danm.BlackBox do
   end
 
   defp parse_skip_in_comment({state, box, line, buffer}, f) do
-    if state == :init and String.first(buffer) == "*" do
-      {line, buffer, comment} = capture_doc({line, buffer}, f, inject: "")
-      {state, set_comment(box, comment), line, buffer}
-    else
-      case String.split(buffer, "*/", parts: 2) do
-	[_, second] -> {state, box, line, second}
-	_ -> parse_skip_in_comment({state, box, line+1, get_line!(f)}, f)
-      end
+    cond do
+      state == :init and String.first(buffer) == "*" ->
+	{line, buffer, comment} = capture_doc({line, buffer}, f, inject: "")
+	{state, set_comment(box, comment), line, buffer}
+      true ->
+	case String.split(buffer, "*/", parts: 2) do
+	  [_, second] -> {state, box, line, second}
+	  _ -> parse_skip_in_comment({state, box, line+1, get_line!(f)}, f)
+	end
     end
   end
 
@@ -147,10 +146,9 @@ defmodule Danm.BlackBox do
   
   defp parse_expect_string({state, box, line, buffer}, str) do
     {first, rest} = String.split_at(buffer, String.length(str))
-    if first == str do
-      {state, box, line, rest}
-    else
-      raise "Expecting: #{str}, got: #{buffer} at line no: #{line}"      
+    cond do
+      first == str -> {state, box, line, rest}
+      true -> raise "Expecting: #{str}, got: #{buffer} at line no: #{line}"
     end
   end
 

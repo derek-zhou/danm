@@ -4,8 +4,10 @@ defmodule Danm.HierDesignTest do
 
   setup_all do
     {:ok,
-     [sch: build("ram_wrapper", verilog_path: ["examples/verilog"],
-	 elixir_path: ["examples/ex"], parameters: %{"width" => 12})]}
+     [sch: build("ram_wrapper",
+	 verilog_path: ["examples/verilog"],
+	 elixir_path: ["examples/ex"],
+	 parameters: %{"width" => 12})]}
     end
 
   test "check design", context do

@@ -39,10 +39,9 @@ defmodule Danm.Schematic do
     case s.__struct__ do
       BlackBox -> BlackBox.resolve(s)
       __MODULE__ ->
-	if function_exported?(s.module, :build, 1) do
-	  apply(s.module, :build, [s])
-	else
-	  s
+	cond do
+	  function_exported?(s.module, :build, 1) -> apply(s.module, :build, [s])
+	  true -> s
 	end
     end
   end
@@ -54,10 +53,9 @@ defmodule Danm.Schematic do
     case s.__struct__ do
       BlackBox -> s.comment
       __MODULE__ ->
-	if function_exported?(s.module, :doc_string, 1) do
-	  apply(s.module, :doc_string, [s])
-	else
-	  "description forth coming"
+	cond do
+	  function_exported?(s.module, :doc_string, 1) -> apply(s.module, :doc_string, [s])
+	  true -> "description forth coming"
 	end
     end
   end
@@ -87,10 +85,9 @@ defmodule Danm.Schematic do
     |> Library.build_module()
 
     i_name = options[:as] || "u_#{name}"
-    if Map.has_key?(s.insts, i_name) do
-      raise "Instance by the name of #{i_name} already exists"
-    else
-      set_instance(s, i_name, to: m)
+    cond do
+      Map.has_key?(s.insts, i_name) -> raise "Instance by the name of #{i_name} already exists"
+      true -> set_instance(s, i_name, to: m)
     end
   end
 
@@ -102,12 +99,12 @@ defmodule Danm.Schematic do
 
   """
   def create_port(s, name, options \\ []) do
-    if Map.has_key?(s.wires, name) do
-      raise "Port by the name of #{name} already exists"
-    else
-      s
-      |> BlackBox.set_port(name, dir: :input, width: options[:width] || 1)
-      |> set_wire(name, conns: [{:self, name}])
+    cond do
+      Map.has_key?(s.wires, name) -> raise "Wire by the name of #{name} already exists"
+      true -> 
+	s
+	|> BlackBox.set_port(name, dir: :input, width: options[:width] || 1)
+	|> set_wire(name, conns: [{:self, name}])
     end
   end
 
@@ -129,10 +126,9 @@ defmodule Danm.Schematic do
       end
     end)
     name = options[:as] || elem(hd(conns), 1)
-    if Map.has_key?(s.wires, name) do
-      merge_wire(s, name, conns: conns)
-    else
-      set_wire(s, name, conns: conns)
+    cond do
+      Map.has_key?(s.wires, name) -> merge_wire(s, name, conns: conns)
+      true -> set_wire(s, name, conns: conns)
     end
   end
 
@@ -140,14 +136,12 @@ defmodule Danm.Schematic do
   expose the wire as a port. width and direction are automatically figured out
   """
   def expose(s, name) do
-    if Map.has_key?(s.wires, name) do
-      unless Map.has_key?(s.ports, name) do
-	{drivers, _, width} = inspect_wire(s, name)
-	dir = if drivers > 0, do: :output, else: :input
-	force_expose(s, name, dir: dir, width: width)
-      end
-    else
-      raise "Wire by the name of #{name} is not found"
+    {drivers, _, width} = inspect_wire(s, name)
+    dir = if drivers > 0, do: :output, else: :input
+    cond do
+      !Map.has_key?(s.wires, name) -> raise "Wire by the name of #{name} is not found"
+      Map.has_key?(s.ports, name) -> s
+      true -> force_expose(s, name, dir: dir, width: width)
     end
   end
 
@@ -160,15 +154,12 @@ defmodule Danm.Schematic do
   expose one wire if necessary
   """
   def auto_expose(s, name) do
-    if Map.has_key?(s.ports, name) do
-      s
-    else
-      {drivers, loads, width} = inspect_wire(s, name)
-      cond do
-	drivers > 0 and loads == 0 -> force_expose(s, name, dir: :output, width: width)
-	drivers == 0 and loads > 0 -> force_expose(s, name, dir: :input, width: width)
-	true -> s
-      end
+    {drivers, loads, width} = inspect_wire(s, name)
+    cond do
+      Map.has_key?(s.ports, name) -> s
+      drivers > 0 and loads == 0 -> force_expose(s, name, dir: :output, width: width)
+      drivers == 0 and loads > 0 -> force_expose(s, name, dir: :input, width: width)
+      true -> s
     end
   end
 

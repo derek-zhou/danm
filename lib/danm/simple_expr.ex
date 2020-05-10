@@ -62,13 +62,13 @@ defmodule Danm.SimpleExpr do
 
   def optimize({op, l, r}) do
     {l, r} = {optimize(l), optimize(r)}
-    if is_integer(l) and is_integer(r) do
-      eval({op, l, r})
-    else
-      {op, l, r}
-      |> try_swap()
-      |> merge()
-      |> short_circuit()
+    cond do
+      is_integer(l) and is_integer(r) -> eval({op, l, r})
+      true ->
+	{op, l, r}
+	|> try_swap()
+	|> merge()
+	|> short_circuit()
     end
   end
 
@@ -91,10 +91,9 @@ defmodule Danm.SimpleExpr do
 
 
   defp try_swap({op, l, r}) do
-    if is_integer(l) and !is_integer(r) and (op == :add or op == :mul) do
-      {op, r, l}
-    else
-      {op, l, r}
+    cond do
+      is_integer(l) and !is_integer(r) and (op == :add or op == :mul) -> {op, r, l}
+      true -> {op, l, r}
     end
   end
 
