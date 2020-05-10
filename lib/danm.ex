@@ -10,14 +10,29 @@ defmodule Danm do
   alias Danm.VerilogPrinting
   alias Danm.CheckDesign
 
+  @doc """
+  Hello world.
+
+  ## Examples
+
+  iex> Danm.hello()
+  :world
+
+  """
+  def hello do
+    :world
+  end
+
   @doc ~S"""
   check design integrity and report errors and warnings. return false if there were errors
+  optional arguments:
+
+    * :check_warnings, when true, fail if there are warnings
+
   """
-  def check_design(s) do
+  def check_design(s, options \\ []) do
     {warnings, errors} = CheckDesign.check_design(s)
-    IO.write(:stderr,
-      "Check design finished with #{errors} errors and #{warnings} warnings\n")
-    errors == 0
+    (errors == 0) and (!options[:check_warnings] or (warnings == 0))
   end
 
   @doc ~S"""
