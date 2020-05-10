@@ -8,6 +8,17 @@ defmodule Danm do
   alias Danm.BlackBox
   alias Danm.HtmlPrinting
   alias Danm.VerilogPrinting
+  alias Danm.CheckDesign
+
+  @doc ~S"""
+  check design integrity and report errors and warnings. return false if there were errors
+  """
+  def check_design(s) do
+    {warnings, errors} = CheckDesign.check_design(s)
+    IO.write(:stderr,
+      "Check design finished with #{errors} errors and #{warnings} warnings\n")
+    errors == 0
+  end
 
   @doc ~S"""
   generate a single verilog file that have everything

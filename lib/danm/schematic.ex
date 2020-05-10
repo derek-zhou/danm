@@ -36,7 +36,6 @@ defmodule Danm.Schematic do
   call elaborate for all sub modules
   """
   def elaborate(s) do
-    IO.write("elaborating #{s.name}\n")
     case s.__struct__ do
       BlackBox -> BlackBox.resolve(s)
       __MODULE__ ->
@@ -173,11 +172,14 @@ defmodule Danm.Schematic do
     end
   end
 
-  defp inspect_wire(s, name) do
+  @doc ~S"""
+  return driver count, load count and calculated width
+  """
+  def inspect_wire(s, name) do
     Enum.reduce(s.wires[name], {0, 0, 1},
       fn {ins, port}, {drivers, loads, width} ->
 	{dir, w} = case ins do
-		     :self -> s.ports[port]
+		     :self -> inverse_port(s.ports[port])
 		     _ -> s.insts[ins].ports[port]
 		   end
 	{drivers + driver_count(dir), loads + load_count(dir), max(w, width)}
@@ -265,6 +267,14 @@ defmodule Danm.Schematic do
       w1 == 0 -> w2
       w1 == w2 -> w2
       true -> -1
+    end
+  end
+
+  defp inverse_port({dir, w}) do
+   case dir do
+      :input -> {:output, w}
+      :output -> {:input, w}
+      :inout -> {:inout, w}
     end
   end
 

@@ -86,6 +86,14 @@ defmodule Danm.VerilogPrinting do
       end
     end)
 
+    s.params
+    |> Map.keys()
+    |> Enum.sort(:asc)
+    |> Enum.each(fn p_name ->
+      p_value = s.params[p_name]
+      IO.write(f, "    parameter #{p_name} = #{p_value};\n")
+    end)
+
     map = Schematic.wire_width_map(s)
     s.wires
     |> Map.keys()
