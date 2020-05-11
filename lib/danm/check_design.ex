@@ -8,6 +8,7 @@ defmodule Danm.CheckDesign do
 
   defstruct dict: %{},
     stack: [],
+    cache: %{},
     errors: 0,
     warnings: 0
 
@@ -66,45 +67,52 @@ defmodule Danm.CheckDesign do
       nil ->
 	state
 	|> begin_check(key, s)
-	|> check_one_design(s)
+	|> check_current_design()
 	|> end_check(key)
     end
   end
 
-  defp check_one_design(state, s) do
-    case s.__struct__ do
-      BlackBox -> check_black_box_design(state, s)
-      Schematic -> check_schematic_design(state, s)
+  defp check_current_design(state) do
+    case current_design(state).__struct__ do
+      BlackBox -> check_black_box_design(state)
+      Schematic -> state |> check_instances() |> check_self_schematic()
     end
   end
 
-  defp check_black_box_design(state, b) do
-    state |> check_params(b) |> check_ports(b)
+  defp check_black_box_design(state) do
+    state |> check_params() |> check_ports()
   end
 
-  defp check_params(state, b) do
-    Enum.reduce(b.params, state, fn {k, v}, state ->
+  defp check_params(state) do
+    Enum.reduce(current_design(state).params, state, fn {k, v}, state ->
       error(state, "unresolved parameter: #{k}", if: !is_integer(v))
     end)
   end
 
-  defp check_ports(state, b) do
-    Enum.reduce(b.ports, state, fn {k, {_, w}}, state ->
+  defp check_ports(state) do
+    Enum.reduce(current_design(state).ports, state, fn {k, {_, w}}, state ->
       error(state, "unresolved port width: #{k}", if: !is_integer(w))
     end)
   end
 
-  defp check_schematic_design(state, s) do
-    map = Schematic.pin_to_wire_map(s)
-    state |> check_instances(s) |> check_conns(s, map) |> check_wires(s, map)
+  defp check_self_schematic(state) do
+    state |> calculate_cache_data() |> check_conns() |> check_wires()
   end
 
-  defp check_instances(state, s) do
-    Enum.reduce(s.insts, state, fn {_, inst}, state -> check_design(state, inst) end)
+  defp check_instances(state) do
+    Enum.reduce(current_design(state).insts, state, fn {_, inst}, state ->
+      check_design(state, inst) end)
   end
 
-  defp check_conns(state, s, map) do
-    Enum.reduce(s.insts, state, fn {i_name, inst}, state ->
+  defp calculate_cache_data(state) do
+    %{state |
+      cache: Map.put(state.cache, :map,
+	state |> current_design() |> Schematic.pin_to_wire_map()) }
+  end
+
+  defp check_conns(state) do
+    map = state.cache.map
+    Enum.reduce(current_design(state).insts, state, fn {i_name, inst}, state ->
       Enum.reduce(inst.ports, state, fn {p_name, _}, state ->
 	pin = "#{i_name}/#{p_name}"
 	error(state, "unconnecterd pin: #{pin}", if: !Map.has_key?(map, pin))
@@ -112,7 +120,9 @@ defmodule Danm.CheckDesign do
     end)
   end
 
-  defp check_wires(state, s, map) do
+  defp check_wires(state) do
+    map = state.cache.map
+    s = current_design(state)
     Enum.reduce(s.wires, state, fn {w_name, conns}, state ->
       {drivers, loads, width} = Schematic.inspect_wire(s, w_name)
       state = state
