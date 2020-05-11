@@ -4,8 +4,6 @@ defmodule Danm do
   """
 
   alias Danm.Library
-  alias Danm.Schematic
-  alias Danm.BlackBox
   alias Danm.HtmlPrinting
   alias Danm.VerilogPrinting
   alias Danm.CheckDesign
@@ -60,15 +58,10 @@ defmodule Danm do
 
   """
   def build(name, options \\ []) do
-    name
-    |> wrap(Library.start_link(options[:verilog_path] || [], options[:elixir_path] || []))
-    |> Library.load_module()
-    |> BlackBox.merge_parameters(options[:parameters] || %{})
-    |> Library.build_module()
-    |> wrap(Library.stop())
+    Library.start_link(options[:verilog_path] || [], options[:elixir_path] || [])
+    m = Library.load_and_build_module(name, options[:parameters] || %{})
+    Library.stop()
+    m
   end
-
-  # small helper function to keep the chain going
-  defp wrap(a, _), do: a
 
 end

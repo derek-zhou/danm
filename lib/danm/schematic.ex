@@ -3,6 +3,7 @@ defmodule Danm.Schematic do
   A schematic is a design entity composed inside Danm.
   """
 
+  alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Library
 
@@ -14,6 +15,7 @@ defmodule Danm.Schematic do
   {i_name, p_name}, where i_name/p_name is connected instance name and port name
   in the case of a wire is also connected to a port, the i_name is :self, p_name has to be
   the same as the wire name in this case
+  for wire as expression the tuple is {:expr, expr}
   module is the elixir module that it is defined in
   """
   defstruct name: nil,
@@ -24,51 +26,26 @@ defmodule Danm.Schematic do
     wires: %{},
     module: nil
 
+  defimpl Entity do
+
+    def elaborate(b), do: apply(b.module, :build, [b])
+
+    def doc_string(b) do
+      cond do
+	function_exported?(b.module, :doc_string, 1) -> apply(b.module, :doc_string, [b])
+	true -> "description forth coming"
+      end
+    end
+
+    def type_string(b), do: "schematic: " <> b.name
+    def sub_modules(b), do: b.insts
+
+  end
+
   # simple accessors
-  def set_instance(s, n, to: i), do: %{s | insts: Map.put(s.insts, n, i)}
-  def drop_instance(s, n), do: %{s | insts: Map.pop(s.insts, n)}
-  def set_wire(s, n, conns: c), do: %{s | wires: Map.put(s.wires, n, c)}
-  def drop_wire(s, n), do: %{s | wires: Map.pop(s.wires, n)}
-  def merge_wire(s, n, conns: c), do: %{s | wires: Map.put(s.wires, n, c ++ s.wires[n])}
-
-  @doc """
-  elaborate the design. This will call the schematic suplied build fuction, which will 
-  call elaborate for all sub modules
-  """
-  def elaborate(s) do
-    case s.__struct__ do
-      BlackBox -> BlackBox.resolve(s)
-      __MODULE__ ->
-	cond do
-	  function_exported?(s.module, :build, 1) -> apply(s.module, :build, [s])
-	  true -> s
-	end
-    end
-  end
-
-  @doc """
-  return the doc string of the design
-  """
-  def doc_string(s) do
-    case s.__struct__ do
-      BlackBox -> s.comment
-      __MODULE__ ->
-	cond do
-	  function_exported?(s.module, :doc_string, 1) -> apply(s.module, :doc_string, [s])
-	  true -> "description forth coming"
-	end
-    end
-  end
-
-  @doc """
-  return the type string of the design
-  """
-  def type_string(s) do
-    case s.__struct__ do
-      BlackBox -> "blackbox: " <> s.name
-      __MODULE__ -> "schematic: " <> s.name
-    end
-  end
+  defp set_instance(s, n, to: i), do: %{s | insts: Map.put(s.insts, n, i)}
+  defp set_wire(s, n, conns: c), do: %{s | wires: Map.put(s.wires, n, c)}
+  defp merge_wire(s, n, conns: c), do: %{s | wires: Map.put(s.wires, n, c ++ s.wires[n])}
 
   @doc ~S"""
   add a sub module instance.
@@ -79,15 +56,12 @@ defmodule Danm.Schematic do
 
   """
   def add_instance_of(s, name, options \\ []) do
-    m = name
-    |> Library.load_module()
-    |> BlackBox.merge_parameters(options[:parameters] || %{})
-    |> Library.build_module()
-
     i_name = options[:as] || "u_#{name}"
     cond do
       Map.has_key?(s.insts, i_name) -> raise "Instance by the name of #{i_name} already exists"
-      true -> set_instance(s, i_name, to: m)
+      true ->
+	m = Library.load_and_build_module(name, options[:parameters] || %{})
+	set_instance(s, i_name, to: m)
     end
   end
 

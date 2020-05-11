@@ -3,6 +3,7 @@ defmodule Danm.HtmlPrinting do
   Generate HTML documents
   """
 
+  alias Danm.Entity
   alias Danm.Schematic
   alias Danm.BlackBox
 
@@ -38,12 +39,12 @@ defmodule Danm.HtmlPrinting do
   print html fragment that contains hier index to f
   """
   def print_html_hier(s, f, as: hier) do
-    if s.__struct__ == Schematic and !Enum.empty?(s.insts) do
+    if !Enum.empty?(Entity.sub_modules(s)) do
       IO.write(f, "<ul>\n")
-      Enum.each(s.insts, fn {i_name, inst} ->
+      Enum.each(Entity.sub_modules(s), fn {i_name, inst} ->
 	IO.write(f, ~s"""
 	<li><a href="#{hier}/#{i_name}.html">#{i_name}</a>
-	(#{Schematic.type_string(inst)})</li>
+	(#{Entity.type_string(inst)})</li>
 	""")
 	print_html_hier(inst, f, as: hier <> "/" <> i_name)
       end)
@@ -56,9 +57,9 @@ defmodule Danm.HtmlPrinting do
   generate html for myself and everything below
   """
   def generate_html(s, as: hier, in: dir) do
-    if s.__struct__ == Schematic and !Enum.empty?(s.insts) do
+    if !Enum.empty?(Entity.sub_modules(s)) do
       File.mkdir("#{dir}/#{hier}")
-      Enum.each(s.insts, fn {i_name, inst} ->
+      Enum.each(Entity.sub_modules(s), fn {i_name, inst} ->
 	generate_html(inst, as: "#{hier}/#{i_name}", in: dir)
       end)
     end
@@ -72,11 +73,11 @@ defmodule Danm.HtmlPrinting do
     f = File.open!("#{dir}/#{hier}.html", [:write, :utf8])
     print_html_header(s, f, as: hier)
     print_html_ports(s, f)
-    if s.__struct__ == Schematic and !Enum.empty?(s.insts) do
+    if !Enum.empty?(Entity.sub_modules(s)) do
       print_html_instance_summary(s, f, as: hier)
       map = Schematic.pin_to_wire_map(s)
       IO.write(f, "<ul>\n")
-      Enum.each(s.insts, fn {i_name, inst} ->
+      Enum.each(Entity.sub_modules(s), fn {i_name, inst} ->
 	print_html_instance(inst, f, as: "#{hier}/#{i_name}", lookup: map)
       end)
       IO.write(f, "</ul><hr/>\n")
@@ -102,7 +103,7 @@ defmodule Danm.HtmlPrinting do
   end
 
   defp print_html_header(s, f, as: hier) do
-    title = "#{hier} (#{Schematic.type_string(s)}) Documentation"
+    title = "#{hier} (#{Entity.type_string(s)}) Documentation"
     {self_module, up_module} = get_self_and_up_module(hier)
     top_path = get_top_path(hier)
     IO.write(f, ~s"""
@@ -128,7 +129,7 @@ defmodule Danm.HtmlPrinting do
     IO.write(f, ~s"""
     | <a href="#{top_path}top.html">Top</a>
     <h1>#{title}</h1>
-    <p>#{Schematic.doc_string(s)}</p>
+    <p>#{Entity.doc_string(s)}</p>
     <p>Defined in: #{s.src}</p><hr/>
     """)
     s

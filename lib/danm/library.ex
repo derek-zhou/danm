@@ -3,6 +3,7 @@ defmodule Danm.Library do
   Loading modules from the filesystem
   """
 
+  alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Schematic
   
@@ -104,11 +105,21 @@ defmodule Danm.Library do
     # I cannot use get_and_update because elaborate may call the agent again
     case Agent.get(__MODULE__, fn l -> l.build_cache[key] end) do
       nil ->
-	s = Schematic.elaborate(m)
+	s = Entity.elaborate(m)
 	Agent.update(__MODULE__, fn l -> %{l | build_cache: Map.put(l.build_cache, key, s)} end)
 	s
       s -> s
     end
+  end
+
+  @doc """
+  load, parameterize and build module
+  """
+  def load_and_build_module(name, params) do
+    name
+    |> load_module()
+    |> BlackBox.merge_parameters(params)
+    |> build_module()
   end
 
 end

@@ -4,6 +4,7 @@ defmodule Danm.BlackBox do
   """
 
   alias Danm.SimpleExpr
+  alias Danm.Entity
   
   defstruct name: nil,
     comment: "",
@@ -11,24 +12,56 @@ defmodule Danm.BlackBox do
     ports: %{},
     params: %{}
 
+  defimpl Entity do
+
+    def elaborate(b) do
+      b
+      |> resolve_parameter()
+      |> resolve_port_width()
+    end
+
+    def doc_string(b), do: b.comment
+    def type_string(b), do: "blackbox: " <> b.name
+    def sub_modules(_), do: %{}
+
+    defp resolve_parameter(b) do
+      {map, sum} = Enum.reduce(b.params, {%{}, 0}, fn {k, v}, {map, sum} ->
+	{v, x} = eval_expr(v, in: b.params)
+	{Map.put(map, k, v), sum + x}
+      end)
+      b = %{b | params: map}
+      if sum > 0, do: resolve_parameter(b), else: b
+    end
+
+    defp resolve_port_width(b) do
+      {map, sum} = Enum.reduce(b.ports, {%{}, 0}, fn {k, {dir, w}}, {map, sum} ->
+	{w, x} = eval_expr(w, in: b.params)
+	{Map.put(map, k, {dir, w}), sum + x}
+      end)
+      b = %{b | ports: map}
+      if sum > 0, do: resolve_port_width(b), else: b
+    end
+
+    defp eval_expr(e, in: dict) do
+      case e do
+	n when is_integer(n) -> {n, 0}
+	e -> case SimpleExpr.eval(e, in: dict) do
+	       n when is_integer(n) -> {n, 1}
+	       e -> {e, 0}
+	     end
+      end
+    end
+
+  end
+
   # simple accessors
-  def set_name(b, n), do: %{b | name: n}
-  def set_comment(b, n), do: %{b | comment: n}
-  def set_parameter(b, n, to: v), do: %{b | params: Map.put(b.params, n, v)}
-  def drop_parameter(b, n), do: %{b | params: Map.pop(b.params, n)}
   def merge_parameters(b, d), do: %{b | params: Map.merge(b.params, d)}
   def set_port(b, n, dir: dir, width: w), do: %{b | ports: Map.put(b.ports, n, {dir, w})}
   def drop_port(b, n), do: %{b | ports: Map.pop(b.ports, n)}
 
-  @doc """
-  resolve
-  resolve parameters and port width to their value
-  """
-  def resolve(b) do
-    b
-    |> resolve_parameter()
-    |> resolve_port_width()
-  end
+  defp set_name(b, n), do: %{b | name: n}
+  defp set_comment(b, n), do: %{b | comment: n}
+  defp set_parameter(b, n, to: v), do: %{b | params: Map.put(b.params, n, v)}
 
   @doc """
   whether the box is fully resolved, ie. all parameter and port width are integers
@@ -38,34 +71,6 @@ defmodule Danm.BlackBox do
     Enum.reduce(b.ports, true, fn {_, {_, w}}, a -> a and is_integer(w) end)
   end
   
-  defp eval_expr(e, in: dict) do
-    case e do
-      n when is_integer(n) -> {n, 0}
-      e -> case SimpleExpr.eval(e, in: dict) do
-	     n when is_integer(n) -> {n, 1}
-	     e -> {e, 0}
-	   end
-    end
-  end
-  
-  defp resolve_parameter(b) do
-    {map, sum} = Enum.reduce(b.params, {%{}, 0}, fn {k, v}, {map, sum} ->
-      {v, x} = eval_expr(v, in: b.params) 
-      {Map.put(map, k, v), sum + x}
-    end)
-    b = %{b | params: map}
-    if sum > 0, do: resolve_parameter(b), else: b
-  end
-
-  defp resolve_port_width(b) do
-    {map, sum} = Enum.reduce(b.ports, {%{}, 0}, fn {k, {dir, w}}, {map, sum} ->
-      {w, x} = eval_expr(w, in: b.params) 
-      {Map.put(map, k, {dir, w}), sum + x}
-    end)
-    b = %{b | ports: map}
-    if sum > 0, do: resolve_port_width(b), else: b
-  end    
-      
   @doc """
   parse_verilog(path)
   parse a verilog module from the path, return the blackbox

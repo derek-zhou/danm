@@ -36,7 +36,6 @@ defmodule Danm.CheckDesign do
     end
   end
 
-  defp warning(state, msg), do: warning(state, msg, if: true)
   defp warning(state, msg, if: bool) do
     cond do
       bool ->
@@ -128,6 +127,7 @@ defmodule Danm.CheckDesign do
       state = state
       |> error("undriven wire: #{w_name}", if: drivers == 0)
       |> error("multiple driven wire: #{w_name}", if: drivers > 1)
+      |> error("unknown width in wire: #{w_name}", if: width == 0)
       |> warning("unloaded wire: #{w_name}", if: loads == 0)
       conns
       |> Enum.reject(fn {i_name, _} -> i_name == :self end)

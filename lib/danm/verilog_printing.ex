@@ -3,6 +3,7 @@ defmodule Danm.VerilogPrinting do
   Generate Verilog file for downstream tools
   """
 
+  alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Schematic
 
@@ -97,7 +98,7 @@ defmodule Danm.VerilogPrinting do
     port_string = Enum.join(sorted_ports, ",\n\t")
     IO.write(f, ~s"""
     /**
-    #{Schematic.doc_string(s)}
+    #{Entity.doc_string(s)}
     */
     module #{ref}(
     	#{port_string});
@@ -190,7 +191,7 @@ defmodule Danm.VerilogPrinting do
     key = module_to_key(inst)
     ref = key_to_ref(state, key)
     IO.write(f, ~s"""
-    // instance of #{Schematic.type_string(inst)}}
+    // instance of #{Entity.type_string(inst)}}
         #{ref} #{i_name}(
     """)
 
