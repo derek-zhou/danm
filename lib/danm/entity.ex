@@ -23,4 +23,9 @@ defprotocol Danm.Entity do
   """
   def sub_modules(b)
 
+  @doc ~S"""
+  whether this module is inlined
+  """
+  def inlined?(b)
+
 end

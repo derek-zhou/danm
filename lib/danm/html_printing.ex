@@ -157,7 +157,7 @@ defmodule Danm.HtmlPrinting do
     {self_module, _} = get_self_and_up_module(hier)
     count = Enum.count(s.insts)
     IO.write(f, "<h2>#{count} Instances</h2><table><tr><th>instance</th><th>module</th></tr>\n")
-    s.insts
+    Entity.sub_modules(s)
     |> Map.keys()
     |> Enum.sort(:asc)
     |> Enum.each(fn i_name ->
@@ -221,6 +221,7 @@ defmodule Danm.HtmlPrinting do
 	Enum.each(s.wires, fn {w_name, conns} ->
 	  conns
 	  |> Enum.reject(fn {i, _} -> i == :self end)
+	  |> Enum.reject(fn {i, _} -> Entity.inlined?(s.insts[i]) end)
 	  |> print_html_wire(f,
 	    as: w_name,
 	    width: map[w_name],

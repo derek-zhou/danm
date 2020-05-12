@@ -23,6 +23,7 @@ defmodule Danm.BlackBox do
     def doc_string(b), do: b.comment
     def type_string(b), do: "blackbox: " <> b.name
     def sub_modules(_), do: %{}
+    def inlined?(_), do: false
 
     defp resolve_parameter(b) do
       {map, sum} = Enum.reduce(b.params, {%{}, 0}, fn {k, v}, {map, sum} ->

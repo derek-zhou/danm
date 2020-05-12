@@ -5,6 +5,7 @@ defmodule Danm.Schematic do
 
   alias Danm.Entity
   alias Danm.BlackBox
+  alias Danm.Sink
   alias Danm.Library
 
   @doc """
@@ -38,7 +39,12 @@ defmodule Danm.Schematic do
     end
 
     def type_string(b), do: "schematic: " <> b.name
-    def sub_modules(b), do: b.insts
+
+    def sub_modules(b) do
+      b.insts |> Enum.reject(fn {_, v} -> Entity.inlined?(v) end) |> Map.new()
+    end
+
+    def inlined?(_), do: false
 
   end
 
@@ -55,7 +61,7 @@ defmodule Danm.Schematic do
     * :parameters, a map of additional parameters to set before elaborate
 
   """
-  def add_instance_of(s, name, options \\ []) do
+  def add(s, name, options \\ []) do
     i_name = options[:as] || "u_#{name}"
     cond do
       Map.has_key?(s.insts, i_name) -> raise "Instance by the name of #{i_name} already exists"
@@ -109,14 +115,31 @@ defmodule Danm.Schematic do
   @doc ~S"""
   expose the wire as a port. width and direction are automatically figured out
   """
-  def expose(s, name) do
+  def expose(s, l) when is_list(l), do: Enum.reduce(l, s, fn x, s -> expose(s, x) end)
+  def expose(s, name) when is_binary(name) do
+    unless Map.has_key?(s.wires, name), do: raise "Wire by the name of #{name} is not found"
     {drivers, _, width} = inspect_wire(s, name)
     dir = if drivers > 0, do: :output, else: :input
     cond do
-      !Map.has_key?(s.wires, name) -> raise "Wire by the name of #{name} is not found"
       Map.has_key?(s.ports, name) -> s
       true -> force_expose(s, name, dir: dir, width: width)
     end
+  end
+
+  @doc ~S"""
+  sink a wire, so it has a fake load and not to be auto-exposed
+  """
+  def sink(s, l) when is_list(l), do: Enum.reduce(l, s, fn x, s -> sink(s, x) end)
+  def sink(s, name) when is_binary(name) do
+    unless Map.has_key?(s.wires, name), do: raise "Wire by the name of #{name} is not found"
+    w = width_of_conns(s, s.wires[name])
+    sink = case s.insts["_sink"] do
+	     nil -> Sink.new_sink(name, w)
+	     sink -> Sink.set_port(sink, name, w)
+	   end
+    s
+    |> merge_wire(name, conns: [{"_sink", name}])
+    |> set_instance("_sink", to: sink)
   end
 
   @doc ~S"""
@@ -124,10 +147,8 @@ defmodule Danm.Schematic do
   """
   def auto_expose(s), do: Enum.reduce(s.wires, s, fn {n, _}, s -> auto_expose(s, n) end)
 
-  @doc ~S"""
-  expose one wire if necessary
-  """
-  def auto_expose(s, name) do
+  defp auto_expose(s, name) do
+    unless Map.has_key?(s.wires, name), do: raise "Wire by the name of #{name} is not found"
     {drivers, loads, width} = inspect_wire(s, name)
     cond do
       Map.has_key?(s.ports, name) -> s

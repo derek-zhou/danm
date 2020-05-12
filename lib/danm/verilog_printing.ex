@@ -4,6 +4,7 @@ defmodule Danm.VerilogPrinting do
   """
 
   alias Danm.Entity
+  alias Danm.Sink
   alias Danm.BlackBox
   alias Danm.Schematic
 
@@ -58,8 +59,8 @@ defmodule Danm.VerilogPrinting do
     case s.__struct__ do
       BlackBox -> copy_self_verilog(state, ref)
       Schematic ->
-	Enum.reduce(s.insts, print_self_verilog(state, ref), fn {_, inst}, state ->
-	  print_full_verilog(state, inst) end)
+	Enum.reduce(Entity.sub_modules(s), print_self_verilog(state, ref),
+	  fn {_, inst}, state -> print_full_verilog(state, inst) end)
     end
   end
 
@@ -139,7 +140,10 @@ defmodule Danm.VerilogPrinting do
     |> Map.keys()
     |> Enum.sort(:asc)
     |> Enum.reduce(state, fn i_name, state ->
-      print_one_instance(state, i_name, with: map)
+      case s.insts[i_name].__struct__ do
+	Sink -> state
+	_ -> print_one_instance(state, i_name, with: map)
+      end
     end)
 
     IO.write(f, "endmodule // #{ref}\n\n")

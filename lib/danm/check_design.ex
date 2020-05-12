@@ -5,6 +5,7 @@ defmodule Danm.CheckDesign do
 
   alias Danm.BlackBox
   alias Danm.Schematic
+  alias Danm.Sink
 
   defstruct dict: %{},
     stack: [],
@@ -21,7 +22,12 @@ defmodule Danm.CheckDesign do
     {state.errors, state.warnings}
   end
 
-  defp module_to_key(s), do: {s.name, s.params}
+  defp module_to_key(s) do
+    case s.__struct__ do
+      Sink -> {"_sink", s.ports}
+      _ -> {s.name, s.params}
+    end
+  end
 
   defp current_design(state), do: hd(state.stack)
 
@@ -75,6 +81,7 @@ defmodule Danm.CheckDesign do
     case current_design(state).__struct__ do
       BlackBox -> check_black_box_design(state)
       Schematic -> state |> check_instances() |> check_self_schematic()
+      Sink -> state
     end
   end
 
