@@ -54,13 +54,24 @@ defmodule Danm.VerilogPrinting do
     end
   end
 
+  defp inlined?(s) do
+    case s.__struct__ do
+      BlackBox -> false
+      Schematic -> false
+      _ -> true
+    end
+  end
+
   defp print_current_design(state, ref) do
     s = current_design(state)
     case s.__struct__ do
       BlackBox -> copy_self_verilog(state, ref)
       Schematic ->
-	Enum.reduce(Entity.sub_modules(s), print_self_verilog(state, ref),
-	  fn {_, inst}, state -> print_full_verilog(state, inst) end)
+	Entity.sub_modules(s)
+	|> Enum.map(fn n -> Entity.sub_module_at(s, n) end)
+	|> Enum.reject(fn s -> inlined?(s) end)
+	|> Enum.reduce(print_self_verilog(state, ref),
+	  fn inst, state -> print_full_verilog(state, inst) end)
     end
   end
 
@@ -92,9 +103,8 @@ defmodule Danm.VerilogPrinting do
   defp print_self_verilog(state, ref) do
     s = current_design(state)
     f = state.stream
-    sorted_ports = s.ports
-    |> Map.keys()
-    |> Enum.sort(fn a, b -> compare_port(dir_of(a, s), a, dir_of(b, s), b) end)
+    sorted_ports = Enum.sort(Entity.ports(s), fn a, b ->
+      compare_port(dir_of(a, s), a, dir_of(b, s), b) end)
 
     port_string = Enum.join(sorted_ports, ",\n\t")
     IO.write(f, ~s"""
@@ -106,7 +116,7 @@ defmodule Danm.VerilogPrinting do
 
     """)
     Enum.each(sorted_ports, fn p_name ->
-      {dir, width} = s.ports[p_name]
+      {dir, width} = Entity.port_at(s, p_name)
       case width do
 	1 -> IO.write(f, "    #{dir} #{p_name};\n")
 	_ -> IO.write(f, "    #{dir} [#{width - 1}:0] #{p_name};\n")
@@ -124,7 +134,7 @@ defmodule Danm.VerilogPrinting do
     map = Schematic.wire_width_map(s)
     s.wires
     |> Map.keys()
-    |> Enum.reject(fn x -> Map.has_key?(s.ports, x) end)
+    |> Enum.filter(fn x -> Entity.port_at(s, x) == nil end)
     |> Enum.sort(:asc)
     |> Enum.each(fn w_name ->
       width = map[w_name]
@@ -136,11 +146,11 @@ defmodule Danm.VerilogPrinting do
     IO.write(f, "\n")
 
     map = Schematic.pin_to_wire_map(s)
-    state = s.insts
-    |> Map.keys()
-    |> Enum.sort(:asc)
-    |> Enum.reduce(state, fn i_name, state ->
-      case s.insts[i_name].__struct__ do
+    state =
+      Entity.sub_modules(s)
+      |> Enum.sort(:asc)
+      |> Enum.reduce(state, fn i_name, state ->
+      case Entity.sub_module_at(s, i_name).__struct__ do
 	Sink -> state
 	_ -> print_one_instance(state, i_name, with: map)
       end
@@ -186,12 +196,12 @@ defmodule Danm.VerilogPrinting do
 	    end}
   end
 
-  defp dir_of(p, s), do: elem(s.ports[p], 0)
+  defp dir_of(p, s), do: elem(Entity.port_at(s, p), 0)
 
   defp print_one_instance(state, i_name, with: map) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Entity.sub_module_at(s, i_name)
     key = module_to_key(inst)
     ref = key_to_ref(state, key)
     IO.write(f, ~s"""
@@ -199,8 +209,7 @@ defmodule Danm.VerilogPrinting do
         #{ref} #{i_name}(
     """)
 
-    conns_str = inst.ports
-    |> Map.keys()
+    conns_str = Entity.ports(inst)
     |> Enum.sort(fn a, b -> compare_port(dir_of(a, inst), a, dir_of(b, inst), b) end)
     |> Enum.filter(fn p_name -> Map.has_key?(map, "#{i_name}/#{p_name}") end)
     |> Enum.map(fn p_name -> ".#{p_name}("<>map["#{i_name}/#{p_name}"] <> ")" end)

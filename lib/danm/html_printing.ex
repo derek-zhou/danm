@@ -39,9 +39,11 @@ defmodule Danm.HtmlPrinting do
   print html fragment that contains hier index to f
   """
   def print_html_hier(s, f, as: hier) do
-    if !Enum.empty?(Entity.sub_modules(s)) do
+    subs = printable_sub_modules(s)
+    if !Enum.empty?(subs) do
       IO.write(f, "<ul>\n")
-      Enum.each(Entity.sub_modules(s), fn {i_name, inst} ->
+      Enum.each(subs, fn i_name ->
+	inst = Entity.sub_module_at(s, i_name)
 	IO.write(f, ~s"""
 	<li><a href="#{hier}/#{i_name}.html">#{i_name}</a>
 	(#{Entity.type_string(inst)})</li>
@@ -57,9 +59,11 @@ defmodule Danm.HtmlPrinting do
   generate html for myself and everything below
   """
   def generate_html(s, as: hier, in: dir) do
-    if !Enum.empty?(Entity.sub_modules(s)) do
+    subs = printable_sub_modules(s)
+    if !Enum.empty?(subs) do
       File.mkdir("#{dir}/#{hier}")
-      Enum.each(Entity.sub_modules(s), fn {i_name, inst} ->
+      Enum.each(subs, fn i_name ->
+	inst = Entity.sub_module_at(s, i_name)
 	generate_html(inst, as: "#{hier}/#{i_name}", in: dir)
       end)
     end
@@ -73,11 +77,13 @@ defmodule Danm.HtmlPrinting do
     f = File.open!("#{dir}/#{hier}.html", [:write, :utf8])
     print_html_header(s, f, as: hier)
     print_html_ports(s, f)
-    if !Enum.empty?(Entity.sub_modules(s)) do
+    subs = printable_sub_modules(s)
+    if !Enum.empty?(subs) do
       print_html_instance_summary(s, f, as: hier)
       map = Schematic.pin_to_wire_map(s)
       IO.write(f, "<ul>\n")
-      Enum.each(Entity.sub_modules(s), fn {i_name, inst} ->
+      Enum.each(subs, fn i_name ->
+	inst = Entity.sub_module_at(s, i_name)
 	print_html_instance(inst, f, as: "#{hier}/#{i_name}", lookup: map)
       end)
       IO.write(f, "</ul><hr/>\n")
@@ -96,6 +102,20 @@ defmodule Danm.HtmlPrinting do
 	 [h0, h1 | _ ] -> {h0, h1}
 	 [h0 | _ ] -> {h0, nil}
        end
+  end
+
+  defp inlined?(s) do
+    case s.__struct__ do
+      BlackBox -> false
+      Schematic -> false
+      _ -> true
+    end
+  end
+
+  defp printable_sub_modules(s) do
+    s
+    |> Entity.sub_modules()
+    |> Enum.reject(fn n -> inlined?(Entity.sub_module_at(s, n)) end)
   end
 
   defp get_top_path(hier) do
@@ -140,11 +160,11 @@ defmodule Danm.HtmlPrinting do
     <h2>Port Summary</h2><table>
     <tr><th>port</th><th>direction</th><th>width</th></tr>
     """)
-    s.ports
-    |> Map.keys()
+    s
+    |> Entity.ports()
     |> Enum.sort(:asc)
     |> Enum.each(fn p_name ->
-      {dir, width} = s.ports[p_name]
+      {dir, width} = Entity.port_at(s, p_name)
       IO.write(f, ~s"""
       <tr><td><a href="#WIRE_#{p_name}">#{p_name}</a></td><td>#{dir}</td><td>#{width}</td></tr>
       """)
@@ -155,13 +175,13 @@ defmodule Danm.HtmlPrinting do
 
   defp print_html_instance_summary(s, f, as: hier) do
     {self_module, _} = get_self_and_up_module(hier)
-    count = Enum.count(s.insts)
+    subs = printable_sub_modules(s)
+    count = Enum.count(subs)
     IO.write(f, "<h2>#{count} Instances</h2><table><tr><th>instance</th><th>module</th></tr>\n")
-    Entity.sub_modules(s)
-    |> Map.keys()
+    subs
     |> Enum.sort(:asc)
     |> Enum.each(fn i_name ->
-      inst = s.insts[i_name]
+      inst = Entity.sub_module_at(s, i_name)
       IO.write(f, ~s"""
       <tr><td><a href="#INST_#{i_name}">#{i_name}</a></td><td><a href="#{self_module}/#{i_name}.html">#{inst.name}</a></td></tr>
       """)
@@ -179,11 +199,11 @@ defmodule Danm.HtmlPrinting do
     <li>Connections:<table>
     <tr><th>port</th><th>direction</th><th>wire</th></tr>
     """)
-    s.ports
-    |> Map.keys()
+    s
+    |> Entity.ports()
     |> Enum.sort(:asc)
     |> Enum.each(fn p_name ->
-      {dir, _} = s.ports[p_name]
+      {dir, _} = Entity.port_at(s, p_name)
       w_name = map["#{self_module}/#{p_name}"]
       IO.write(f, ~s"""
       <tr><td><a href="#{up_module}/#{self_module}.html#WIRE_#{p_name}">#{p_name}</a></td><td>#{dir}</td><td><a href="#WIRE_#{w_name}">#{w_name}</a></td></tr>
@@ -207,25 +227,27 @@ defmodule Danm.HtmlPrinting do
   defp print_html_wires(s, f, as: hier) do
     {self_module, up_module} = get_self_and_up_module(hier)
     count = case s.__struct__ do
-	      BlackBox -> Enum.count(s.ports)
+	      BlackBox -> Enum.count(Entity.ports(s))
 	      Schematic -> Enum.count(s.wires)
 	    end
     IO.write(f, "<h2>#{count} wires</h2><ul>\n")
     case s.__struct__ do
       BlackBox ->
-	Enum.each(s.ports, fn {p_name, port} ->
-	  print_html_port(port, f, as: p_name, self: self_module, up: up_module)
+	Enum.each(Entity.ports(s), fn p_name ->
+	  s
+	  |> Entity.port_at(p_name)
+	  |> print_html_port(f, as: p_name, self: self_module, up: up_module)
 	end)
       Schematic ->
 	map = Schematic.wire_width_map(s)
 	Enum.each(s.wires, fn {w_name, conns} ->
 	  conns
 	  |> Enum.reject(fn {i, _} -> i == :self end)
-	  |> Enum.reject(fn {i, _} -> Entity.inlined?(s.insts[i]) end)
+	  |> Enum.reject(fn {i, _} -> inlined?(Entity.sub_module_at(s, i)) end)
 	  |> print_html_wire(f,
 	    as: w_name,
 	    width: map[w_name],
-	    port: s.ports[w_name],
+	    port: Entity.port_at(s, w_name),
 	    self: self_module,
 	    up: up_module)
 	end)

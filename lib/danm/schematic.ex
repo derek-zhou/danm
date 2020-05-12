@@ -40,11 +40,10 @@ defmodule Danm.Schematic do
 
     def type_string(b), do: "schematic: " <> b.name
 
-    def sub_modules(b) do
-      b.insts |> Enum.reject(fn {_, v} -> Entity.inlined?(v) end) |> Map.new()
-    end
-
-    def inlined?(_), do: false
+    def sub_modules(b), do: b.insts |> Map.keys()
+    def sub_module_at(b, name), do: b.insts[name]
+    def ports(b), do: b.ports |> Map.keys()
+    def port_at(b, name), do: b.ports[name]
 
   end
 
@@ -148,7 +147,6 @@ defmodule Danm.Schematic do
   def auto_expose(s), do: Enum.reduce(s.wires, s, fn {n, _}, s -> auto_expose(s, n) end)
 
   defp auto_expose(s, name) do
-    unless Map.has_key?(s.wires, name), do: raise "Wire by the name of #{name} is not found"
     {drivers, loads, width} = inspect_wire(s, name)
     cond do
       Map.has_key?(s.ports, name) -> s
@@ -166,7 +164,7 @@ defmodule Danm.Schematic do
       fn {ins, port}, {drivers, loads, width} ->
 	{dir, w} = case ins do
 		     :self -> inverse_port(s.ports[port])
-		     _ -> s.insts[ins].ports[port]
+		     _ -> s |> Entity.sub_module_at(ins) |> Entity.port_at(port)
 		   end
 	{drivers + driver_count(dir), loads + load_count(dir), max(w, width)}
       end)
@@ -183,7 +181,7 @@ defmodule Danm.Schematic do
     Enum.reduce_while(conns, 1, fn {ins, port}, width ->
       case ins do
 	:self -> {:halt, elem(s.ports[port], 1)}
-	_ -> {:cont, max(width, elem(s.insts[ins].ports[port], 1))}
+	_ -> {:cont, max(width, elem(s |> Entity.sub_module_at(ins) |> Entity.port_at(port), 1))}
       end
     end)
   end
@@ -201,7 +199,7 @@ defmodule Danm.Schematic do
   def auto_connect(s) do
     # set of unique port name
     set = Enum.reduce(s.insts, MapSet.new(), fn {_, inst}, set ->
-      inst.ports |> Map.keys() |> MapSet.new() |> MapSet.union(set)
+      inst |> Entity.ports() |> MapSet.new() |> MapSet.union(set)
     end)
     map = pin_to_wire_map(s)
     # do auto connect for each unique port name, with pin -> w_name map as an aid
@@ -229,13 +227,16 @@ defmodule Danm.Schematic do
     # driver count, width. I set width to -1 if width does not matcch 
     {drivers, width, pins} = Enum.reduce(s.insts, {drivers, width, []},
       fn {i_name, inst}, {drivers, width, list} ->
-	cond do
-	  Map.has_key?(pw_map, "#{i_name}/#{name}") -> {drivers, width, list}
-	  !Map.has_key?(inst.ports, name) -> {drivers, width, list}
-	  {dir, w} = inst.ports[name] ->
-	    {drivers + driver_count(dir),
-	     common_width(width, w),
-	     [ {i_name, name} | list ]}
+	case Entity.port_at(inst, name) do
+	  nil -> {drivers, width, list}
+	  {dir, w} ->
+	    cond do
+	      Map.has_key?(pw_map, "#{i_name}/#{name}") -> {drivers, width, list}
+	      true ->
+		{drivers + driver_count(dir),
+		 common_width(width, w),
+		 [ {i_name, name} | list ]}
+	    end
 	end
       end)
     cond do

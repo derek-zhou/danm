@@ -3,6 +3,7 @@ defmodule Danm.CheckDesign do
   perform design check on a design
   """
 
+  alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Schematic
   alias Danm.Sink
@@ -96,8 +97,12 @@ defmodule Danm.CheckDesign do
   end
 
   defp check_ports(state) do
-    Enum.reduce(current_design(state).ports, state, fn {k, {_, w}}, state ->
-      error(state, "unresolved port width: #{k}", if: !is_integer(w))
+    s = current_design(state)
+    s
+    |> Entity.ports()
+    |> Enum.reduce(state, fn p_name, state ->
+      {_, w} = Entity.port_at(s, p_name)
+      error(state, "unresolved port width: #{p_name}", if: !is_integer(w))
     end)
   end
 
@@ -106,8 +111,11 @@ defmodule Danm.CheckDesign do
   end
 
   defp check_instances(state) do
-    Enum.reduce(current_design(state).insts, state, fn {_, inst}, state ->
-      check_design(state, inst) end)
+    s = current_design(state)
+    s
+    |> Entity.sub_modules()
+    |> Enum.map(fn n -> Entity.sub_module_at(s, n) end)
+    |> Enum.reduce(state, fn inst, state -> check_design(state, inst) end)
   end
 
   defp calculate_cache_data(state) do
@@ -118,8 +126,14 @@ defmodule Danm.CheckDesign do
 
   defp check_conns(state) do
     map = state.cache.map
-    Enum.reduce(current_design(state).insts, state, fn {i_name, inst}, state ->
-      Enum.reduce(inst.ports, state, fn {p_name, _}, state ->
+    s = current_design(state)
+    s
+    |> Entity.sub_modules()
+    |> Enum.reduce(state, fn i_name, state ->
+      s
+      |> Entity.sub_module_at(i_name)
+      |> Entity.ports()
+      |> Enum.reduce(state, fn p_name, state ->
 	pin = "#{i_name}/#{p_name}"
 	error(state, "unconnecterd pin: #{pin}", if: !Map.has_key?(map, pin))
       end)
@@ -141,10 +155,10 @@ defmodule Danm.CheckDesign do
       |> Enum.reduce(state, fn {i_name, p_name}, state ->
 	pin = "#{i_name}/#{p_name}"
 	wn2 = map[pin]
-	{_, w2} = s.insts[i_name].ports[p_name]
+	{_, w2} = s |> Entity.sub_module_at(i_name) |> Entity.port_at(p_name)
 	state
 	|> error("multiple wire on pin: #{pin}", if: wn2 != w_name)
-	|> error("wire width not match on pin: #{pin}", if: w2 != width)
+	|> error("wire width not match on pin: #{pin}, #{w2} != #{width}", if: w2 != width)
       end)
     end)
   end
