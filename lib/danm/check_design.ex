@@ -6,7 +6,6 @@ defmodule Danm.CheckDesign do
   alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Schematic
-  alias Danm.Sink
 
   defstruct dict: %{},
     stack: [],
@@ -25,8 +24,9 @@ defmodule Danm.CheckDesign do
 
   defp module_to_key(s) do
     case s.__struct__ do
-      Sink -> {"_sink", s.ports}
-      _ -> {s.name, s.params}
+      BlackBox -> {s.name, s.params}
+      Schematic -> {s.name, s.params}
+      _ -> s       # anything else should always has a unique key
     end
   end
 
@@ -82,7 +82,7 @@ defmodule Danm.CheckDesign do
     case current_design(state).__struct__ do
       BlackBox -> check_black_box_design(state)
       Schematic -> state |> check_instances() |> check_self_schematic()
-      Sink -> state
+      _ -> state
     end
   end
 

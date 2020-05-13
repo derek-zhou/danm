@@ -5,12 +5,14 @@ defmodule Danm.BlackBox do
 
   alias Danm.SimpleExpr
   alias Danm.Entity
-  
-  defstruct name: nil,
+
+  defstruct [
+    :name,
     comment: "",
     src: "",
     ports: %{},
     params: %{}
+  ]
 
   defimpl Entity do
 
@@ -21,38 +23,29 @@ defmodule Danm.BlackBox do
     end
 
     def doc_string(b), do: b.comment
-    def type_string(b), do: "blackbox: " <> b.name
+    def type_string(b), do: "black box: " <> b.name
     def sub_modules(_), do: []
     def sub_module_at(_, _), do: nil
     def ports(b), do: b.ports |> Map.keys()
     def port_at(b, name), do: b.ports[name]
 
     defp resolve_parameter(b) do
-      {map, sum} = Enum.reduce(b.params, {%{}, 0}, fn {k, v}, {map, sum} ->
-	{v, x} = eval_expr(v, in: b.params)
-	{Map.put(map, k, v), sum + x}
+      {map, changes} = Enum.reduce(b.params, {%{}, 0}, fn {k, v}, {map, changes} ->
+	v_new = SimpleExpr.eval(v, in: b.params)
+	cond do
+	  v_new === v -> {Map.put(map, k, v), changes}
+	  true -> {Map.put(map, k, v_new), changes + 1}
+	end
       end)
       b = %{b | params: map}
-      if sum > 0, do: resolve_parameter(b), else: b
+      if changes > 0, do: resolve_parameter(b), else: b
     end
 
     defp resolve_port_width(b) do
-      {map, sum} = Enum.reduce(b.ports, {%{}, 0}, fn {k, {dir, w}}, {map, sum} ->
-	{w, x} = eval_expr(w, in: b.params)
-	{Map.put(map, k, {dir, w}), sum + x}
+      new_ports = Enum.reduce(b.ports, %{}, fn {p_name, {dir, w}}, map ->
+	Map.put(map, p_name, {dir, SimpleExpr.eval(w, in: b.params)})
       end)
-      b = %{b | ports: map}
-      if sum > 0, do: resolve_port_width(b), else: b
-    end
-
-    defp eval_expr(e, in: dict) do
-      case e do
-	n when is_integer(n) -> {n, 0}
-	e -> case SimpleExpr.eval(e, in: dict) do
-	       n when is_integer(n) -> {n, 1}
-	       e -> {e, 0}
-	     end
-      end
+      %{b | ports: new_ports}
     end
 
   end
@@ -239,6 +232,28 @@ defmodule Danm.BlackBox do
     {state, box, line, buffer}
     |> parse_expect_string(";")
     |> parse_skip_spaces(f)
+  end
+
+  defp port_order_of(p, s) do
+    order_map = %{input: 0, output: 1, inout: 2}
+    Map.fetch!(order_map, elem(Entity.port_at(s, p), 0))
+  end
+
+  defp compare_port(oa, a, ob, b) do
+    cond do
+      oa < ob -> true
+      oa > ob -> false
+      true -> a <= b
+    end
+  end
+
+  @doc ~S"""
+  return a sorted list of ports
+  """
+  def sort_ports(s) do
+    s
+    |> Entity.ports()
+    |> Enum.sort(fn a, b -> compare_port(port_order_of(a, s), a, port_order_of(b, s), b) end)
   end
 
 end

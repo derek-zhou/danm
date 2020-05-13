@@ -15,12 +15,11 @@ defmodule Danm.WireExpr do
   width(ast, in: context)
   return the width of the ast inside the context
   """
-  def width(:defult, in: _), do: nil
   def width({:const, w, _}, in: _), do: w
   def width({:dup, sub, times}, in: con), do: times * width(sub, in: con)
   def width({:ext, _, msb, lsb, step}, in: _), do: div((lsb - msb), step) + 1
   # FIXME:
-  def width({:id, _}, in: _), do: 32
+  def width({:id, id}, in: con), do: con[id]
   
   # unary operators
   def width({:bit_not, sub}, in: con), do: width(sub, in: con)
@@ -62,56 +61,109 @@ defmodule Danm.WireExpr do
   defp max_width(items, con), do: Enum.reduce(items, 0, &(max(width(&1, in: con), &2)))
 
   @doc """
-  ast_string(ast)
-  return a string representation of ast
+  return a list of all ids in this expr
   """
-  def ast_string(:defult), do: "default"
-  def ast_string({:const, 0, v}), do: to_string(v)
-  def ast_string({:const, w, v}), do: "#{w}'d#{v}"
-  # FIXME
-  def ast_string({:id, name}), do: name
-  def ast_string({:dup, sub, times}), do: "{#{times}{#{ast_string(sub)}}}"
-  def ast_string({:ext, sub, msb, lsb, -1}), do: "#{ast_string(sub)}[#{msb}:#{lsb}]"
-  def ast_string({:ext, sub, msb, lsb, step}), do: "#{ast_string(sub)}[#{msb}:#{lsb}:#{step}]"
-  
+  def ids({:const, _, _}), do: []
+  def ids({:dup, sub, _}), do: ids(sub)
+  def ids({:ext, sub, _, _, _}), do: ids(sub)
+  def ids({:id, x}), do: [x]
+
   # unary operators
-  def ast_string({:bit_not, sub}), do: "(~ #{ast_string(sub)})"
-  def ast_string({:negate, sub}), do: "(- #{ast_string(sub)})"
-  def ast_string({:log_not, sub}), do: "(! #{ast_string(sub)})"
-  def ast_string({:bit_and, sub}), do: "(& #{ast_string(sub)})"
-  def ast_string({:bit_or, sub}), do: "(| #{ast_string(sub)})"
-  def ast_string({:bit_xor, sub}), do: "(^ #{ast_string(sub)})"
+  def ids({:bit_not, sub}), do: ids(sub)
+  def ids({:negate, sub}), do: ids(sub)
+  def ids({:log_not, sub}), do: ids(sub)
+  def ids({:bit_and, sub}), do: ids(sub)
+  def ids({:bit_or, sub}), do: ids(sub)
+  def ids({:bit_xor, sub}), do: ids(sub)
 
   # binary operators
-  def ast_string({:add, l, r}), do: "(#{ast_string(l)} + #{ast_string(r)})"
-  def ast_string({:sub, l, r}), do: "(#{ast_string(l)} - #{ast_string(r)})"
-  def ast_string({:bit_and, l, r}), do: "(#{ast_string(l)} & #{ast_string(r)})"
-  def ast_string({:bit_or, l, r}), do: "(#{ast_string(l)} | #{ast_string(r)})"
-  def ast_string({:bit_xor, l, r}), do: "(#{ast_string(l)} ^ #{ast_string(r)})"
-  def ast_string({:equal, l, r}), do: "(#{ast_string(l)} == #{ast_string(r)})"
-  def ast_string({:greater, l, r}), do: "(#{ast_string(l)} > #{ast_string(r)})"
-  def ast_string({:less, l, r}), do: "(#{ast_string(l)} < #{ast_string(r)})"
-  def ast_string({:not_greater, l, r}), do: "(#{ast_string(l)} <= #{ast_string(r)})"
-  def ast_string({:not_less, l, r}), do: "(#{ast_string(l)} >= #{ast_string(r)})"
-  def ast_string({:unequal, l, r}), do: "(#{ast_string(l)} != #{ast_string(r)})"
-  def ast_string({:log_and, l, r}), do: "(#{ast_string(l)} && #{ast_string(r)})"
-  def ast_string({:log_or, l, r}), do: "(#{ast_string(l)} || #{ast_string(r)})"
-  def ast_string({:log_xor, l, r}), do: "(#{ast_string(l)} ^^ #{ast_string(r)})"
-  def ast_string({:comma, l, r}), do: "(#{ast_string(l)} , #{ast_string(r)})"
+  def ids({:add, l, r}), do: ids(l) ++ ids(r)
+  def ids({:sub, l, r}), do: ids(l) ++ ids(r)
+  def ids({:bit_and, l, r}), do: ids(l) ++ ids(r)
+  def ids({:bit_or, l, r}), do: ids(l) ++ ids(r)
+  def ids({:bit_xor, l, r}), do: ids(l) ++ ids(r)
+  def ids({:equal, l, r}), do: ids(l) ++ ids(r)
+  def ids({:greater, l, r}), do: ids(l) ++ ids(r)
+  def ids({:less, l, r}), do: ids(l) ++ ids(r)
+  def ids({:not_greater, l, r}), do: ids(l) ++ ids(r)
+  def ids({:not_less, l, r}), do: ids(l) ++ ids(r)
+  def ids({:unequal, l, r}), do: ids(l) ++ ids(r)
+  def ids({:log_and, l, r}), do: ids(l) ++ ids(r)
+  def ids({:log_or, l, r}), do: ids(l) ++ ids(r)
+  def ids({:log_xor, l, r}), do: ids(l) ++ ids(r)
+  def ids({:comma, l, r}), do: ids(l) ++ ids(r)
 
   # compound operators
-  def ast_string({:bundle, items}), do: "{#{ast_string_bundle_inner(",", items)}}"
-  def ast_string({:bundle_or, items}), do: "(#{ast_string_bundle_inner("|", items)})"
-  def ast_string({:bundle_and, items}), do: "(#{ast_string_bundle_inner("&", items)})"
-  def ast_string({:bundle_xor, items}), do: "(#{ast_string_bundle_inner("^", items)})"
+  def ids({:bundle, items}), do: Enum.reduce(items, [], fn x, acc -> ids(x) ++ acc end) 
+  def ids({:bundle_or, items}), do: Enum.reduce(items, [], fn x, acc -> ids(x) ++ acc end)
+  def ids({:bundle_and, items}), do: Enum.reduce(items, [], fn x, acc -> ids(x) ++ acc end)
+  def ids({:bundle_xor, items}), do: Enum.reduce(items, [], fn x, acc -> ids(x) ++ acc end)
+
+  def ids({:choice, condition, choices}) do
+    Enum.reduce(choices, ids(condition), fn x, acc -> ids(x) ++ acc end)
+  end
+
+  def ids({:ifs, conditions, choices}) do
+    l = Enum.reduce(choices, [], fn x, acc -> ids(x) ++ acc end)
+    Enum.reduce(conditions, l, fn x, acc -> ids(x) ++ acc end)
+  end
+
+  def ids({:cases, sub, cases, choices}) do
+    l = Enum.reduce(choices, ids(sub), fn x, acc -> ids(x) ++ acc end)
+    Enum.reduce(cases, l, fn x, acc -> ids(x) ++ acc end)
+  end
+
+  @doc """
+  ast_string(ast, callback)
+  return a string representation of ast. when encounter an id, use the callback for the string
+  generation
+  """
+  def ast_string({:const, 0, v}, _), do: to_string(v)
+  def ast_string({:const, w, v}, _), do: "#{w}'d#{v}"
+  # FIXME
+  def ast_string({:id, name}, f), do: f.(name)
+  def ast_string({:dup, sub, times}, f), do: "{#{times}{#{ast_string(sub, f)}}}"
+  def ast_string({:ext, sub, msb, lsb, -1}, f), do: "#{ast_string(sub, f)}[#{msb}:#{lsb}]"
+  def ast_string({:ext, sub, msb, lsb, step}, f), do: "#{ast_string(sub, f)}[#{msb}:#{lsb}:#{step}]"
+  
+  # unary operators
+  def ast_string({:bit_not, sub}, f), do: "(~ #{ast_string(sub, f)})"
+  def ast_string({:negate, sub}, f), do: "(- #{ast_string(sub, f)})"
+  def ast_string({:log_not, sub}, f), do: "(! #{ast_string(sub, f)})"
+  def ast_string({:bit_and, sub}, f), do: "(& #{ast_string(sub, f)})"
+  def ast_string({:bit_or, sub}, f), do: "(| #{ast_string(sub, f)})"
+  def ast_string({:bit_xor, sub}, f), do: "(^ #{ast_string(sub, f)})"
+
+  # binary operators
+  def ast_string({:add, l, r}, f), do: "(#{ast_string(l, f)} + #{ast_string(r, f)})"
+  def ast_string({:sub, l, r}, f), do: "(#{ast_string(l, f)} - #{ast_string(r, f)})"
+  def ast_string({:bit_and, l, r}, f), do: "(#{ast_string(l, f)} & #{ast_string(r, f)})"
+  def ast_string({:bit_or, l, r}, f), do: "(#{ast_string(l, f)} | #{ast_string(r, f)})"
+  def ast_string({:bit_xor, l, r}, f), do: "(#{ast_string(l, f)} ^ #{ast_string(r, f)})"
+  def ast_string({:equal, l, r}, f), do: "(#{ast_string(l, f)} == #{ast_string(r, f)})"
+  def ast_string({:greater, l, r}, f), do: "(#{ast_string(l, f)} > #{ast_string(r, f)})"
+  def ast_string({:less, l, r}, f), do: "(#{ast_string(l, f)} < #{ast_string(r, f)})"
+  def ast_string({:not_greater, l, r}, f), do: "(#{ast_string(l, f)} <= #{ast_string(r, f)})"
+  def ast_string({:not_less, l, r}, f), do: "(#{ast_string(l, f)} >= #{ast_string(r, f)})"
+  def ast_string({:unequal, l, r}, f), do: "(#{ast_string(l, f)} != #{ast_string(r, f)})"
+  def ast_string({:log_and, l, r}, f), do: "(#{ast_string(l, f)} && #{ast_string(r, f)})"
+  def ast_string({:log_or, l, r}, f), do: "(#{ast_string(l, f)} || #{ast_string(r, f)})"
+  def ast_string({:log_xor, l, r}, f), do: "(#{ast_string(l, f)} ^^ #{ast_string(r, f)})"
+  def ast_string({:comma, l, r}, f), do: "{#{ast_string(l, f)}, #{ast_string(r, f)}}"
+
+  # compound operators
+  def ast_string({:bundle, items}, f), do: "{#{ast_string_bundle(",", items, f)}}"
+  def ast_string({:bundle_or, items}, f), do: "(#{ast_string_bundle("|", items, f)})"
+  def ast_string({:bundle_and, items}, f), do: "(#{ast_string_bundle("&", items, f)})"
+  def ast_string({:bundle_xor, items}, f), do: "(#{ast_string_bundle("^", items, f)})"
 
   # FIXME: catch all
-  def ast_string(t), do: inspect(t)
+  def ast_string(t, _), do: inspect(t)
 
-  defp ast_string_bundle_inner(_, []), do: ""
-  defp ast_string_bundle_inner(_, [head]), do: ast_string(head)
-  defp ast_string_bundle_inner(op, [head | tail]) do
-    ast_string(head) <> op <> ast_string_bundle_inner(op, tail)
+  defp ast_string_bundle(_, [], _), do: ""
+  defp ast_string_bundle(_, [head], f), do: ast_string(head, f)
+  defp ast_string_bundle(op, [head | tail], f) do
+    ast_string(head, f) <> op <> ast_string_bundle(op, tail, f)
   end
 
   @doc """

@@ -5,8 +5,11 @@ defmodule Danm.Schematic do
 
   alias Danm.Entity
   alias Danm.BlackBox
+  alias Danm.Schematic
   alias Danm.Sink
+  alias Danm.ComboLogic
   alias Danm.Library
+  alias Danm.WireExpr
 
   @doc """
   A schematic is an extention of a black box.
@@ -19,17 +22,24 @@ defmodule Danm.Schematic do
   for wire as expression the tuple is {:expr, expr}
   module is the elixir module that it is defined in
   """
-  defstruct name: nil,
+  defstruct [
+    :name,
+    :module,
     src: "",
     ports: %{},
     params: %{},
     insts: %{},
     wires: %{},
-    module: nil
+  ]
 
   defimpl Entity do
 
-    def elaborate(b), do: apply(b.module, :build, [b])
+    def elaborate(b) do
+      b.module
+      |> apply(:build, [b])
+      |> resolve_logic()
+      |> resolve_port_width()
+    end
 
     def doc_string(b) do
       cond do
@@ -45,12 +55,72 @@ defmodule Danm.Schematic do
     def ports(b), do: b.ports |> Map.keys()
     def port_at(b, name), do: b.ports[name]
 
+    defp resolve_logic(b) do
+      {map, changes} = Enum.reduce(b.insts, {%{}, 0}, fn {i_name, inst}, {map, changes} ->
+	case inst.__struct__ do
+	  t when t in [BlackBox, Schematic] -> {Map.put(map, i_name, inst), changes}
+	  _ ->
+	    inst_new = inst |> resolve_inputs(in: b) |> Entity.elaborate()
+	    cond do
+	      inst_new === inst -> {Map.put(map, i_name, inst), changes}
+	      true -> {Map.put(map, i_name, inst_new), changes + 1}
+	    end
+	end
+      end)
+      b = %{b | insts: map}
+      if changes > 0, do: resolve_logic(b), else: b
+    end
+
+    defp resolve_inputs(inst, in: s) do
+      inst.inputs
+      |> Enum.reduce(inst, fn {p_name, w}, inst ->
+	w_new = Schematic.width_of_wire(s, s.wires[p_name])
+	cond do
+	  w_new == w -> inst
+	  true -> Sink.set_input(inst, p_name, w_new)
+	end
+      end)
+    end
+
+    defp resolve_port_width(b) do
+      new_ports = Enum.reduce(b.ports, %{}, fn {p_name, {dir, _}}, map ->
+	Map.put(map, p_name, {dir, Schematic.width_of_wire(b, b.wires[p_name])})
+      end)
+      %{b | ports: new_ports}
+    end
+
   end
 
   # simple accessors
   defp set_instance(s, n, to: i), do: %{s | insts: Map.put(s.insts, n, i)}
-  defp set_wire(s, n, conns: c), do: %{s | wires: Map.put(s.wires, n, c)}
-  defp merge_wire(s, n, conns: c), do: %{s | wires: Map.put(s.wires, n, c ++ s.wires[n])}
+  defp set_wire(s, n, c), do: %{s | wires: Map.put(s.wires, n, [c])}
+  defp merge_wire(s, n, c), do: %{s | wires: Map.put(s.wires, n, [ c | s.wires[n] ])}
+
+  defp conjure_wire(s, n, conns: c) do
+    list = cond do
+      Map.has_key?(s.wires, n) -> s.wires[n]
+      true -> []
+    end
+    # make sure conns are valid
+    list = Enum.reduce(c, list, fn {inst, port}, list ->
+      case inst do
+	:self ->
+	  if s.ports[port] == nil do
+	    raise "Port of name #{port} is not found in design #{s.name}"
+	  end
+	_ ->
+	  case s.insts[inst] do
+	    nil -> raise "Instance of name #{inst} is not found in design #{s.name}"
+	    i ->
+	      if Entity.port_at(i, port) == nil do
+		raise "Port of name #{port} is not found in design #{i.name}"
+	      end
+	  end
+      end
+      [ {inst, port} | list ]
+    end)
+    %{s | wires: Map.put(s.wires, n, list)}
+  end
 
   @doc ~S"""
   add a sub module instance.
@@ -83,7 +153,7 @@ defmodule Danm.Schematic do
       true -> 
 	s
 	|> BlackBox.set_port(name, dir: :input, width: options[:width] || 1)
-	|> set_wire(name, conns: [{:self, name}])
+	|> set_wire(name, {:self, name})
     end
   end
 
@@ -98,17 +168,10 @@ defmodule Danm.Schematic do
     conns = Enum.map(conns, fn each ->
       case each do
 	{inst, port} -> {inst, port}
-	pin ->
-	  pin
-	  |> String.split("/", parts: 2)
-	  |> List.to_tuple()
+	pin -> pin |> String.split("/", parts: 2) |> List.to_tuple()
       end
     end)
-    name = options[:as] || elem(hd(conns), 1)
-    cond do
-      Map.has_key?(s.wires, name) -> merge_wire(s, name, conns: conns)
-      true -> set_wire(s, name, conns: conns)
-    end
+    conjure_wire(s, options[:as] || elem(hd(conns), 1), conns: conns)
   end
 
   @doc ~S"""
@@ -130,15 +193,14 @@ defmodule Danm.Schematic do
   """
   def sink(s, l) when is_list(l), do: Enum.reduce(l, s, fn x, s -> sink(s, x) end)
   def sink(s, name) when is_binary(name) do
-    unless Map.has_key?(s.wires, name), do: raise "Wire by the name of #{name} is not found"
-    w = width_of_conns(s, s.wires[name])
-    sink = case s.insts["_sink"] do
-	     nil -> Sink.new_sink(name, w)
-	     sink -> Sink.set_port(sink, name, w)
-	   end
+    sink =
+      case s.insts["_sink"] do
+	nil -> Sink.new(name)
+	sink -> Sink.set_input(sink, name)
+      end
     s
-    |> merge_wire(name, conns: [{"_sink", name}])
     |> set_instance("_sink", to: sink)
+    |> conjure_wire(name, conns: [{"_sink", name}])
   end
 
   @doc ~S"""
@@ -160,13 +222,13 @@ defmodule Danm.Schematic do
   return driver count, load count and calculated width
   """
   def inspect_wire(s, name) do
-    Enum.reduce(s.wires[name], {0, 0, 1},
+    Enum.reduce(s.wires[name], {0, 0, 0},
       fn {ins, port}, {drivers, loads, width} ->
-	{dir, w} = case ins do
-		     :self -> inverse_port(s.ports[port])
-		     _ -> s |> Entity.sub_module_at(ins) |> Entity.port_at(port)
-		   end
-	{drivers + driver_count(dir), loads + load_count(dir), max(w, width)}
+	{dir, w} = pin_property(s, ins, port)
+	dc = driver_count(dir)
+	{drivers + dc,
+	 loads + load_count(dir),
+	 (if dc > 0, do: w, else: max(width, w))}
       end)
   end
 
@@ -174,14 +236,18 @@ defmodule Danm.Schematic do
   produce a map of w_name -> width for the design
   """
   def wire_width_map(s) do
-    Map.new(s.wires, fn {w_name, conns} -> {w_name, width_of_conns(s, conns)} end)
+    Map.new(s.wires, fn {w_name, conns} -> {w_name, width_of_wire(s, conns)} end)
   end
 
-  defp width_of_conns(s, conns) do
-    Enum.reduce_while(conns, 1, fn {ins, port}, width ->
-      case ins do
-	:self -> {:halt, elem(s.ports[port], 1)}
-	_ -> {:cont, max(width, elem(s |> Entity.sub_module_at(ins) |> Entity.port_at(port), 1))}
+  @doc ~S"""
+  return the width of a wire. First driver rules, failing that, the widest load
+  """
+  def width_of_wire(s, conns) do
+    Enum.reduce_while(conns, 0, fn {ins, port}, width ->
+      {dir, w} = pin_property(s, ins, port)
+      case driver_count(dir) do
+	0 -> {:cont, max(width, w)}
+	_ -> {:halt, w}
       end
     end)
   end
@@ -189,7 +255,7 @@ defmodule Danm.Schematic do
   defp force_expose(s, name, dir: dir, width: width) do
     s
     |> BlackBox.set_port(name, dir: dir, width: width)
-    |> merge_wire(name, conns: [{:self, name}])
+    |> merge_wire(name, {:self, name})
   end
 
   @doc ~S"""
@@ -243,8 +309,7 @@ defmodule Danm.Schematic do
       drivers > 1 -> s
       width < 0 -> s
       pins == [] -> s
-      Map.has_key?(s.wires, name) -> merge_wire(s, name, conns: pins)
-      true -> set_wire(s, name, conns: pins)
+      true -> conjure_wire(s, name, conns: pins)
     end
   end
 
@@ -257,11 +322,20 @@ defmodule Danm.Schematic do
     end
   end
 
-  defp inverse_port({dir, w}) do
+  defp inverse_dir(dir) do
    case dir do
-      :input -> {:output, w}
-      :output -> {:input, w}
-      :inout -> {:inout, w}
+      :input -> :output
+      :output -> :input
+      :inout -> :inout
+    end
+  end
+
+  defp pin_property(s, i_name, p_name) do
+    case i_name do
+      :self ->
+	{dir, w} = Entity.port_at(s, p_name)
+	{inverse_dir(dir), w}
+      _ -> s |> Entity.sub_module_at(i_name) |> Entity.port_at(p_name)
     end
   end
 
@@ -279,6 +353,44 @@ defmodule Danm.Schematic do
       :output -> 0
       :inout -> 1
     end
+  end
+
+  defp inst_order_of(i, s) do
+    order_map = %{
+      BlackBox => 0,
+      Schematic => 1,
+      ComboLogic => 2,
+      Sink => 9
+    }
+    Map.fetch!(order_map, Entity.sub_module_at(s, i).__struct__)
+  end
+
+  defp compare_inst(oa, a, ob, b) do
+    cond do
+      oa < ob -> true
+      oa > ob -> false
+      true -> a <= b
+    end
+  end
+
+  @doc ~S"""
+  return a sorted list of instances
+  """
+  def sort_sub_modules(s) do
+    s
+    |> Entity.sub_modules()
+    |> Enum.sort(fn a, b -> compare_inst(inst_order_of(a, s), a, inst_order_of(b, s), b) end)
+  end
+
+  @doc ~S"""
+  assign an expression to a wire
+  """
+  def let(s, n, be: str) do
+    cl = str |> WireExpr.parse() |> ComboLogic.new(as: n)
+    cl
+    |> Entity.ports()
+    |> Enum.reduce(set_instance(s, n, to: cl), fn p_name, s ->
+      conjure_wire(s, p_name, conns: [{n, p_name}]) end)
   end
 
 end

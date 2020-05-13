@@ -5,6 +5,7 @@ defmodule Danm.VerilogPrinting do
 
   alias Danm.Entity
   alias Danm.Sink
+  alias Danm.ComboLogic
   alias Danm.BlackBox
   alias Danm.Schematic
 
@@ -67,7 +68,8 @@ defmodule Danm.VerilogPrinting do
     case s.__struct__ do
       BlackBox -> copy_self_verilog(state, ref)
       Schematic ->
-	Entity.sub_modules(s)
+	s
+	|> Schematic.sort_sub_modules()
 	|> Enum.map(fn n -> Entity.sub_module_at(s, n) end)
 	|> Enum.reject(fn s -> inlined?(s) end)
 	|> Enum.reduce(print_self_verilog(state, ref),
@@ -103,8 +105,7 @@ defmodule Danm.VerilogPrinting do
   defp print_self_verilog(state, ref) do
     s = current_design(state)
     f = state.stream
-    sorted_ports = Enum.sort(Entity.ports(s), fn a, b ->
-      compare_port(dir_of(a, s), a, dir_of(b, s), b) end)
+    sorted_ports = BlackBox.sort_ports(s)
 
     port_string = Enum.join(sorted_ports, ",\n\t")
     IO.write(f, ~s"""
@@ -130,6 +131,7 @@ defmodule Danm.VerilogPrinting do
       p_value = s.params[p_name]
       IO.write(f, "    parameter #{p_name} = #{p_value};\n")
     end)
+    IO.write(f, "\n")
 
     map = Schematic.wire_width_map(s)
     s.wires
@@ -147,11 +149,12 @@ defmodule Danm.VerilogPrinting do
 
     map = Schematic.pin_to_wire_map(s)
     state =
-      Entity.sub_modules(s)
-      |> Enum.sort(:asc)
+      s
+      |> Schematic.sort_sub_modules()
       |> Enum.reduce(state, fn i_name, state ->
       case Entity.sub_module_at(s, i_name).__struct__ do
-	Sink -> state
+	Sink -> print_one_sink(state, i_name)
+	ComboLogic -> print_one_combo_logic(state, i_name)
 	_ -> print_one_instance(state, i_name, with: map)
       end
     end)
@@ -160,18 +163,11 @@ defmodule Danm.VerilogPrinting do
     state
   end
 
-  defp compare_port(dir_a, a, dir_b, b) do
-    cond do
-      dir_a < dir_b -> true
-      dir_a > dir_b -> false
-      true -> a <= b
-    end
-  end
-
   defp module_to_key(s) do
     case s.__struct__ do
       BlackBox -> s.name
       Schematic -> {s.name, s.params}
+      # anything else should not hava a key
     end
   end
 
@@ -196,8 +192,6 @@ defmodule Danm.VerilogPrinting do
 	    end}
   end
 
-  defp dir_of(p, s), do: elem(Entity.port_at(s, p), 0)
-
   defp print_one_instance(state, i_name, with: map) do
     s = current_design(state)
     f = state.stream
@@ -205,15 +199,16 @@ defmodule Danm.VerilogPrinting do
     key = module_to_key(inst)
     ref = key_to_ref(state, key)
     IO.write(f, ~s"""
-    // instance of #{Entity.type_string(inst)}}
+    // instance of #{Entity.type_string(inst)}
         #{ref} #{i_name}(
     """)
 
-    conns_str = Entity.ports(inst)
-    |> Enum.sort(fn a, b -> compare_port(dir_of(a, inst), a, dir_of(b, inst), b) end)
-    |> Enum.filter(fn p_name -> Map.has_key?(map, "#{i_name}/#{p_name}") end)
-    |> Enum.map(fn p_name -> ".#{p_name}("<>map["#{i_name}/#{p_name}"] <> ")" end)
-    |> Enum.join(",\n\t")
+    conns_str =
+      inst
+      |> BlackBox.sort_ports()
+      |> Enum.filter(fn p_name -> Map.has_key?(map, "#{i_name}/#{p_name}") end)
+      |> Enum.map(fn p_name -> ".#{p_name}("<>map["#{i_name}/#{p_name}"] <> ")" end)
+      |> Enum.join(",\n\t")
 
     IO.write(f, "\t#{conns_str});\n")
     inst.params
@@ -225,6 +220,35 @@ defmodule Danm.VerilogPrinting do
     end)
     IO.write(f, "\n")
     setup_key_ref(state, key, ref)
+  end
+
+  defp print_one_sink(state, i_name) do
+    s = current_design(state)
+    f = state.stream
+    inst = Entity.sub_module_at(s, i_name)
+    IO.write(f, "// instance of #{Entity.type_string(inst)}\n")
+    inst
+    |> Entity.ports()
+    |> Enum.sort(:asc)
+    |> Enum.each(fn p_name ->
+      IO.write(f, "//\t sink(#{p_name});\n")
+    end)
+    IO.write(f, "\n")
+    state
+  end
+
+  defp print_one_combo_logic(state, i_name) do
+    s = current_design(state)
+    f = state.stream
+    inst = Entity.sub_module_at(s, i_name)
+    str = ComboLogic.exp_string(inst, fn str ->
+      cond do
+	String.contains?(str, "/") -> "\\" <> str <> " "
+	true -> str
+      end
+    end)
+    IO.write(f, "    assign #{i_name} = #{str};\n")
+    state
   end
 
 end

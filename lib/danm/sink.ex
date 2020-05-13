@@ -8,7 +8,7 @@ defmodule Danm.Sink do
   @doc """
   A sink is super simple, however I need to make it a full struct to be an entity
   """
-  defstruct ports: %{}
+  defstruct inputs: %{}
 
   defimpl Entity do
 
@@ -17,10 +17,18 @@ defmodule Danm.Sink do
     def type_string(_), do: "sink"
     def sub_modules(_), do: []
     def sub_module_at(_, _), do: nil
-    def ports(b), do: b.ports |> Map.keys()
-    def port_at(b, name), do: (if b.ports[name], do: {:input, b.ports[name]})
+    def ports(b), do: b.inputs |> Map.keys()
+    def port_at(b, name), do: (if b.inputs[name], do: {:input, b.inputs[name]})
   end
 
-  def set_port(b, n, w), do: %{b | ports: Map.put(b.ports, n, w)}
-  def new_sink(n, w), do: %__MODULE__{ports: %{n => w}}
+  @doc """
+  add/change an input of a sink. all width assume to be 0 if absent
+  """
+  def set_input(b, n), do: %{b | inputs: Map.put(b.inputs, n, 0)}
+  def set_input(b, n, w), do: %{b | inputs: Map.put(b.inputs, n, w)}
+
+  @doc """
+  create a sink. all width assume to be 0 for now
+  """
+  def new(n), do: %__MODULE__{inputs: %{n => 0}}
 end
