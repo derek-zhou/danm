@@ -8,6 +8,7 @@ defmodule Danm.Schematic do
   alias Danm.Schematic
   alias Danm.Sink
   alias Danm.ComboLogic
+  alias Danm.BundleLogic
   alias Danm.Library
   alias Danm.WireExpr
 
@@ -50,8 +51,6 @@ defmodule Danm.Schematic do
 
     def type_string(b), do: "schematic: " <> b.name
 
-    def sub_modules(b), do: b.insts |> Map.keys()
-    def sub_module_at(b, name), do: b.insts[name]
     def ports(b), do: b.ports |> Map.keys()
     def port_at(b, name), do: b.ports[name]
 
@@ -252,6 +251,16 @@ defmodule Danm.Schematic do
     end)
   end
 
+  @doc ~S"""
+  return the driver of wire as a conn tuple.
+  """
+  def driver_of_wire(s, conns) do
+    Enum.find(conns, fn {ins, port} ->
+      {dir, _} = pin_property(s, ins, port)
+      driver_count(dir) > 0
+    end)
+  end
+
   defp force_expose(s, name, dir: dir, width: width) do
     s
     |> BlackBox.set_port(name, dir: dir, width: width)
@@ -335,7 +344,7 @@ defmodule Danm.Schematic do
       :self ->
 	{dir, w} = Entity.port_at(s, p_name)
 	{inverse_dir(dir), w}
-      _ -> s |> Entity.sub_module_at(i_name) |> Entity.port_at(p_name)
+      _ -> Entity.port_at(s.insts[i_name], p_name)
     end
   end
 
@@ -362,7 +371,7 @@ defmodule Danm.Schematic do
       ComboLogic => 2,
       Sink => 9
     }
-    Map.fetch!(order_map, Entity.sub_module_at(s, i).__struct__)
+    Map.fetch!(order_map, s.insts[i].__struct__)
   end
 
   defp compare_inst(oa, a, ob, b) do
@@ -377,20 +386,33 @@ defmodule Danm.Schematic do
   return a sorted list of instances
   """
   def sort_sub_modules(s) do
-    s
-    |> Entity.sub_modules()
+    s.insts
+    |> Map.keys()
     |> Enum.sort(fn a, b -> compare_inst(inst_order_of(a, s), a, inst_order_of(b, s), b) end)
   end
 
   @doc ~S"""
   assign an expression to a wire
   """
-  def let(s, n, be: str) do
+  def assign(s, str, as: n) do
     cl = str |> WireExpr.parse() |> ComboLogic.new(as: n)
-    cl
+    s |> set_instance(n, to: cl) |> connect_wires(cl, n)
+  end
+
+  @doc ~S"""
+  bundle expressions to a wire with given op
+  """
+  def bundle(s, strs, as: n), do: bundle(s, strs, with: :comma, as: n)
+  def bundle(s, strs, with: op, as: n) do
+    exprs = Enum.map(strs, fn str -> WireExpr.parse(str) end)
+    bl = BundleLogic.new(op, exprs, as: n)
+    s |> set_instance(n, to: bl) |> connect_wires(bl, n)
+  end
+
+  defp connect_wires(s, inst, n) do
+    inst
     |> Entity.ports()
-    |> Enum.reduce(set_instance(s, n, to: cl), fn p_name, s ->
-      conjure_wire(s, p_name, conns: [{n, p_name}]) end)
+    |> Enum.reduce(s, fn p_name, s -> conjure_wire(s, p_name, conns: [{n, p_name}]) end)
   end
 
 end

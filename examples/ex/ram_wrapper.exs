@@ -9,7 +9,7 @@ defmodule Danm.Schematic.RamWrapper do
     |> add("spram_simple", as: "lo", parameters: %{"width" => w})
     |> connect(["hi/dout"], as: "hi_dout")
     |> connect(["lo/dout"], as: "lo_dout")
-    |> let("dout", be: "hi_dout, lo_dout")
+    |> assign("hi_dout, lo_dout", as: "dout")
     |> auto_connect()
     |> auto_expose()
   end

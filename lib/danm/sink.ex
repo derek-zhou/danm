@@ -15,8 +15,6 @@ defmodule Danm.Sink do
     def elaborate(b), do: b
     def doc_string(_), do: "Just a sink"
     def type_string(_), do: "sink"
-    def sub_modules(_), do: []
-    def sub_module_at(_, _), do: nil
     def ports(b), do: b.inputs |> Map.keys()
     def port_at(b, name), do: (if b.inputs[name], do: {:input, b.inputs[name]})
   end

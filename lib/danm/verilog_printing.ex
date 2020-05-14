@@ -6,6 +6,7 @@ defmodule Danm.VerilogPrinting do
   alias Danm.Entity
   alias Danm.Sink
   alias Danm.ComboLogic
+  alias Danm.BundleLogic
   alias Danm.BlackBox
   alias Danm.Schematic
 
@@ -70,7 +71,7 @@ defmodule Danm.VerilogPrinting do
       Schematic ->
 	s
 	|> Schematic.sort_sub_modules()
-	|> Enum.map(fn n -> Entity.sub_module_at(s, n) end)
+	|> Enum.map(fn n -> s.insts[n] end)
 	|> Enum.reject(fn s -> inlined?(s) end)
 	|> Enum.reduce(print_self_verilog(state, ref),
 	  fn inst, state -> print_full_verilog(state, inst) end)
@@ -136,13 +137,13 @@ defmodule Danm.VerilogPrinting do
     map = Schematic.wire_width_map(s)
     s.wires
     |> Map.keys()
-    |> Enum.filter(fn x -> Entity.port_at(s, x) == nil end)
     |> Enum.sort(:asc)
     |> Enum.each(fn w_name ->
       width = map[w_name]
+      wire_type = wire_type(s, w_name)
       case width do
-	1 -> IO.write(f, "    wire #{w_name};\n")
-	_ -> IO.write(f, "    wire [#{width - 1}:0] #{w_name};\n")
+	1 -> IO.write(f, "    #{wire_type} #{w_name};\n")
+	_ -> IO.write(f, "    #{wire_type} [#{width - 1}:0] #{w_name};\n")
       end
     end)
     IO.write(f, "\n")
@@ -152,15 +153,29 @@ defmodule Danm.VerilogPrinting do
       s
       |> Schematic.sort_sub_modules()
       |> Enum.reduce(state, fn i_name, state ->
-      case Entity.sub_module_at(s, i_name).__struct__ do
+      case s.insts[i_name].__struct__ do
+	t when t in [ComboLogic, BundleLogic] ->
+	  print_one_simple_logic(state, i_name)
 	Sink -> print_one_sink(state, i_name)
-	ComboLogic -> print_one_combo_logic(state, i_name)
 	_ -> print_one_instance(state, i_name, with: map)
       end
     end)
 
     IO.write(f, "endmodule // #{ref}\n\n")
     state
+  end
+
+  defp wire_type(s, w_name) do
+    {di, _} = Schematic.driver_of_wire(s, s.wires[w_name])
+    case di do
+      :self -> "wire"
+      _ -> case s.insts[di].__struct__ do
+	     BlackBox -> "wire"
+	     Schematic -> "wire"
+	     ComboLogic -> "wire"
+	     _ -> "reg"
+	   end
+    end
   end
 
   defp module_to_key(s) do
@@ -195,7 +210,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_instance(state, i_name, with: map) do
     s = current_design(state)
     f = state.stream
-    inst = Entity.sub_module_at(s, i_name)
+    inst = s.insts[i_name]
     key = module_to_key(inst)
     ref = key_to_ref(state, key)
     IO.write(f, ~s"""
@@ -225,7 +240,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_sink(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = Entity.sub_module_at(s, i_name)
+    inst = s.insts[i_name]
     IO.write(f, "// instance of #{Entity.type_string(inst)}\n")
     inst
     |> Entity.ports()
@@ -237,11 +252,15 @@ defmodule Danm.VerilogPrinting do
     state
   end
 
-  defp print_one_combo_logic(state, i_name) do
+  defp print_one_simple_logic(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = Entity.sub_module_at(s, i_name)
-    str = ComboLogic.exp_string(inst, fn str ->
+    inst = s.insts[i_name]
+    expr_fn = case inst.__struct__ do
+		ComboLogic -> &ComboLogic.expr_string/2
+		BundleLogic -> &BundleLogic.expr_string/2
+	      end
+    str = expr_fn.(inst, fn str ->
       cond do
 	String.contains?(str, "/") -> "\\" <> str <> " "
 	true -> str

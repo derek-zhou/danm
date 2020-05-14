@@ -22,8 +22,6 @@ defmodule Danm.ComboLogic do
 
     def doc_string(_), do: "Just a combo logic"
     def type_string(_), do: "combo logic"
-    def sub_modules(_), do: []
-    def sub_module_at(_, _), do: nil
     def ports(b), do: [ b.output | Map.keys(b.inputs) ]
 
     def port_at(b, name) do
@@ -39,14 +37,14 @@ defmodule Danm.ComboLogic do
   @doc """
   create a combo logic. all width assume to be 0 for now
   """
-  def new(exp, as: n) do
-    map = exp |> WireExpr.ids() |> Enum.map(fn x -> {x, 0} end) |> Map.new()
-    %__MODULE__{expr: exp, output: n, inputs: map}
+  def new(expr, as: n) do
+    map = expr |> WireExpr.ids() |> Enum.map(fn x -> {x, 0} end) |> Map.new()
+    %__MODULE__{expr: expr, output: n, inputs: map}
   end
 
   @doc """
   a string representation of the exp
   """
-  def exp_string(c, f), do: WireExpr.ast_string(c.expr, f)
+  def expr_string(c, f), do: WireExpr.ast_string(c.expr, f)
 
 end

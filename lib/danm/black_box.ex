@@ -24,8 +24,6 @@ defmodule Danm.BlackBox do
 
     def doc_string(b), do: b.comment
     def type_string(b), do: "black box: " <> b.name
-    def sub_modules(_), do: []
-    def sub_module_at(_, _), do: nil
     def ports(b), do: b.ports |> Map.keys()
     def port_at(b, name), do: b.ports[name]
 

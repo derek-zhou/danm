@@ -6,12 +6,6 @@ defmodule Danm.WireExpr do
   use Bitwise, only_operators: true
 
   @doc """
-  width(ast)
-  return the width of the ast
-  """
-  def width(x), do: width(x, in: %{})
-
-  @doc """
   width(ast, in: context)
   return the width of the ast inside the context
   """
@@ -46,17 +40,15 @@ defmodule Danm.WireExpr do
   def width({:log_xor, _, _}, in: _), do: 1
   def width({:comma, l, r}, in: con), do: sum_width(l, r, con)
 
+  # a?b:c operator
+  def width({:cond, _, l, r}, in: con), do: max_width(l, r, con)
+
   # compound operators
-  def width({:bundle, items}, in: con), do: sum_width(items, con)
-  def width({:bundle_or, items}, in: con), do: max_width(items, con)
-  def width({:bundle_and, items}, in: con), do: max_width(items, con)
-  def width({:bundle_xor, items}, in: con), do: max_width(items, con)
   def width({:choice, _, choices}, in: con), do: max_width(choices, con)
   def width({:ifs, _, choices}, in: con), do: max_width(choices, con)
   def width({:cases, _, _, choices}, in: con), do: max_width(choices, con)
 
   defp sum_width(l, r, con), do: width(l, in: con) + width(r, in: con)
-  defp sum_width(items, con), do: Enum.reduce(items, 0, &(width(&1, in: con) + &2))
   defp max_width(l, r, con), do: max(width(l, in: con), width(r, in: con))
   defp max_width(items, con), do: Enum.reduce(items, 0, &(max(width(&1, in: con), &2)))
 
@@ -93,12 +85,10 @@ defmodule Danm.WireExpr do
   def ids({:log_xor, l, r}), do: ids(l) ++ ids(r)
   def ids({:comma, l, r}), do: ids(l) ++ ids(r)
 
-  # compound operators
-  def ids({:bundle, items}), do: Enum.reduce(items, [], fn x, acc -> ids(x) ++ acc end) 
-  def ids({:bundle_or, items}), do: Enum.reduce(items, [], fn x, acc -> ids(x) ++ acc end)
-  def ids({:bundle_and, items}), do: Enum.reduce(items, [], fn x, acc -> ids(x) ++ acc end)
-  def ids({:bundle_xor, items}), do: Enum.reduce(items, [], fn x, acc -> ids(x) ++ acc end)
+  # a?b:c operator
+  def ids({:cond, c, l, r}), do: ids(c) ++ ids(l) ++ ids(r)
 
+  # compound operators
   def ids({:choice, condition, choices}) do
     Enum.reduce(choices, ids(condition), fn x, acc -> ids(x) ++ acc end)
   end
@@ -151,20 +141,12 @@ defmodule Danm.WireExpr do
   def ast_string({:log_xor, l, r}, f), do: "(#{ast_string(l, f)} ^^ #{ast_string(r, f)})"
   def ast_string({:comma, l, r}, f), do: "{#{ast_string(l, f)}, #{ast_string(r, f)}}"
 
-  # compound operators
-  def ast_string({:bundle, items}, f), do: "{#{ast_string_bundle(",", items, f)}}"
-  def ast_string({:bundle_or, items}, f), do: "(#{ast_string_bundle("|", items, f)})"
-  def ast_string({:bundle_and, items}, f), do: "(#{ast_string_bundle("&", items, f)})"
-  def ast_string({:bundle_xor, items}, f), do: "(#{ast_string_bundle("^", items, f)})"
+  # a?b:c operator
+  def ast_string({:cond, c, l, r}, f),
+    do: "(#{ast_string(c, f)} ? #{ast_string(l, f)} : #{ast_string(r, f)})"
 
   # FIXME: catch all
   def ast_string(t, _), do: inspect(t)
-
-  defp ast_string_bundle(_, [], _), do: ""
-  defp ast_string_bundle(_, [head], f), do: ast_string(head, f)
-  defp ast_string_bundle(op, [head | tail], f) do
-    ast_string(head, f) <> op <> ast_string_bundle(op, tail, f)
-  end
 
   @doc """
   parse(str)
@@ -175,7 +157,7 @@ defmodule Danm.WireExpr do
    2. unary operator
    4. binary operators with 2 chars: == != >= <= && || ^^
    3. binary operator with single char: +-&|^,><
-   5, ?::
+   5, ?:
 
    The above order is important, so that a && b will be (a && b) not (a & (&b))
 
@@ -191,9 +173,10 @@ defmodule Danm.WireExpr do
     case expect_token(s, "?") do
       {:error, s} -> {condition, s}
       {:ok, s} ->
-	{first, s} = parse_segment(s)
-	{choices, s} = parse_choices_chain(s)
-	{{:choice, condition, [first | choices]}, s}
+	{true_case, s} = parse_segment(s)
+	s = expect_token!(s, ":")
+	{false_case, s} = parse_segment(s)
+	{{:cond, condition, true_case, false_case}, s}
     end
   end
 
@@ -210,16 +193,6 @@ defmodule Danm.WireExpr do
   end
 
   defp skip_token(s, t), do: elem(expect_token(s, t), 1)
-
-  defp parse_choices_chain(s) do
-    case expect_token(s, ":") do
-      {:error, s} -> {[], s}
-      {:ok, s} ->
-	{this, s} = parse_segment(s)
-	{rest, s} = parse_choices_chain(s)
-	{[this | rest], s}
-    end
-  end
 
   defp parse_segment(s) do
     {l, s} = parse_segment_higher(s)

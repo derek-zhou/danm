@@ -6,6 +6,7 @@ defmodule Danm.HtmlPrinting do
   alias Danm.Entity
   alias Danm.Sink
   alias Danm.ComboLogic
+  alias Danm.BundleLogic
   alias Danm.Schematic
   alias Danm.BlackBox
 
@@ -41,33 +42,40 @@ defmodule Danm.HtmlPrinting do
   print html fragment that contains hier index to f
   """
   def print_html_hier(s, f, as: hier) do
-    subs = printable_sub_modules(s)
-    if !Enum.empty?(subs) do
-      IO.write(f, "<ul>\n")
-      Enum.each(subs, fn i_name ->
-	inst = Entity.sub_module_at(s, i_name)
-	IO.write(f, ~s"""
-	<li><a href="#{hier}/#{i_name}.html">#{i_name}</a>
-	(#{Entity.type_string(inst)})</li>
-	""")
-	print_html_hier(inst, f, as: hier <> "/" <> i_name)
-      end)
-      IO.write(f, "</ul>\n")
+    case s.__struct__ do
+      Schematic ->
+	subs = printable_sub_modules(s)
+	if !Enum.empty?(subs) do
+	  IO.write(f, "<ul>\n")
+	  Enum.each(subs, fn i_name ->
+	    inst = s.insts[i_name]
+	    IO.write(f, ~s"""
+	    <li><a href="#{hier}/#{i_name}.html">#{i_name}</a>
+	    (#{Entity.type_string(inst)})</li>
+	    """)
+	    print_html_hier(inst, f, as: hier <> "/" <> i_name)
+	  end)
+	  IO.write(f, "</ul>\n")
+	end
+      _ -> nil
     end
-    s
   end
 
   @doc ~S"""
   generate html for myself and everything below
   """
   def generate_html(s, as: hier, in: dir) do
-    subs = printable_sub_modules(s)
-    if !Enum.empty?(subs) do
-      File.mkdir("#{dir}/#{hier}")
-      Enum.each(subs, fn i_name ->
-	inst = Entity.sub_module_at(s, i_name)
-	generate_html(inst, as: "#{hier}/#{i_name}", in: dir)
-      end)
+    case s.__struct__ do
+      Schematic ->
+	subs = printable_sub_modules(s)
+	if !Enum.empty?(subs) do
+	  File.mkdir("#{dir}/#{hier}")
+	  Enum.each(subs, fn i_name ->
+	    inst = s.insts[i_name]
+	    generate_html(inst, as: "#{hier}/#{i_name}", in: dir)
+	  end)
+	end
+      _ -> nil
     end
     generate_own_html(s, as: hier, in: dir)
   end
@@ -79,20 +87,25 @@ defmodule Danm.HtmlPrinting do
     f = File.open!("#{dir}/#{hier}.html", [:write, :utf8])
     print_html_header(s, f, as: hier)
     print_html_ports(s, f)
-    subs = Schematic.sort_sub_modules(s)
-    if !Enum.empty?(subs) do
-      print_html_instance_summary(s, f, subs, as: hier)
-      map = Schematic.pin_to_wire_map(s)
-      IO.write(f, "<ul>\n")
-      Enum.each(subs, fn i_name ->
-	inst = Entity.sub_module_at(s, i_name)
-	case inst.__struct__ do
-	  Sink -> print_html_sink(inst, f, as: "#{i_name}")
-	  ComboLogic -> print_html_combo_logic(inst, f, as: "#{i_name}")
-	  _ -> print_html_instance(inst, f, as: "#{hier}/#{i_name}", lookup: map)
+    case s.__struct__ do
+      Schematic ->
+	subs = Schematic.sort_sub_modules(s)
+	if !Enum.empty?(subs) do
+	  print_html_instance_summary(s, f, subs, as: hier)
+	  map = Schematic.pin_to_wire_map(s)
+	  IO.write(f, "<ul>\n")
+	  Enum.each(subs, fn i_name ->
+	    inst = s.insts[i_name]
+	    case inst.__struct__ do
+	      t when t in [ComboLogic, BundleLogic] ->
+		print_html_simple_logic(inst, f, as: "#{i_name}")
+	      Sink -> print_html_sink(inst, f, as: "#{i_name}")
+	      _ -> print_html_instance(inst, f, as: "#{hier}/#{i_name}", lookup: map)
+	    end
+	  end)
+	  IO.write(f, "</ul><hr/>\n")
 	end
-      end)
-      IO.write(f, "</ul><hr/>\n")
+      _ -> nil
     end
     print_html_wires(s, f, as: hier)
     print_html_footer(f)
@@ -121,7 +134,7 @@ defmodule Danm.HtmlPrinting do
   defp printable_sub_modules(s) do
     s
     |> Schematic.sort_sub_modules()
-    |> Enum.reject(fn n -> inlined?(Entity.sub_module_at(s, n)) end)
+    |> Enum.reject(fn n -> inlined?(s.insts[n]) end)
   end
 
   defp get_top_path(hier) do
@@ -183,9 +196,9 @@ defmodule Danm.HtmlPrinting do
     count = Enum.count(subs)
     IO.write(f, "<h2>#{count} Instances</h2><table><tr><th>instance</th><th>module</th></tr>\n")
     Enum.each(subs, fn i_name ->
-      inst = Entity.sub_module_at(s, i_name)
+      inst = s.insts[i_name]
       case inst.__struct__ do
-	t when t in [ BlackBox, Schematic ] ->
+	t when t in [BlackBox, Schematic] ->
 	  IO.write(f, ~s"""
 	  <tr><td><a href="#INST_#{i_name}">#{i_name}</a></td>
 	  <td><a href="#{self_module}/#{i_name}.html">#{inst.name}</a></td></tr>
@@ -250,8 +263,12 @@ defmodule Danm.HtmlPrinting do
     """)
   end
 
-  defp print_html_combo_logic(s, f, as: self) do
-    str = ComboLogic.exp_string(s, fn x ->
+  defp print_html_simple_logic(s, f, as: self) do
+    expr_fn = case s.__struct__ do
+		ComboLogic -> &ComboLogic.expr_string/2
+		BundleLogic -> &BundleLogic.expr_string/2
+	      end
+    str = expr_fn.(s, fn x ->
       "<a id=\"PIN_#{self}/#{x}\" href=\"#WIRE_#{x}\">#{x}</a>"
     end)
     IO.write(f, ~s"""

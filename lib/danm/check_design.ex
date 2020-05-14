@@ -112,9 +112,8 @@ defmodule Danm.CheckDesign do
 
   defp check_instances(state) do
     s = current_design(state)
-    s
-    |> Entity.sub_modules()
-    |> Enum.map(fn n -> Entity.sub_module_at(s, n) end)
+    s.insts
+    |> Map.values()
     |> Enum.reduce(state, fn inst, state -> check_design(state, inst) end)
   end
 
@@ -127,11 +126,10 @@ defmodule Danm.CheckDesign do
   defp check_conns(state) do
     map = state.cache.map
     s = current_design(state)
-    s
-    |> Entity.sub_modules()
+    s.insts
+    |> Map.keys()
     |> Enum.reduce(state, fn i_name, state ->
-      s
-      |> Entity.sub_module_at(i_name)
+      s.insts[i_name]
       |> Entity.ports()
       |> Enum.reduce(state, fn p_name, state ->
 	pin = "#{i_name}/#{p_name}"
@@ -155,7 +153,7 @@ defmodule Danm.CheckDesign do
       |> Enum.reduce(state, fn {i_name, p_name}, state ->
 	pin = "#{i_name}/#{p_name}"
 	wn2 = map[pin]
-	{_, w2} = s |> Entity.sub_module_at(i_name) |> Entity.port_at(p_name)
+	{_, w2} = Entity.port_at(s.insts[i_name], p_name)
 	state
 	|> error("multiple wire on pin: #{pin}", if: wn2 != w_name)
 	|> error("wire width not match on pin: #{pin}, #{w2} != #{width}", if: w2 != width)
