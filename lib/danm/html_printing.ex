@@ -241,19 +241,7 @@ defmodule Danm.HtmlPrinting do
       <td>#{dir}</td><td><a href="#WIRE_#{w_name}">#{w_name}</a></td></tr>
     """)
     end)
-    IO.write(f, "</table></li>\n")
-    unless Enum.empty?(s.params) do
-      IO.write(f, "<li>Parameters:<table><tr><th>parameter</th><th>value</th></tr>\n")
-      s.params
-      |> Map.keys()
-      |> Enum.sort(:asc)
-      |> Enum.each(fn p_name ->
-	p_v = s.params[p_name]
-	IO.write(f, "<tr><td>#{p_name}</td><td>#{p_v}</td></tr>\n")
-      end)
-      IO.write(f, "</table></li>\n")
-    end
-    IO.write(f, "</ul></li>\n")
+    IO.write(f, "</table></li></ul></li>\n")
   end
 
   defp print_html_sink(s, f, as: self) do

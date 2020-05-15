@@ -118,7 +118,6 @@ defmodule Danm.VerilogPrinting do
     */
     module #{ref}(
     	#{port_string});
-
     """)
     Enum.each(sorted_ports, fn p_name ->
       {dir, width} = Entity.port_at(s, p_name)
@@ -140,7 +139,6 @@ defmodule Danm.VerilogPrinting do
 	_ -> IO.write(f, "    #{wire_type} [#{width - 1}:0] #{verilog_escape(w_name)};\n")
       end
     end)
-    IO.write(f, "\n")
 
     map = Schematic.pin_to_wire_map(s)
     state =
@@ -252,7 +250,6 @@ defmodule Danm.VerilogPrinting do
     |> Enum.each(fn p_name ->
       IO.write(f, "//\t sink(#{verilog_escape(p_name)});\n")
     end)
-    IO.write(f, "\n")
     state
   end
 
@@ -279,7 +276,7 @@ defmodule Danm.VerilogPrinting do
       IO.write(f, "\t    #{w}'b#{pad_string(i, 2, w)}: #{verilog_escape(i_name)} = #{verilog_string(c)};\n")
       i + 1
     end)
-    IO.write(f, "\tendcase\n\n")
+    IO.write(f, "\tendcase\n")
     state
   end
 
@@ -304,7 +301,6 @@ defmodule Danm.VerilogPrinting do
       IO.write(f, "\t    #{verilog_escape(i_name)} = #{verilog_string(ch)};\n")
       i + 1
     end)
-    IO.write(f, "\n")
     state
   end
 
@@ -320,7 +316,7 @@ defmodule Danm.VerilogPrinting do
       IO.write(f, "\t    #{verilog_string(co)}}: #{verilog_escape(i_name)} = #{verilog_string(ch)};\n")
       i + 1
     end)
-    IO.write(f, "\tendcase\n\n")
+    IO.write(f, "\tendcase\n")
     state
   end
 
