@@ -3,10 +3,15 @@ defmodule Danm.CheckDesign do
   perform design check on a design
   """
 
+  alias Danm.WireExpr
   alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Schematic
-
+  alias Danm.BundleLogic
+  alias Danm.ChoiceLogic
+  alias Danm.ConditionLogic
+  alias Danm.CaseLogic
+  
   defstruct dict: %{},
     stack: [],
     cache: %{},
@@ -43,6 +48,7 @@ defmodule Danm.CheckDesign do
     end
   end
 
+  defp warning(state, msg), do: warning(state, msg, if: true)
   defp warning(state, msg, if: bool) do
     cond do
       bool ->
@@ -82,6 +88,10 @@ defmodule Danm.CheckDesign do
     case current_design(state).__struct__ do
       BlackBox -> check_black_box_design(state)
       Schematic -> state |> check_instances() |> check_self_schematic()
+      BundleLogic -> check_bundle_logic(state)
+      ChoiceLogic -> check_choice_logic(state)
+      ConditionLogic -> check_condition_logic(state)
+      CaseLogic -> check_case_logic(state)
       _ -> state
     end
   end
@@ -161,4 +171,42 @@ defmodule Danm.CheckDesign do
     end)
   end
 
+  defp check_bundle_logic(state) do
+    s = current_design(state)
+    case s.op do
+      :comma -> state
+      _ ->
+	warning(state, "bundling wires with unmatched width",
+	  if: !WireExpr.width_match?(s.exprs, in: s.inputs))
+    end
+  end
+
+  defp check_choice_logic(state) do
+    s = current_design(state)
+    state
+    |> error("condition in choice has wrong width",
+          if: !ChoiceLogic.condition_width_match?(s))
+    |> warning("choices have unmatched width",
+	  if: !WireExpr.width_match?(s.choices, in: s.inputs))
+  end
+
+  defp check_condition_logic(state) do
+    s = current_design(state)
+    state
+    |> error("last condition must be always true",
+          if: !ConditionLogic.last_is_true?(s))
+    |> warning("choices have unmatched width",
+          if: !WireExpr.width_match?(s.choices, in: s.inputs))
+  end
+
+  defp check_case_logic(state) do
+    s = current_design(state)
+    state
+    |> error("last case must be default",
+          if: !CaseLogic.last_is_default?(s))
+    |> warning("choices have unmatched width",
+	  if: !WireExpr.width_match?(s.choices, in: s.inputs))
+    |> warning("All cases must has matching width",
+          if: !CaseLogic.width_match?(s))
+  end
 end

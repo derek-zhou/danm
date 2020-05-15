@@ -20,13 +20,20 @@ defmodule Danm.Sink do
   end
 
   @doc """
-  add/change an input of a sink. all width assume to be 0 if absent
+  set the width of one input
   """
-  def set_input(b, n), do: %{b | inputs: Map.put(b.inputs, n, 0)}
-  def set_input(b, n, w), do: %{b | inputs: Map.put(b.inputs, n, w)}
+  def set_input(b, n, w), do: %{b | inputs: Map.replace!(b.inputs, n, w)}
 
   @doc """
   create a sink. all width assume to be 0 for now
   """
-  def new(n), do: %__MODULE__{inputs: %{n => 0}}
+  def new(inputs), do: %__MODULE__{inputs: Map.new(inputs, fn x -> {x, 0} end)}
+
+  @doc """
+  merge a sink
+  """
+  def merge(b, inputs) do
+    %{b | inputs: Map.merge(b.inputs, Map.new(inputs, fn x -> {x, 0} end))}
+  end
+
 end

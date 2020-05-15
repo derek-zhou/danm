@@ -5,8 +5,12 @@ defmodule Danm.HtmlPrinting do
 
   alias Danm.Entity
   alias Danm.Sink
+  alias Danm.WireExpr
   alias Danm.ComboLogic
   alias Danm.BundleLogic
+  alias Danm.ChoiceLogic
+  alias Danm.ConditionLogic
+  alias Danm.CaseLogic
   alias Danm.Schematic
   alias Danm.BlackBox
 
@@ -97,9 +101,12 @@ defmodule Danm.HtmlPrinting do
 	  Enum.each(subs, fn i_name ->
 	    inst = s.insts[i_name]
 	    case inst.__struct__ do
+	      ChoiceLogic -> print_html_choice_logic(inst, f, as: i_name)
+	      ConditionLogic -> print_html_condition_logic(inst, f, as: i_name)
+	      CaseLogic -> print_html_case_logic(inst, f, as: i_name)
+	      Sink -> print_html_sink(inst, f, as: i_name)
 	      t when t in [ComboLogic, BundleLogic] ->
-		print_html_simple_logic(inst, f, as: "#{i_name}")
-	      Sink -> print_html_sink(inst, f, as: "#{i_name}")
+		print_html_simple_logic(inst, f, as: i_name)
 	      _ -> print_html_instance(inst, f, as: "#{hier}/#{i_name}", lookup: map)
 	    end
 	  end)
@@ -264,17 +271,69 @@ defmodule Danm.HtmlPrinting do
   end
 
   defp print_html_simple_logic(s, f, as: self) do
-    expr_fn = case s.__struct__ do
-		ComboLogic -> &ComboLogic.expr_string/2
-		BundleLogic -> &BundleLogic.expr_string/2
-	      end
-    str = expr_fn.(s, fn x ->
-      "<a id=\"PIN_#{self}/#{x}\" href=\"#WIRE_#{x}\">#{x}</a>"
-    end)
+    pin_fn = fn x -> "<a href=\"#WIRE_#{x}\">#{x}</a>" end
+    str = case s.__struct__ do
+	    ComboLogic -> WireExpr.ast_string(s.expr, pin_fn)
+	    BundleLogic -> BundleLogic.expr_string(s, pin_fn)
+	  end
     IO.write(f, ~s"""
-    <li><h3>Instance <a id="INST_#{self}">#{self} (#{Entity.type_string(s)})</a></h3>
+    <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
+    (#{Entity.type_string(s)})</h3>
     <ul><li>Expression: #{str}</li></ul></li>
     """)
+  end
+
+  defp print_html_choice_logic(s, f, as: self) do
+    pin_fn = fn x -> "<a href=\"#WIRE_#{x}\">#{x}</a>" end
+    cond_str = WireExpr.ast_string(s.condition, pin_fn)
+    IO.write(f, ~s"""
+    <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
+    (#{Entity.type_string(s)})</h3>
+    <ul><li>Switch: #{cond_str} <table><tr><th>case</th><th>value</th></tr>
+    """)
+    Enum.reduce(s.choices, 0, fn c, i ->
+      c_str = WireExpr.ast_string(c, pin_fn)
+      IO.write(f, "<tr><td>#{i}</td><td>#{c_str}</td></tr>\n")
+      i + 1
+    end)
+    IO.write(f, "</table></li></ul></li>\n")
+  end
+
+  defp print_html_condition_logic(s, f, as: self) do
+    pin_fn = fn x -> "<a href=\"#WIRE_#{x}\">#{x}</a>" end
+    IO.write(f, ~s"""
+    <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
+    (#{Entity.type_string(s)})</h3>
+    <ul><li>Conditions: <table><tr><th>case</th><th>value</th></tr>
+    """)
+    s.conditions
+    |> Enum.zip(s.choices)
+    Enum.reduce(0, fn {co, ch}, i ->
+      co_str = WireExpr.ast_string(co, pin_fn)
+      ch_str = WireExpr.ast_string(ch, pin_fn)
+      IO.write(f, "<tr><td>#{co_str}</td><td>#{ch_str}</td></tr>\n")
+      i + 1
+    end)
+    IO.write(f, "</table></li></ul></li>\n")
+  end
+
+  defp print_html_case_logic(s, f, as: self) do
+    pin_fn = fn x -> "<a href=\"#WIRE_#{x}\">#{x}</a>" end
+    sub_str = WireExpr.ast_string(s.subject, pin_fn)
+    IO.write(f, ~s"""
+    <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
+    (#{Entity.type_string(s)})</h3>
+    <ul><li>Switch: #{sub_str} <table><tr><th>case</th><th>value</th></tr>
+    """)
+    s.cases
+    |> Enum.zip(s.choices)
+    Enum.reduce(0, fn {co, ch}, i ->
+      co_str = WireExpr.ast_string(co, pin_fn)
+      ch_str = WireExpr.ast_string(ch, pin_fn)
+      IO.write(f, "<tr><td>#{co_str}</td><td>#{ch_str}</td></tr>\n")
+      i + 1
+    end)
+    IO.write(f, "</table></li></ul></li>\n")
   end
 
   defp print_html_wires(s, f, as: hier) do
@@ -298,7 +357,7 @@ defmodule Danm.HtmlPrinting do
 	Enum.each(s.wires, fn {w_name, conns} ->
 	  conns
 	  |> Enum.reject(fn {i, _} -> i == :self end)
-	  |> print_html_wire(f,
+	  |> print_html_wire(s, f,
 	    as: w_name,
 	    width: map[w_name],
 	    port: Entity.port_at(s, w_name),
@@ -325,7 +384,7 @@ defmodule Danm.HtmlPrinting do
     end
   end
 
-  defp print_html_wire(conns, f, as: w_name, width: width, port: port, self: self, up: up) do
+  defp print_html_wire(conns, s, f, as: w_name, width: width, port: port, self: self, up: up) do
     IO.write(f, ~s"""
     <li><h3>Wire <a id="WIRE_#{w_name}">#{w_name}</a></h3><ul>
     <li>width:#{width}</li>
@@ -337,9 +396,13 @@ defmodule Danm.HtmlPrinting do
     unless Enum.empty?(conns) do
       IO.write(f, "<li>connections: <table><tr><th>instance</th><th>port</th></tr>\n")
       Enum.each(conns, fn {ins, port} ->
-	IO.write(f, ~s"""
-	<tr><td><a href="#INST_#{ins}">#{ins}</a></td><td><a href="#PIN_#{ins}/#{port}">#{port}</a></td></tr>
-	""")
+	if inlined?(s.insts[ins]) do
+	  IO.write(f, "<tr><td><a href=\"#INST_#{ins}\">#{ins}</a></td><td></td></tr>")
+	else
+	  IO.write(f, ~s"""
+	  <tr><td><a href="#INST_#{ins}">#{ins}</a></td><td><a href="#PIN_#{ins}/#{port}">#{port}</a></td></tr>
+	  """)
+	end
       end)
       IO.write(f, "</table></li>\n")
     end

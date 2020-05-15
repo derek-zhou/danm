@@ -4,9 +4,13 @@ defmodule Danm.VerilogPrinting do
   """
 
   alias Danm.Entity
+  alias Danm.WireExpr
   alias Danm.Sink
   alias Danm.ComboLogic
   alias Danm.BundleLogic
+  alias Danm.ChoiceLogic
+  alias Danm.ConditionLogic
+  alias Danm.CaseLogic
   alias Danm.BlackBox
   alias Danm.Schematic
 
@@ -154,9 +158,12 @@ defmodule Danm.VerilogPrinting do
       |> Schematic.sort_sub_modules()
       |> Enum.reduce(state, fn i_name, state ->
       case s.insts[i_name].__struct__ do
+	ChoiceLogic -> print_one_choice_logic(state, i_name)
+	ConditionLogic -> print_one_condition_logic(state, i_name)
+	CaseLogic -> print_one_case_logic(state, i_name)
+	Sink -> print_one_sink(state, i_name)
 	t when t in [ComboLogic, BundleLogic] ->
 	  print_one_simple_logic(state, i_name)
-	Sink -> print_one_sink(state, i_name)
 	_ -> print_one_instance(state, i_name, with: map)
       end
     end)
@@ -173,6 +180,7 @@ defmodule Danm.VerilogPrinting do
 	     BlackBox -> "wire"
 	     Schematic -> "wire"
 	     ComboLogic -> "wire"
+	     BundleLogic -> "wire"
 	     _ -> "reg"
 	   end
     end
@@ -193,7 +201,7 @@ defmodule Danm.VerilogPrinting do
 		 {name, _} -> name
 		 name -> name
 	       end
-	unique_name_like(name, from: state.dict)
+	unique_name_like(name, from: state.refs)
       ref -> ref
     end
   end
@@ -256,18 +264,89 @@ defmodule Danm.VerilogPrinting do
     s = current_design(state)
     f = state.stream
     inst = s.insts[i_name]
-    expr_fn = case inst.__struct__ do
-		ComboLogic -> &ComboLogic.expr_string/2
-		BundleLogic -> &BundleLogic.expr_string/2
-	      end
-    str = expr_fn.(inst, fn str ->
-      cond do
-	String.contains?(str, "/") -> "\\" <> str <> " "
-	true -> str
-      end
-    end)
+    str = case inst.__struct__ do
+	    ComboLogic -> verilog_string(inst.expr)
+	    BundleLogic -> BundleLogic.expr_string(inst, &verilog_escape/1) 
+	  end
     IO.write(f, "    assign #{i_name} = #{str};\n")
     state
+  end
+
+  defp print_one_choice_logic(state, i_name) do
+    s = current_design(state)
+    f = state.stream
+    inst = s.insts[i_name]
+    w = ChoiceLogic.cond_width(inst)
+    IO.write(f, "    always @(#{sensitivity_string(inst)})\n")
+    IO.write(f, "        case (#{verilog_string(inst.condition)})\n")
+    Enum.reduce(inst.choices, 0, fn c, i ->
+      IO.write(f, "\t    #{w}'b#{pad_string(i, 2, w)}: #{verilog_string(i_name)} = #{verilog_string(c)};\n")
+      i + 1
+    end)
+    IO.write(f, "\tendcase\n\n")
+    state
+  end
+
+  defp print_one_condition_logic(state, i_name) do
+    s = current_design(state)
+    f = state.stream
+    inst = s.insts[i_name]
+    IO.write(f, "    always @(#{sensitivity_string(inst)})\n")
+    inst.conditions
+    |> Enum.zip(inst.choices)
+    |> Enum.reduce(0, fn {co, ch}, i ->
+      case i do
+	0 ->
+	  IO.write(f, "\tif (#{verilog_string(co)})\n")
+	_->
+	  case co do
+	    nil -> IO.write(f, "\telse\n")
+	    _ ->
+	      IO.write(f, "\telse if (#{verilog_string(co)})\n")
+	  end
+      end
+      IO.write(f, "\t    #{verilog_string(i_name)} = #{verilog_string(ch)};\n")	      
+      i + 1
+    end)
+    IO.write(f, "\n")
+    state
+  end
+
+  defp print_one_case_logic(state, i_name) do
+    s = current_design(state)
+    f = state.stream
+    inst = s.insts[i_name]
+    IO.write(f, "    always @(#{sensitivity_string(inst)})\n")
+    IO.write(f, "        case (#{verilog_string(inst.condition)})\n")
+    inst.cases
+    |> Enum.zip(inst.choices)
+    |> Enum.reduce(0, fn {co, ch}, i ->
+      IO.write(f, "\t    #{verilog_string(co)}}: #{verilog_string(i_name)} = #{verilog_string(ch)};\n")
+      i + 1
+    end)
+    IO.write(f, "\tendcase\n\n")
+    state
+  end
+
+  defp pad_string(n, b, w) do
+    str = Integer.to_string(n, b)
+    String.duplicate("0", w-String.length(str)) <> str
+  end
+
+  defp sensitivity_string(inst) do
+    inst.inputs
+    |> Map.keys()
+    |> Enum.map(fn x -> verilog_string(x) end)
+    |> Enum.join(" or ")
+  end
+
+  defp verilog_string(term), do: WireExpr.ast_string(term, &verilog_escape/1)
+
+  defp verilog_escape(str) do
+    cond do
+      String.contains?(str, "/") -> "\\" <> str <> " "
+      true -> str
+    end
   end
 
 end

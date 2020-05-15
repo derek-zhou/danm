@@ -9,6 +9,7 @@ defmodule Danm.WireExpr do
   width(ast, in: context)
   return the width of the ast inside the context
   """
+  def width(nil, in: _), do: 0
   def width({:const, w, _}, in: _), do: w
   def width({:dup, sub, times}, in: con), do: times * width(sub, in: con)
   def width({:ext, _, msb, lsb, step}, in: _), do: div((lsb - msb), step) + 1
@@ -43,18 +44,13 @@ defmodule Danm.WireExpr do
   # a?b:c operator
   def width({:cond, _, l, r}, in: con), do: max_width(l, r, con)
 
-  # compound operators
-  def width({:choice, _, choices}, in: con), do: max_width(choices, con)
-  def width({:ifs, _, choices}, in: con), do: max_width(choices, con)
-  def width({:cases, _, _, choices}, in: con), do: max_width(choices, con)
-
   defp sum_width(l, r, con), do: width(l, in: con) + width(r, in: con)
   defp max_width(l, r, con), do: max(width(l, in: con), width(r, in: con))
-  defp max_width(items, con), do: Enum.reduce(items, 0, &(max(width(&1, in: con), &2)))
 
   @doc """
   return a list of all ids in this expr
   """
+  def ids(nil), do: []
   def ids({:const, _, _}), do: []
   def ids({:dup, sub, _}), do: ids(sub)
   def ids({:ext, sub, _, _, _}), do: ids(sub)
@@ -88,34 +84,36 @@ defmodule Danm.WireExpr do
   # a?b:c operator
   def ids({:cond, c, l, r}), do: ids(c) ++ ids(l) ++ ids(r)
 
-  # compound operators
-  def ids({:choice, condition, choices}) do
-    Enum.reduce(choices, ids(condition), fn x, acc -> ids(x) ++ acc end)
-  end
-
-  def ids({:ifs, conditions, choices}) do
-    l = Enum.reduce(choices, [], fn x, acc -> ids(x) ++ acc end)
-    Enum.reduce(conditions, l, fn x, acc -> ids(x) ++ acc end)
-  end
-
-  def ids({:cases, sub, cases, choices}) do
-    l = Enum.reduce(choices, ids(sub), fn x, acc -> ids(x) ++ acc end)
-    Enum.reduce(cases, l, fn x, acc -> ids(x) ++ acc end)
-  end
-
   @doc """
   ast_string(ast, callback)
   return a string representation of ast. when encounter an id, use the callback for the string
   generation
   """
+  def ast_string(nil, _), do: "default"
   def ast_string({:const, 0, v}, _), do: to_string(v)
   def ast_string({:const, w, v}, _), do: "#{w}'d#{v}"
-  # FIXME
   def ast_string({:id, name}, f), do: f.(name)
   def ast_string({:dup, sub, times}, f), do: "{#{times}{#{ast_string(sub, f)}}}"
-  def ast_string({:ext, sub, msb, lsb, -1}, f), do: "#{ast_string(sub, f)}[#{msb}:#{lsb}]"
-  def ast_string({:ext, sub, msb, lsb, step}, f), do: "#{ast_string(sub, f)}[#{msb}:#{lsb}:#{step}]"
   
+  def ast_string({:ext, sub, msb, lsb, -1}, f) do
+    cond do
+      msb == lsb -> "#{ast_string(sub, f)}[#{msb}]"
+      true -> "#{ast_string(sub, f)}[#{msb}:#{lsb}]"
+    end
+  end
+  
+  def ast_string({:ext, sub, msb, lsb, step}, f) do
+    cond do
+      msb == lsb -> "#{ast_string(sub, f)}[#{msb}]"
+      msb > lsb ->
+	if step >= 0, do: raise "Illegal [#{msb}:#{lsb}:#{step}]"
+         "{#{ext_inner_string(sub, msb, lsb, 0-step, f)}}"
+      msb < lsb ->
+	if step <= 0, do: raise "Illegal [#{msb}:#{lsb}:#{step}]"
+        "{#{ext_inner_string(sub, msb, lsb, step, f)}}"
+    end
+  end
+
   # unary operators
   def ast_string({:bit_not, sub}, f), do: "(~ #{ast_string(sub, f)})"
   def ast_string({:negate, sub}, f), do: "(- #{ast_string(sub, f)})"
@@ -145,9 +143,13 @@ defmodule Danm.WireExpr do
   def ast_string({:cond, c, l, r}, f),
     do: "(#{ast_string(c, f)} ? #{ast_string(l, f)} : #{ast_string(r, f)})"
 
-  # FIXME: catch all
-  def ast_string(t, _), do: inspect(t)
-
+  defp ext_inner_string(sub, msb, lsb, step, f) do
+    msb..lsb
+    |> Enum.chunk_every(step)
+    |> Enum.map(fn l -> "#{ast_string(sub, f)}[#{hd(l)}]" end)
+    |> Enum.join(", ")
+  end
+  
   @doc """
   parse(str)
   parse the str
@@ -162,7 +164,9 @@ defmodule Danm.WireExpr do
    The above order is important, so that a && b will be (a && b) not (a & (&b))
 
   """
-  def parse(s) do
+  def parse(nil), do: nil
+  def parse(n) when is_integer(n), do: bare_integer(n)
+  def parse(s) when is_binary(s) do
     {e, s} = parse_expr(s)
     if String.length(s) > 0, do: raise "Garbage at the end: #{s}"
     e
@@ -294,15 +298,18 @@ defmodule Danm.WireExpr do
 	{{:dup, sub, n}, s}
       {:ext, s} ->
 	{msb, s} = expect_integer!(s)
-	s = expect_token!(s, ":")
-	{lsb, s} = expect_integer!(s)
 	case expect_token(s, ":") do
-	  {:error, s} -> {{:ext, sub, msb, lsb, -1}, expect_token!(s, "]")}
+	  {:error, s} -> {{:ext, sub, msb, msb, -1}, expect_token!(s, "]")}
 	  {:ok, s} ->
-	    {step, s} = expect_integer!(s)
-	    {{:ext, sub, msb, lsb, step}, expect_token!(s, "]")}
+	    {lsb, s} = expect_integer!(s)
+	    case expect_token(s, ":") do
+	      {:error, s} -> {{:ext, sub, msb, lsb, -1}, expect_token!(s, "]")}
+	      {:ok, s} ->
+		{step, s} = expect_integer!(s)
+		{{:ext, sub, msb, lsb, step}, expect_token!(s, "]")}
+	    end
 	end
-    end	
+    end
   end
 
   defp parse_factor(s) do
@@ -346,10 +353,10 @@ defmodule Danm.WireExpr do
   end
 
   # TODO: original code supports _ as spacer
-  def parse_constant(s, width) do
+  defp parse_constant(s, width) do
     s = skip_token(s, "'")
     case parse_radix(s) do
-      {:error, s} -> {{:const, nil, width}, s}
+      {:error, s} -> {bare_integer(width), s}
       {r, s} ->
 	case Integer.parse(s, r) do
 	  {n, s} when is_integer(n) -> {{:const, width, n}, s}
@@ -357,5 +364,24 @@ defmodule Danm.WireExpr do
 	end
     end
   end
-  
+
+  defp bare_integer(n) do
+    w = n |> Integer.digits(2) |> Enum.count()
+    {:const, w, n}
+  end
+
+  @doc """
+  if every items has the same width
+  """
+  def width_match?(exprs, in: dict) do
+    w = Enum.reduce_while(exprs, 0, fn x, acc ->
+      w = width(x, in: dict)
+      cond do
+	w == 0 or (acc != 0 and w != acc) -> {:halt, 0}
+	true -> {:cont, w}
+      end
+    end)
+    w > 0
+  end
+
 end

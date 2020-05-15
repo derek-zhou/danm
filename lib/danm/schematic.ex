@@ -9,6 +9,9 @@ defmodule Danm.Schematic do
   alias Danm.Sink
   alias Danm.ComboLogic
   alias Danm.BundleLogic
+  alias Danm.ChoiceLogic
+  alias Danm.ConditionLogic
+  alias Danm.CaseLogic
   alias Danm.Library
   alias Danm.WireExpr
 
@@ -163,7 +166,9 @@ defmodule Danm.Schematic do
     * :as, wire name. if nil, a name as the first port name is used
 
   """
-  def connect(s, conns, options \\ []) do
+  def connect(s, conns, options \\ [])
+  def connect(s, str, options) when is_binary(str), do: connect(s, [str], options) 
+  def connect(s, conns, options) when is_list(conns) do
     conns = Enum.map(conns, fn each ->
       case each do
 	{inst, port} -> {inst, port}
@@ -185,21 +190,6 @@ defmodule Danm.Schematic do
       Map.has_key?(s.ports, name) -> s
       true -> force_expose(s, name, dir: dir, width: width)
     end
-  end
-
-  @doc ~S"""
-  sink a wire, so it has a fake load and not to be auto-exposed
-  """
-  def sink(s, l) when is_list(l), do: Enum.reduce(l, s, fn x, s -> sink(s, x) end)
-  def sink(s, name) when is_binary(name) do
-    sink =
-      case s.insts["_sink"] do
-	nil -> Sink.new(name)
-	sink -> Sink.set_input(sink, name)
-      end
-    s
-    |> set_instance("_sink", to: sink)
-    |> conjure_wire(name, conns: [{"_sink", name}])
   end
 
   @doc ~S"""
@@ -392,6 +382,19 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
+  sink a wire, so it has a fake load and not to be auto-exposed
+  """
+  def sink(s, name) when is_binary(name), do: sink(s, [name])
+  def sink(s, l) when is_list(l) do
+    sink =
+      case s.insts["_sink"] do
+	nil -> Sink.new(l)
+	sink -> Sink.merge(sink, l)
+      end
+    s |> set_instance("_sink", to: sink) |> connect_wires(sink, "_sink")
+  end
+
+  @doc ~S"""
   assign an expression to a wire
   """
   def assign(s, str, as: n) do
@@ -413,6 +416,39 @@ defmodule Danm.Schematic do
     inst
     |> Entity.ports()
     |> Enum.reduce(s, fn p_name, s -> conjure_wire(s, p_name, conns: [{n, p_name}]) end)
+  end
+
+  @doc ~S"""
+  pick one choice out of 2^n choices based on condition value
+  """
+  def decode(s, condition, choices, as: n) do
+    condition = WireExpr.parse(condition)
+    choices = Enum.map(choices, fn str -> WireExpr.parse(str) end)
+    cl = ChoiceLogic.new(condition, choices, as: n)
+    s |> set_instance(n, to: cl) |> connect_wires(cl, n)   
+  end
+
+  @doc ~S"""
+  pick one choice out of n choices based on first none zero condition.
+  the list is a list of {condition, choice} tuple
+  """
+  def condition(s, list, as: n) do
+    conditions = Enum.map(list, fn {str, _} -> WireExpr.parse(str) end)
+    choices = Enum.map(list, fn {_, str} -> WireExpr.parse(str) end)
+    cl = ConditionLogic.new(conditions, choices, as: n)
+    s |> set_instance(n, to: cl) |> connect_wires(cl, n)    
+  end
+
+  @doc ~S"""
+  pick one choice out of n choices based on subject matching condition.
+  the list is a list of {condition, choice} tuple
+  """
+  def case(s, subject, list, as: n) do
+    subject = WireExpr.parse(subject)
+    conditions = Enum.map(list, fn {str, _} -> WireExpr.parse(str) end)
+    choices = Enum.map(list, fn {_, str} -> WireExpr.parse(str) end)
+    cl = CaseLogic.new(subject, conditions, choices, as: n)
+    s |> set_instance(n, to: cl) |> connect_wires(cl, n)    
   end
 
 end

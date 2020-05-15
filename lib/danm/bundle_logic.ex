@@ -51,9 +51,8 @@ defmodule Danm.BundleLogic do
   def new(op, exprs, as: n) do
     map =
       exprs
-      |> Enum.flat_map(fn x -> WireExpr.ids(x) end) 
-      |> Enum.map(fn x -> {x, 0} end)
-      |> Map.new()
+      |> Enum.flat_map(fn x -> WireExpr.ids(x) end)
+      |> Map.new(fn x -> {x, 0} end)
     %__MODULE__{exprs: exprs, output: n, inputs: map, op: op}
   end
 
