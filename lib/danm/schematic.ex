@@ -45,6 +45,8 @@ defmodule Danm.Schematic do
       |> resolve_port_width()
     end
 
+    def name(b), do: b.name
+
     def doc_string(b) do
       cond do
 	function_exported?(b.module, :doc_string, 1) -> apply(b.module, :doc_string, [b])
@@ -359,6 +361,10 @@ defmodule Danm.Schematic do
       BlackBox => 0,
       Schematic => 1,
       ComboLogic => 2,
+      BundleLogic => 3,
+      ChoiceLogic => 4,
+      ConditionLogic => 5,
+      CaseLogic => 6,
       Sink => 9
     }
     Map.fetch!(order_map, s.insts[i].__struct__)

@@ -9,6 +9,11 @@ defprotocol Danm.Entity do
   def elaborate(b)
 
   @doc ~S"""
+  return the name of the design
+  """
+  def name(b)
+
+  @doc ~S"""
   return the doc string of the design
   """
   def doc_string(b)

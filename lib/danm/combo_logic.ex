@@ -20,6 +20,7 @@ defmodule Danm.ComboLogic do
       if new_width == b.width, do: b, else: %{b | width: new_width}
     end
 
+    def name(b), do: b.output
     def doc_string(_), do: "Just a combo logic"
     def type_string(_), do: "combo logic"
     def ports(b), do: [ b.output | Map.keys(b.inputs) ]

@@ -22,6 +22,7 @@ defmodule Danm.ConditionLogic do
       if new_width == b.width, do: b, else: %{b | width: new_width}
     end
 
+    def name(b), do: b.output
     def doc_string(_), do: "Priority decoder"
     def type_string(_), do: "priority decoder"
     def ports(b), do: [ b.output | Map.keys(b.inputs) ]

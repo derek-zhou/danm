@@ -24,6 +24,7 @@ defmodule Danm.ChoiceLogic do
       if new_width == b.width, do: b, else: %{b | width: new_width}
     end
 
+    def name(b), do: b.output
     def doc_string(_), do: "Full case decoder"
     def type_string(_), do: "full case decoder"
     def ports(b), do: [ b.output | Map.keys(b.inputs) ]

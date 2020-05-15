@@ -41,7 +41,7 @@ defmodule Danm.CheckDesign do
   defp error(state, msg, if: bool) do
     cond do
       bool ->
-	focus = current_design(state).name
+	focus = state |> current_design() |> Entity.name()
 	IO.write(:stderr, "Check design ERROR: #{msg}, in #{focus}\n")
 	%{state | errors: state.errors + 1}
       true -> state
@@ -52,7 +52,7 @@ defmodule Danm.CheckDesign do
   defp warning(state, msg, if: bool) do
     cond do
       bool ->
-	focus = current_design(state).name
+	focus = state |> current_design() |> Entity.name()
 	IO.write(:stderr, "Check design WARNING: #{msg}, in #{focus}\n")
 	%{state | warnings: state.warnings + 1}
       true -> state

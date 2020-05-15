@@ -25,6 +25,8 @@ defmodule Danm.BundleLogic do
       if new_width == b.width, do: b, else: %{b | width: new_width}
     end
 
+    def name(b), do: b.output
+
     def doc_string(b) do
       case b.op do
 	:comma -> "Concatenate several expressions together"

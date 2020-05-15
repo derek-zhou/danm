@@ -304,11 +304,11 @@ defmodule Danm.HtmlPrinting do
     IO.write(f, ~s"""
     <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
     (#{Entity.type_string(s)})</h3>
-    <ul><li>Conditions: <table><tr><th>case</th><th>value</th></tr>
+    <ul><li>Conditions: <table><tr><th>condition</th><th>value</th></tr>
     """)
     s.conditions
     |> Enum.zip(s.choices)
-    Enum.reduce(0, fn {co, ch}, i ->
+    |> Enum.reduce(0, fn {co, ch}, i ->
       co_str = WireExpr.ast_string(co, pin_fn)
       ch_str = WireExpr.ast_string(ch, pin_fn)
       IO.write(f, "<tr><td>#{co_str}</td><td>#{ch_str}</td></tr>\n")
@@ -327,7 +327,7 @@ defmodule Danm.HtmlPrinting do
     """)
     s.cases
     |> Enum.zip(s.choices)
-    Enum.reduce(0, fn {co, ch}, i ->
+    |> Enum.reduce(0, fn {co, ch}, i ->
       co_str = WireExpr.ast_string(co, pin_fn)
       ch_str = WireExpr.ast_string(ch, pin_fn)
       IO.write(f, "<tr><td>#{co_str}</td><td>#{ch_str}</td></tr>\n")

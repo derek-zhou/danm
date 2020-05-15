@@ -22,6 +22,7 @@ defmodule Danm.BlackBox do
       |> resolve_port_width()
     end
 
+    def name(b), do: b.name
     def doc_string(b), do: b.comment
     def type_string(b), do: "black box: " <> b.name
     def ports(b), do: b.ports |> Map.keys()

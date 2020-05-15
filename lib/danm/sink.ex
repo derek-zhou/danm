@@ -13,6 +13,7 @@ defmodule Danm.Sink do
   defimpl Entity do
 
     def elaborate(b), do: b
+    def name(_), do: "_sink"
     def doc_string(_), do: "Just a sink"
     def type_string(_), do: "sink"
     def ports(b), do: b.inputs |> Map.keys()

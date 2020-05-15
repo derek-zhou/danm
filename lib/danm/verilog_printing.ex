@@ -111,8 +111,7 @@ defmodule Danm.VerilogPrinting do
     s = current_design(state)
     f = state.stream
     sorted_ports = BlackBox.sort_ports(s)
-
-    port_string = Enum.join(sorted_ports, ",\n\t")
+    port_string = sorted_ports |> Enum.map(&verilog_escape/1) |> Enum.join(",\n\t")
     IO.write(f, ~s"""
     /**
     #{Entity.doc_string(s)}
@@ -124,19 +123,10 @@ defmodule Danm.VerilogPrinting do
     Enum.each(sorted_ports, fn p_name ->
       {dir, width} = Entity.port_at(s, p_name)
       case width do
-	1 -> IO.write(f, "    #{dir} #{p_name};\n")
-	_ -> IO.write(f, "    #{dir} [#{width - 1}:0] #{p_name};\n")
+	1 -> IO.write(f, "    #{dir} #{verilog_escape(p_name)};\n")
+	_ -> IO.write(f, "    #{dir} [#{width - 1}:0] #{verilog_escape(p_name)};\n")
       end
     end)
-
-    s.params
-    |> Map.keys()
-    |> Enum.sort(:asc)
-    |> Enum.each(fn p_name ->
-      p_value = s.params[p_name]
-      IO.write(f, "    parameter #{p_name} = #{p_value};\n")
-    end)
-    IO.write(f, "\n")
 
     map = Schematic.wire_width_map(s)
     s.wires
@@ -146,8 +136,8 @@ defmodule Danm.VerilogPrinting do
       width = map[w_name]
       wire_type = wire_type(s, w_name)
       case width do
-	1 -> IO.write(f, "    #{wire_type} #{w_name};\n")
-	_ -> IO.write(f, "    #{wire_type} [#{width - 1}:0] #{w_name};\n")
+	1 -> IO.write(f, "    #{wire_type} #{verilog_escape(w_name)};\n")
+	_ -> IO.write(f, "    #{wire_type} [#{width - 1}:0] #{verilog_escape(w_name)};\n")
       end
     end)
     IO.write(f, "\n")
@@ -223,25 +213,31 @@ defmodule Danm.VerilogPrinting do
     ref = key_to_ref(state, key)
     IO.write(f, ~s"""
     // instance of #{Entity.type_string(inst)}
-        #{ref} #{i_name}(
+        #{ref} #{verilog_escape(i_name)}(
     """)
 
     conns_str =
       inst
       |> BlackBox.sort_ports()
       |> Enum.filter(fn p_name -> Map.has_key?(map, "#{i_name}/#{p_name}") end)
-      |> Enum.map(fn p_name -> ".#{p_name}("<>map["#{i_name}/#{p_name}"] <> ")" end)
+      |> Enum.map(fn p_name ->
+           ".#{verilog_escape(p_name)}(" <> verilog_escape(map["#{i_name}/#{p_name}"]) <> ")"
+         end)
       |> Enum.join(",\n\t")
 
     IO.write(f, "\t#{conns_str});\n")
-    inst.params
-    |> Map.keys()
-    |> Enum.sort(:asc)
-    |> Enum.each(fn p_name ->
-      p_value = inst.params[p_name]
-      IO.write(f, "    defparam #{i_name}.#{p_name} = #{p_value};\n")
-    end)
-    IO.write(f, "\n")
+
+    # only print defparam for black boxes. schematic has parameters passed in the generated code
+    if inst.__struct__ == BlackBox do
+      inst.params
+      |> Map.keys()
+      |> Enum.sort(:asc)
+      |> Enum.each(fn p_name ->
+	p_value = inst.params[p_name]
+	IO.write(f, "    defparam #{verilog_escape(i_name)}.#{verilog_escape(p_name)} = #{p_value};\n")
+      end)
+      IO.write(f, "\n")
+    end
     setup_key_ref(state, key, ref)
   end
 
@@ -254,7 +250,7 @@ defmodule Danm.VerilogPrinting do
     |> Entity.ports()
     |> Enum.sort(:asc)
     |> Enum.each(fn p_name ->
-      IO.write(f, "//\t sink(#{p_name});\n")
+      IO.write(f, "//\t sink(#{verilog_escape(p_name)});\n")
     end)
     IO.write(f, "\n")
     state
@@ -268,7 +264,7 @@ defmodule Danm.VerilogPrinting do
 	    ComboLogic -> verilog_string(inst.expr)
 	    BundleLogic -> BundleLogic.expr_string(inst, &verilog_escape/1) 
 	  end
-    IO.write(f, "    assign #{i_name} = #{str};\n")
+    IO.write(f, "    assign #{verilog_escape(i_name)} = #{str};\n")
     state
   end
 
@@ -280,7 +276,7 @@ defmodule Danm.VerilogPrinting do
     IO.write(f, "    always @(#{sensitivity_string(inst)})\n")
     IO.write(f, "        case (#{verilog_string(inst.condition)})\n")
     Enum.reduce(inst.choices, 0, fn c, i ->
-      IO.write(f, "\t    #{w}'b#{pad_string(i, 2, w)}: #{verilog_string(i_name)} = #{verilog_string(c)};\n")
+      IO.write(f, "\t    #{w}'b#{pad_string(i, 2, w)}: #{verilog_escape(i_name)} = #{verilog_string(c)};\n")
       i + 1
     end)
     IO.write(f, "\tendcase\n\n")
@@ -300,12 +296,12 @@ defmodule Danm.VerilogPrinting do
 	  IO.write(f, "\tif (#{verilog_string(co)})\n")
 	_->
 	  case co do
-	    nil -> IO.write(f, "\telse\n")
+	    {:const, _, v} when v > 0 -> IO.write(f, "\telse\n")
 	    _ ->
 	      IO.write(f, "\telse if (#{verilog_string(co)})\n")
 	  end
       end
-      IO.write(f, "\t    #{verilog_string(i_name)} = #{verilog_string(ch)};\n")	      
+      IO.write(f, "\t    #{verilog_escape(i_name)} = #{verilog_string(ch)};\n")
       i + 1
     end)
     IO.write(f, "\n")
@@ -321,7 +317,7 @@ defmodule Danm.VerilogPrinting do
     inst.cases
     |> Enum.zip(inst.choices)
     |> Enum.reduce(0, fn {co, ch}, i ->
-      IO.write(f, "\t    #{verilog_string(co)}}: #{verilog_string(i_name)} = #{verilog_string(ch)};\n")
+      IO.write(f, "\t    #{verilog_string(co)}}: #{verilog_escape(i_name)} = #{verilog_string(ch)};\n")
       i + 1
     end)
     IO.write(f, "\tendcase\n\n")
@@ -334,10 +330,7 @@ defmodule Danm.VerilogPrinting do
   end
 
   defp sensitivity_string(inst) do
-    inst.inputs
-    |> Map.keys()
-    |> Enum.map(fn x -> verilog_string(x) end)
-    |> Enum.join(" or ")
+    inst.inputs |> Map.keys() |> Enum.map(&verilog_escape/1) |> Enum.join(" or ")
   end
 
   defp verilog_string(term), do: WireExpr.ast_string(term, &verilog_escape/1)
