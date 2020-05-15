@@ -132,15 +132,24 @@ defmodule Danm.Schematic do
 
     * :as, instance name. if nil, a name as u_MODULE_NAME is used
     * :parameters, a map of additional parameters to set before elaborate
+    * :connections, a map of port to wire name for connection
 
   """
   def add(s, name, options \\ []) do
     i_name = options[:as] || "u_#{name}"
-    cond do
-      Map.has_key?(s.insts, i_name) -> raise "Instance by the name of #{i_name} already exists"
-      true ->
-	m = Library.load_and_build_module(name, options[:parameters] || %{})
-	set_instance(s, i_name, to: m)
+    s =
+      case s.insts[i_name] do
+        nil ->
+	  m = Library.load_and_build_module(name, options[:parameters] || %{})
+	  set_instance(s, i_name, to: m)
+	_ -> raise "Instance by the name of #{i_name} already exists"
+      end
+    case options[:connections] do
+      nil -> s
+      cs ->
+	Enum.reduce(cs, s, fn {p_name, w_name}, s ->
+	  conjure_wire(s, w_name, conns: [{i_name, p_name}])
+	end)
     end
   end
 
