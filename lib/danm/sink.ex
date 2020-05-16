@@ -4,6 +4,7 @@ defmodule Danm.Sink do
   """
 
   alias Danm.Entity
+  alias Danm.SeqLogic
 
   @doc """
   A sink is super simple, however I need to make it a full struct to be an entity
@@ -23,7 +24,22 @@ defmodule Danm.Sink do
   @doc """
   set the width of one input
   """
-  def set_input(b, n, w), do: %{b | inputs: Map.replace!(b.inputs, n, w)}
+  def set_input(b, n, w) do
+    case b.__struct__ do
+      SeqLogic -> %{b | core: set_input(b.core, n, w)}
+      _ -> %{b | inputs: Map.replace!(b.inputs, n, w)}
+    end
+  end
+
+  @doc """
+  return inputs as a map of name => width
+  """
+  def inputs(b) do
+    case b.__struct__ do
+      SeqLogic -> b.core.inputs
+      _ -> b.inputs
+    end
+  end
 
   @doc """
   create a sink. all width assume to be 0 for now

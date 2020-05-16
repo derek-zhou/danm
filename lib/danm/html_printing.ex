@@ -11,6 +11,7 @@ defmodule Danm.HtmlPrinting do
   alias Danm.ChoiceLogic
   alias Danm.ConditionLogic
   alias Danm.CaseLogic
+  alias Danm.SeqLogic
   alias Danm.Schematic
   alias Danm.BlackBox
 
@@ -104,6 +105,7 @@ defmodule Danm.HtmlPrinting do
 	      ChoiceLogic -> print_html_choice_logic(inst, f, as: i_name)
 	      ConditionLogic -> print_html_condition_logic(inst, f, as: i_name)
 	      CaseLogic -> print_html_case_logic(inst, f, as: i_name)
+	      SeqLogic -> print_html_seq_logic(inst, f, as: i_name)
 	      Sink -> print_html_sink(inst, f, as: i_name)
 	      t when t in [ComboLogic, BundleLogic] ->
 		print_html_simple_logic(inst, f, as: i_name)
@@ -258,70 +260,92 @@ defmodule Danm.HtmlPrinting do
     """)
   end
 
+  defp html_wire_string(x), do: "<a href=\"#WIRE_#{x}\">#{x}</a>"
+
   defp print_html_simple_logic(s, f, as: self) do
-    pin_fn = fn x -> "<a href=\"#WIRE_#{x}\">#{x}</a>" end
-    str = case s.__struct__ do
-	    ComboLogic -> WireExpr.ast_string(s.expr, pin_fn)
-	    BundleLogic -> BundleLogic.expr_string(s, pin_fn)
-	  end
-    IO.write(f, ~s"""
-    <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
-    (#{Entity.type_string(s)})</h3>
-    <ul><li>Expression: #{str}</li></ul></li>
-    """)
+    print_html_logic(s, f, &print_simple_logic_core/2, as: self)
   end
 
   defp print_html_choice_logic(s, f, as: self) do
-    pin_fn = fn x -> "<a href=\"#WIRE_#{x}\">#{x}</a>" end
-    cond_str = WireExpr.ast_string(s.condition, pin_fn)
-    IO.write(f, ~s"""
-    <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
-    (#{Entity.type_string(s)})</h3>
-    <ul><li>Switch: #{cond_str} <table><tr><th>case</th><th>value</th></tr>
-    """)
-    Enum.reduce(s.choices, 0, fn c, i ->
-      c_str = WireExpr.ast_string(c, pin_fn)
-      IO.write(f, "<tr><td>#{i}</td><td>#{c_str}</td></tr>\n")
-      i + 1
-    end)
-    IO.write(f, "</table></li></ul></li>\n")
+    print_html_logic(s, f, &print_choice_logic_core/2, as: self)
   end
 
   defp print_html_condition_logic(s, f, as: self) do
-    pin_fn = fn x -> "<a href=\"#WIRE_#{x}\">#{x}</a>" end
-    IO.write(f, ~s"""
-    <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
-    (#{Entity.type_string(s)})</h3>
-    <ul><li>Conditions: <table><tr><th>condition</th><th>value</th></tr>
-    """)
-    s.conditions
-    |> Enum.zip(s.choices)
-    |> Enum.reduce(0, fn {co, ch}, i ->
-      co_str = WireExpr.ast_string(co, pin_fn)
-      ch_str = WireExpr.ast_string(ch, pin_fn)
-      IO.write(f, "<tr><td>#{co_str}</td><td>#{ch_str}</td></tr>\n")
-      i + 1
-    end)
-    IO.write(f, "</table></li></ul></li>\n")
+    print_html_logic(s, f, &print_condition_logic_core/2, as: self)
   end
 
   defp print_html_case_logic(s, f, as: self) do
-    pin_fn = fn x -> "<a href=\"#WIRE_#{x}\">#{x}</a>" end
-    sub_str = WireExpr.ast_string(s.subject, pin_fn)
+    print_html_logic(s, f, &print_case_logic_core/2, as: self)
+  end
+
+  defp print_html_seq_logic(s, f, as: self) do
+    print_html_logic(s, f, &print_seq_logic_core/2, as: self)
+  end
+
+  defp print_html_logic(s, f, core_fn, as: self) do
     IO.write(f, ~s"""
     <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
-    (#{Entity.type_string(s)})</h3>
-    <ul><li>Switch: #{sub_str} <table><tr><th>case</th><th>value</th></tr>
+    (#{Entity.type_string(s)})</h3><ul>
     """)
-    s.cases
+    core_fn.(s, f)
+    IO.write(f, "</ul></li>")
+  end
+
+  defp print_simple_logic_core(s, f) do
+    str = case s.__struct__ do
+	    ComboLogic -> WireExpr.ast_string(s.expr, &html_wire_string/1)
+	    BundleLogic -> BundleLogic.expr_string(s, &html_wire_string/1)
+	  end
+    IO.write(f, "<li>Expression: #{str}</li>\n")
+  end
+
+  defp print_choice_logic_core(s, f) do
+    cond_str = WireExpr.ast_string(s.condition, &html_wire_string/1)
+    IO.write(f, "<li>Switch: #{cond_str} <table><tr><th>case</th><th>value</th></tr>\n")
+    Enum.reduce(s.choices, 0, fn c, i ->
+      c_str = WireExpr.ast_string(c, &html_wire_string/1)
+      IO.write(f, "<tr><td>#{i}</td><td>#{c_str}</td></tr>\n")
+      i + 1
+    end)
+    IO.write(f, "</table></li>\n")
+  end
+
+  defp print_condition_logic_core(s, f) do
+    IO.write(f, "<li>Conditions: <table><tr><th>condition</th><th>value</th></tr>\n")
+    s.conditions
     |> Enum.zip(s.choices)
     |> Enum.reduce(0, fn {co, ch}, i ->
-      co_str = WireExpr.ast_string(co, pin_fn)
-      ch_str = WireExpr.ast_string(ch, pin_fn)
+      co_str = WireExpr.ast_string(co, &html_wire_string/1)
+      ch_str = WireExpr.ast_string(ch, &html_wire_string/1)
       IO.write(f, "<tr><td>#{co_str}</td><td>#{ch_str}</td></tr>\n")
       i + 1
     end)
-    IO.write(f, "</table></li></ul></li>\n")
+    IO.write(f, "</table></li>\n")
+  end
+
+  defp print_case_logic_core(s, f) do
+    sub_str = WireExpr.ast_string(s.subject, &html_wire_string/1)
+    IO.write(f, "<li>Switch: #{sub_str} <table><tr><th>case</th><th>value</th></tr>\n")
+    s.cases
+    |> Enum.zip(s.choices)
+    |> Enum.reduce(0, fn {co, ch}, i ->
+      co_str = WireExpr.ast_string(co, &html_wire_string/1)
+      ch_str = WireExpr.ast_string(ch, &html_wire_string/1)
+      IO.write(f, "<tr><td>#{co_str}</td><td>#{ch_str}</td></tr>\n")
+      i + 1
+    end)
+    IO.write(f, "</table></li>\n")
+  end
+
+  defp print_seq_logic_core(s, f) do
+    clk_str = html_wire_string(s.clk)
+    IO.write(f, "<li>Clocked by: #{clk_str}</li>\n")
+    case s.core.__struct__ do
+      ChoiceLogic -> print_choice_logic_core(s.core, f)
+      ConditionLogic -> print_condition_logic_core(s.core, f)
+      CaseLogic -> print_case_logic_core(s.core, f)
+      _ -> print_simple_logic_core(s.core, f)
+    end
   end
 
   defp print_html_wires(s, f, as: hier) do

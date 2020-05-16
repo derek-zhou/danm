@@ -43,9 +43,6 @@ defmodule Danm.ChoiceLogic do
   create a choice logic. all width assume to be 0 for now
   """
   def new(condition, choices, as: n) do
-    [ _ | tail ] = choices |> Enum.count() |> Integer.digits(2)
-    Enum.each(tail, fn d ->
-      if d != 0, do: raise "choices must be power of 2 long" end) 
     map =
       [ condition | choices ]
       |> Enum.flat_map(fn x -> WireExpr.ids(x) end)
@@ -61,6 +58,11 @@ defmodule Danm.ChoiceLogic do
   @doc """
   whether condition has the right width
   """
-  def condition_width_match?(s), do: Enum.count(s.choices) === (1 <<< cond_width(s))
+  def condition_width_match?(s), do: Enum.count(s.choices) == (1 <<< cond_width(s))
+
+  @doc """
+  whether condition has the enough width
+  """
+  def condition_width_enough?(s), do: Enum.count(s.choices) <= (1 <<< cond_width(s))
 
 end

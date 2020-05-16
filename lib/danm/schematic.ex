@@ -12,6 +12,7 @@ defmodule Danm.Schematic do
   alias Danm.ChoiceLogic
   alias Danm.ConditionLogic
   alias Danm.CaseLogic
+  alias Danm.SeqLogic
   alias Danm.Library
   alias Danm.WireExpr
 
@@ -76,7 +77,7 @@ defmodule Danm.Schematic do
     end
 
     defp resolve_inputs(inst, in: s) do
-      inst.inputs
+      Sink.inputs(inst)
       |> Enum.reduce(inst, fn {p_name, w}, inst ->
 	w_new = Schematic.width_of_wire(s, s.wires[p_name])
 	cond do
@@ -374,6 +375,7 @@ defmodule Danm.Schematic do
       ChoiceLogic => 4,
       ConditionLogic => 5,
       CaseLogic => 6,
+      SeqLogic => 7,
       Sink => 9
     }
     Map.fetch!(order_map, s.insts[i].__struct__)
@@ -409,22 +411,15 @@ defmodule Danm.Schematic do
     s |> set_instance("_sink", to: sink) |> connect_wires(sink, "_sink")
   end
 
-  @doc ~S"""
-  assign an expression to a wire
-  """
-  def assign(s, str, as: n) do
-    cl = str |> WireExpr.parse() |> ComboLogic.new(as: n)
-    s |> set_instance(n, to: cl) |> connect_wires(cl, n)
-  end
-
-  @doc ~S"""
-  bundle expressions to a wire with given op
-  """
-  def bundle(s, strs, as: n), do: bundle(s, strs, with: :comma, as: n)
-  def bundle(s, strs, with: op, as: n) do
-    exprs = Enum.map(strs, fn str -> WireExpr.parse(str) end)
-    bl = BundleLogic.new(op, exprs, as: n)
-    s |> set_instance(n, to: bl) |> connect_wires(bl, n)
+  defp add_logic(s, core, options) do
+    logic =
+      cond do
+        options[:flop_by] -> SeqLogic.new(core, options[:flop_by])
+        true -> core
+      end
+    n = options[:as]
+    if n == nil, do: raise "logic must be named"
+    s |> set_instance(n, to: logic) |> connect_wires(logic, n)
   end
 
   defp connect_wires(s, inst, n) do
@@ -434,36 +429,89 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
-  pick one choice out of 2^n choices based on condition value
+  assign an expression to a wire
+  optional arguments:
+
+    * :as, name of the wire. required
+    * :flop_by, clock name of the flop
+
   """
-  def decode(s, condition, choices, as: n) do
+  def assign(s, str, options \\ []) do
+    core = str |> WireExpr.parse() |> ComboLogic.new(as: options[:as])
+    add_logic(s, core, options)
+  end
+
+  @doc ~S"""
+  bundle expressions to a wire with given op
+  optional arguments:
+
+    * :as, name of the wire. required
+    * :with, one of (:comma, :and, :or, :xor). default to :comma
+    * :flop_by, clock name of the flop
+
+  """
+  def bundle(s, strs, options \\ []) do
+    op = options[:with] || :comma
+    exprs = Enum.map(strs, fn str -> WireExpr.parse(str) end)
+    core = BundleLogic.new(op, exprs, as: options[:as])
+    add_logic(s, core, options)
+  end
+
+  @doc ~S"""
+  pick one choice out of 2^n choices based on condition value
+  optional arguments:
+
+    * :as, name of the wire. required
+    * :flop_by, clock name of the flop
+
+  """
+  def decode(s, condition, choices, options \\ []) do
     condition = WireExpr.parse(condition)
     choices = Enum.map(choices, fn str -> WireExpr.parse(str) end)
-    cl = ChoiceLogic.new(condition, choices, as: n)
-    s |> set_instance(n, to: cl) |> connect_wires(cl, n)   
+    core = ChoiceLogic.new(condition, choices, as: options[:as])
+    add_logic(s, core, options)
   end
 
   @doc ~S"""
   pick one choice out of n choices based on first none zero condition.
   the list is a list of {condition, choice} tuple
+  optional arguments:
+
+    * :as, name of the wire. required
+    * :flop_by, clock name of the flop
+
   """
-  def condition(s, list, as: n) do
+  def condition(s, list, options \\ []) do
     conditions = Enum.map(list, fn {str, _} -> WireExpr.parse(str) end)
     choices = Enum.map(list, fn {_, str} -> WireExpr.parse(str) end)
-    cl = ConditionLogic.new(conditions, choices, as: n)
-    s |> set_instance(n, to: cl) |> connect_wires(cl, n)    
+    core = ConditionLogic.new(conditions, choices, as: options[:as])
+    add_logic(s, core, options)
   end
 
   @doc ~S"""
   pick one choice out of n choices based on subject matching condition.
   the list is a list of {condition, choice} tuple
+  optional arguments:
+
+    * :as, name of the wire. required
+    * :flop_by, clock name of the flop
+
   """
-  def case(s, subject, list, as: n) do
+  def case(s, subject, list, options \\ []) do
     subject = WireExpr.parse(subject)
     conditions = Enum.map(list, fn {str, _} -> WireExpr.parse(str) end)
     choices = Enum.map(list, fn {_, str} -> WireExpr.parse(str) end)
-    cl = CaseLogic.new(subject, conditions, choices, as: n)
-    s |> set_instance(n, to: cl) |> connect_wires(cl, n)    
+    core = CaseLogic.new(subject, conditions, choices, as: options[:as])
+    add_logic(s, core, options)
+  end
+
+  @doc ~S"""
+  helper macro to maintain flow of the pipe operator
+  """
+  defmacro bind_to(value, name) do
+    quote do
+      unquote(name) = unquote(value)
+    end
   end
 
 end

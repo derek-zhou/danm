@@ -11,6 +11,7 @@ defmodule Danm.VerilogPrinting do
   alias Danm.ChoiceLogic
   alias Danm.ConditionLogic
   alias Danm.CaseLogic
+  alias Danm.SeqLogic
   alias Danm.BlackBox
   alias Danm.Schematic
 
@@ -77,8 +78,8 @@ defmodule Danm.VerilogPrinting do
 	|> Schematic.sort_sub_modules()
 	|> Enum.map(fn n -> s.insts[n] end)
 	|> Enum.reject(fn s -> inlined?(s) end)
-	|> Enum.reduce(print_self_verilog(state, ref),
-	  fn inst, state -> print_full_verilog(state, inst) end)
+	|> Enum.reduce(print_self_verilog(state, ref), fn inst, state ->
+	  print_full_verilog(state, inst) end)
     end
   end
 
@@ -149,6 +150,7 @@ defmodule Danm.VerilogPrinting do
 	ChoiceLogic -> print_one_choice_logic(state, i_name)
 	ConditionLogic -> print_one_condition_logic(state, i_name)
 	CaseLogic -> print_one_case_logic(state, i_name)
+	SeqLogic -> print_one_seq_logic(state, i_name)
 	Sink -> print_one_sink(state, i_name)
 	t when t in [ComboLogic, BundleLogic] ->
 	  print_one_simple_logic(state, i_name)
@@ -257,27 +259,38 @@ defmodule Danm.VerilogPrinting do
     s = current_design(state)
     f = state.stream
     inst = s.insts[i_name]
+    IO.write(f, "    assign ")
+    print_simple_logic_core(inst, i_name, "=", 0, f)
+    state
+  end
+
+  defp indent(n), do: String.duplicate("\t", div(n, 8)) <> String.duplicate(" ", rem(n, 8))
+
+  defp print_simple_logic_core(inst, i_name, assign, indent, f) do
     str = case inst.__struct__ do
 	    ComboLogic -> verilog_string(inst.expr)
 	    BundleLogic -> BundleLogic.expr_string(inst, &verilog_escape/1) 
 	  end
-    IO.write(f, "    assign #{verilog_escape(i_name)} = #{str};\n")
-    state
+    IO.write(f, "#{indent(indent)}#{verilog_escape(i_name)} #{assign} #{str};\n")
   end
 
   defp print_one_choice_logic(state, i_name) do
     s = current_design(state)
     f = state.stream
     inst = s.insts[i_name]
-    w = ChoiceLogic.cond_width(inst)
     IO.write(f, "    always @(#{sensitivity_string(inst)})\n")
-    IO.write(f, "        case (#{verilog_string(inst.condition)})\n")
+    print_choice_logic_core(inst, i_name, "=", 8, f)
+    state
+  end
+
+  defp print_choice_logic_core(inst, i_name, assign, indent, f) do
+    w = ChoiceLogic.cond_width(inst)
+    IO.write(f, "#{indent(indent)}case (#{verilog_string(inst.condition)})\n")
     Enum.reduce(inst.choices, 0, fn c, i ->
-      IO.write(f, "\t    #{w}'b#{pad_string(i, 2, w)}: #{verilog_escape(i_name)} = #{verilog_string(c)};\n")
+      IO.write(f, "#{indent(indent+4)}#{w}'b#{pad_string(i, 2, w)}: #{verilog_escape(i_name)} #{assign} #{verilog_string(c)};\n")
       i + 1
     end)
-    IO.write(f, "\tendcase\n")
-    state
+    IO.write(f, "#{indent(indent)}endcase\n")
   end
 
   defp print_one_condition_logic(state, i_name) do
@@ -285,23 +298,27 @@ defmodule Danm.VerilogPrinting do
     f = state.stream
     inst = s.insts[i_name]
     IO.write(f, "    always @(#{sensitivity_string(inst)})\n")
+    print_condition_logic_core(inst, i_name, "=", 8, f)
+    state
+  end
+
+  defp print_condition_logic_core(inst, i_name, assign, indent, f) do
     inst.conditions
     |> Enum.zip(inst.choices)
     |> Enum.reduce(0, fn {co, ch}, i ->
       case i do
 	0 ->
-	  IO.write(f, "\tif (#{verilog_string(co)})\n")
+	  IO.write(f, "#{indent(indent)}if (#{verilog_string(co)})\n")
 	_->
 	  case co do
-	    {:const, _, v} when v > 0 -> IO.write(f, "\telse\n")
+	    {:const, _, v} when v > 0 -> IO.write(f, "#{indent(indent)}else\n")
 	    _ ->
-	      IO.write(f, "\telse if (#{verilog_string(co)})\n")
+	      IO.write(f, "#{indent(indent)}else if (#{verilog_string(co)})\n")
 	  end
       end
-      IO.write(f, "\t    #{verilog_escape(i_name)} = #{verilog_string(ch)};\n")
+      IO.write(f, "#{indent(indent+4)}#{verilog_escape(i_name)} #{assign} #{verilog_string(ch)};\n")
       i + 1
     end)
-    state
   end
 
   defp print_one_case_logic(state, i_name) do
@@ -309,14 +326,36 @@ defmodule Danm.VerilogPrinting do
     f = state.stream
     inst = s.insts[i_name]
     IO.write(f, "    always @(#{sensitivity_string(inst)})\n")
-    IO.write(f, "        case (#{verilog_string(inst.condition)})\n")
+    print_case_logic_core(inst, i_name, "=", 8, f)
+    state
+  end
+
+  defp print_case_logic_core(inst, i_name, assign, indent, f) do
+    IO.write(f, "#{indent(indent)}case (#{verilog_string(inst.condition)})\n")
     inst.cases
     |> Enum.zip(inst.choices)
     |> Enum.reduce(0, fn {co, ch}, i ->
-      IO.write(f, "\t    #{verilog_string(co)}}: #{verilog_escape(i_name)} = #{verilog_string(ch)};\n")
+      IO.write(f, "#{indent(indent+4)}#{verilog_string(co)}}: #{verilog_escape(i_name)} #{assign} #{verilog_string(ch)};\n")
       i + 1
     end)
-    IO.write(f, "\tendcase\n")
+    IO.write(f, "#{indent(indent)}endcase\n")
+  end
+
+  defp print_one_seq_logic(state, i_name) do
+    s = current_design(state)
+    f = state.stream
+    inst = s.insts[i_name]
+    IO.write(f, "    always @(posedge #{verilog_escape(inst.clk)})\n")
+    case inst.core.__struct__ do
+      ChoiceLogic ->
+	print_choice_logic_core(inst.core, i_name, "<=", 8, f)
+      ConditionLogic ->
+	print_condition_logic_core(inst.core, i_name, "<=", 8, f)
+      CaseLogic ->
+	print_case_logic_core(inst.core, i_name, "<=", 8, f)
+      _->
+	print_simple_logic_core(inst.core, i_name, "<=", 8, f)
+    end
     state
   end
 

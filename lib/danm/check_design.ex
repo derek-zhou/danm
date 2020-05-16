@@ -11,6 +11,7 @@ defmodule Danm.CheckDesign do
   alias Danm.ChoiceLogic
   alias Danm.ConditionLogic
   alias Danm.CaseLogic
+  alias Danm.SeqLogic
   
   defstruct dict: %{},
     stack: [],
@@ -92,6 +93,7 @@ defmodule Danm.CheckDesign do
       ChoiceLogic -> check_choice_logic(state)
       ConditionLogic -> check_condition_logic(state)
       CaseLogic -> check_case_logic(state)
+      SeqLogic -> check_seq_logic(state)
       _ -> state
     end
   end
@@ -143,7 +145,12 @@ defmodule Danm.CheckDesign do
       |> Entity.ports()
       |> Enum.reduce(state, fn p_name, state ->
 	pin = "#{i_name}/#{p_name}"
-	error(state, "unconnecterd pin: #{pin}", if: !Map.has_key?(map, pin))
+	{dir, _} = Entity.port_at(s.insts[i_name], p_name)
+	cond do
+	  Map.has_key?(map, pin) -> state
+	  dir == :output -> warning(state, "unconnecterd output pin: #{pin}")
+	  true -> error(state, "unconnecterd input pin: #{pin}")
+	end
       end)
     end)
   end
@@ -209,4 +216,37 @@ defmodule Danm.CheckDesign do
     |> warning("All cases must has matching width",
           if: !CaseLogic.width_match?(s))
   end
+
+  # be explicit here
+  defp check_seq_logic(state) do
+    s = current_design(state)
+    core = s.core
+    case core.__struct__ do
+      ComboLogic -> state
+      BundleLogic ->
+	case core.op do
+	  :comma -> state
+	  _ ->
+	    warning(state, "bundling wires with unmatched width",
+	      if: !WireExpr.width_match?(core.exprs, in: core.inputs))
+	end
+      ChoiceLogic ->
+	state
+	|> error("condition in choice has less than enough width",
+          if: !ChoiceLogic.condition_width_enough?(core))
+	|> warning("choices have unmatched width",
+	  if: !WireExpr.width_match?(core.choices, in: core.inputs))
+      ConditionLogic ->
+	state
+	|> warning("choices have unmatched width",
+          if: !WireExpr.width_match?(core.choices, in: core.inputs))
+      CaseLogic ->
+	state
+	|> warning("choices have unmatched width",
+	  if: !WireExpr.width_match?(core.choices, in: core.inputs))
+	|> warning("All cases must has matching width",
+          if: !CaseLogic.width_match?(core))
+    end
+  end
+
 end
