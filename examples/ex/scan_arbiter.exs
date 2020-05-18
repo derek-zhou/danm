@@ -34,7 +34,7 @@ defmodule Danm.Schematic.ScanArbiter do
     |> bundle(Enum.map(width-1..0, fn i -> "client#{i}_en" end), as: "client_en")
     |> bind_to(s)
     
-    case s.params["width"] || 8 do
+    case width do
       1 -> s |> assign("(busy|lag)?0:request", as: "grant")
       width ->
 	mask = (1<<<width)-1

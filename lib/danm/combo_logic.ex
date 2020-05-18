@@ -6,6 +6,7 @@ defmodule Danm.ComboLogic do
 
   alias Danm.Entity
   alias Danm.WireExpr
+  alias Danm.ComboLogic
 
   @doc """
   A combo logic is just a wrapper around an expr. output is a string
@@ -23,15 +24,8 @@ defmodule Danm.ComboLogic do
     def name(b), do: b.output
     def doc_string(_), do: "Just a combo logic"
     def type_string(_), do: "combo logic"
-    def ports(b), do: [ b.output | Map.keys(b.inputs) ]
-
-    def port_at(b, name) do
-      cond do
-	name == b.output -> {:output, b.width}
-	Map.has_key?(b.inputs, name) -> {:input, b.inputs[name]}
-	true -> nil
-      end
-    end
+    def ports(b), do: ComboLogic.ports(b)
+    def port_at(b, name), do: ComboLogic.port_at(b, name)
 
   end
 
@@ -41,6 +35,32 @@ defmodule Danm.ComboLogic do
   def new(expr, as: n) do
     map = expr |> WireExpr.ids() |> Map.new(fn x -> {x, 0} end)
     %__MODULE__{expr: expr, output: n, inputs: map}
+  end
+
+  @doc """
+  whether output is part of inputs
+  """
+  def loop_back?(b), do: Map.has_key?(b.inputs, b.output)
+
+  @doc """
+  my ports function
+  """
+  def ports(b) do
+    cond do
+      loop_back?(b) -> Map.keys(b.inputs)
+      true -> [ b.output | Map.keys(b.inputs) ]
+    end
+  end
+
+  @doc """
+  my port_at function
+  """
+  def port_at(b, name) do
+    cond do
+      name == b.output -> {:output, b.width}
+      Map.has_key?(b.inputs, name) -> {:input, b.inputs[name]}
+      true -> nil
+    end
   end
 
 end

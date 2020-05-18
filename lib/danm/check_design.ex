@@ -7,6 +7,7 @@ defmodule Danm.CheckDesign do
   alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Schematic
+  alias Danm.ComboLogic
   alias Danm.BundleLogic
   alias Danm.ChoiceLogic
   alias Danm.ConditionLogic
@@ -89,6 +90,7 @@ defmodule Danm.CheckDesign do
     case current_design(state).__struct__ do
       BlackBox -> check_black_box_design(state)
       Schematic -> state |> check_instances() |> check_self_schematic()
+      ComboLogic -> check_combo_logic(state)
       BundleLogic -> check_bundle_logic(state)
       ChoiceLogic -> check_choice_logic(state)
       ConditionLogic -> check_condition_logic(state)
@@ -178,6 +180,11 @@ defmodule Danm.CheckDesign do
     end)
   end
 
+  defp check_combo_logic(state) do
+    s = current_design(state)
+    error(state, "output looped back to input", if: ComboLogic.loop_back?(s))
+  end
+
   defp check_bundle_logic(state) do
     s = current_design(state)
     case s.op do
@@ -186,11 +193,15 @@ defmodule Danm.CheckDesign do
 	warning(state, "bundling wires with unmatched width",
 	  if: !WireExpr.width_match?(s.exprs, in: s.inputs))
     end
+    |> error("output looped back to input",
+	  if: ComboLogic.loop_back?(s))
   end
 
   defp check_choice_logic(state) do
     s = current_design(state)
     state
+    |> error("output looped back to input",
+	  if: ComboLogic.loop_back?(s))
     |> error("condition in choice has wrong width",
           if: !ChoiceLogic.condition_width_match?(s))
     |> warning("choices have unmatched width",
@@ -200,6 +211,8 @@ defmodule Danm.CheckDesign do
   defp check_condition_logic(state) do
     s = current_design(state)
     state
+    |> error("output looped back to input",
+	  if: ComboLogic.loop_back?(s))
     |> error("last condition must be always true",
           if: !ConditionLogic.last_is_true?(s))
     |> warning("choices have unmatched width",
@@ -209,6 +222,8 @@ defmodule Danm.CheckDesign do
   defp check_case_logic(state) do
     s = current_design(state)
     state
+    |> error("output looped back to input",
+	  if: ComboLogic.loop_back?(s))
     |> error("last case must be default",
           if: !CaseLogic.last_is_default?(s))
     |> warning("choices have unmatched width",

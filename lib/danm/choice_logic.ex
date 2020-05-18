@@ -6,6 +6,7 @@ defmodule Danm.ChoiceLogic do
 
   alias Danm.Entity
   alias Danm.WireExpr
+  alias Danm.ComboLogic
 
   use Bitwise, only_operators: true
   
@@ -27,15 +28,8 @@ defmodule Danm.ChoiceLogic do
     def name(b), do: b.output
     def doc_string(_), do: "Full case decoder"
     def type_string(_), do: "full case decoder"
-    def ports(b), do: [ b.output | Map.keys(b.inputs) ]
-
-    def port_at(b, name) do
-      cond do
-	name == b.output -> {:output, b.width}
-	Map.has_key?(b.inputs, name) -> {:input, b.inputs[name]}
-	true -> nil
-      end
-    end
+    def ports(b), do: ComboLogic.ports(b)
+    def port_at(b, name), do: ComboLogic.port_at(b, name)
 
   end
 

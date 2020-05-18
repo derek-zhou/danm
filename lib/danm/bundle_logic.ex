@@ -5,6 +5,7 @@ defmodule Danm.BundleLogic do
 
   alias Danm.Entity
   alias Danm.WireExpr
+  alias Danm.ComboLogic
 
   @doc """
   A bundle logic is just a wrapper around a list of expr. output is a string
@@ -35,15 +36,8 @@ defmodule Danm.BundleLogic do
     end
     
     def type_string(_), do: "bundle logic"
-    def ports(b), do: [ b.output | Map.keys(b.inputs) ]
-
-    def port_at(b, name) do
-      cond do
-	name == b.output -> {:output, b.width}
-	Map.has_key?(b.inputs, name) -> {:input, b.inputs[name]}
-	true -> nil
-      end
-    end
+    def ports(b), do: ComboLogic.ports(b)
+    def port_at(b, name), do: ComboLogic.port_at(b, name)
 
   end
 
