@@ -59,7 +59,9 @@ defmodule Danm.Library do
       nil ->
 	case Enum.find_value(l.elixir_path, fn p ->
 	      try do
-		[ {m, _} | _ ] = Code.compile_file("#{name}.exs", p)
+		Code.require_file("#{name}.exs", p)
+		# naming convention enforced
+		m = String.to_atom("Elixir.Danm.Schematic." <> Macro.camelize(name))
 		%Schematic{name: name, module: m, src: "#{p}/#{name}.exs"}
 	      rescue
 		Code.LoadError -> nil
