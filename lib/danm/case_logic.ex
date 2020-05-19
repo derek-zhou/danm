@@ -25,7 +25,6 @@ defmodule Danm.CaseLogic do
     end
 
     def name(b), do: b.output
-    def doc_string(_), do: "Case decoder"
     def type_string(_), do: "case decoder"
     def ports(b), do: ComboLogic.ports(b)
     def port_at(b, name), do: ComboLogic.port_at(b, name)

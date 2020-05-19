@@ -28,13 +28,6 @@ defmodule Danm.BundleLogic do
 
     def name(b), do: b.output
 
-    def doc_string(b) do
-      case b.op do
-	:comma -> "Concatenate several expressions together"
-	op -> "Bundle several expression together with #{op}"
-      end
-    end
-    
     def type_string(_), do: "bundle logic"
     def ports(b), do: ComboLogic.ports(b)
     def port_at(b, name), do: ComboLogic.port_at(b, name)

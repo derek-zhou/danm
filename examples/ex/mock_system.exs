@@ -10,6 +10,9 @@ defmodule Danm.Schematic.MockSystem do
     |> create_port("reset_")
     |> add("scan_arbiter", as: "arbiter",
        parameters: %{"width" => client_count})
+    |> add("collision_detector", as: "u_cd",
+       parameters: %{"width" => client_count})
+    |> connect(["arbiter/client_en", "u_cd/in"])
     |> bind_to(s)
 
     Enum.reduce(0..client_count-1, s, fn i, s ->
@@ -24,7 +27,6 @@ defmodule Danm.Schematic.MockSystem do
     |> bundle(Enum.map(client_count-1..0, fn i -> "request_#{i}" end), as: "request")
     |> bundle(Enum.map(client_count-1..0, fn i -> "busy_#{i}" end), with: :or, as: "busy")
     |> auto_connect()
-    |> sink("client_en")
   end
 
 end

@@ -15,6 +15,7 @@ defmodule Danm.VerilogPrinting do
   alias Danm.CaseLogic
   alias Danm.SeqLogic
   alias Danm.FiniteStateMachine
+  alias Danm.Assertion
 
   defstruct dict: %{},
     stack: [],
@@ -116,7 +117,7 @@ defmodule Danm.VerilogPrinting do
     port_string = sorted_ports |> Enum.map(&verilog_escape/1) |> Enum.join(",\n\t")
     IO.write(f, ~s"""
     /**
-    #{Entity.doc_string(s)}
+    #{Schematic.doc_string(s)}
     */
     module #{ref}(
     	#{port_string});
@@ -154,6 +155,7 @@ defmodule Danm.VerilogPrinting do
 	SeqLogic -> print_one_seq_logic(state, i_name)
 	FiniteStateMachine -> print_one_fsm_logic(state, i_name)
 	Sink -> print_one_sink(state, i_name)
+	Assertion -> print_one_assertion(state, i_name)
 	t when t in [ComboLogic, BundleLogic] ->
 	  print_one_simple_logic(state, i_name)
 	t when t in [BlackBox, Schematic] ->
@@ -385,6 +387,23 @@ defmodule Danm.VerilogPrinting do
     end)
     IO.write(f, "\t    default: #{verilog_escape(i_name)} <= #{inst.width}'d0;\n")
     IO.write(f, "\tendcase\n")
+    state
+  end
+
+  defp print_one_assertion(state, i_name) do
+    s = current_design(state)
+    f = state.stream
+    inst = s.insts[i_name]
+    case inst.clk do
+      nil -> IO.write(f, "    always @(#{sensitivity_string(inst)})\n")
+      clk -> IO.write(f, "    always @(posedge #{verilog_escape(clk)})\n")
+    end
+    IO.write(f, ~s"""
+    \tif (($stime > #{inst.silent_time})&&#{verilog_string(inst.expr)}) begin
+    \t    $fdisplay(32'h80000002, "Assertion #{s.name}.#{i_name} failed at %%d", $stime);
+    \t    $finish;
+    \tend
+    """)
     state
   end
 

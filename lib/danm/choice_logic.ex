@@ -26,7 +26,6 @@ defmodule Danm.ChoiceLogic do
     end
 
     def name(b), do: b.output
-    def doc_string(_), do: "Full case decoder"
     def type_string(_), do: "full case decoder"
     def ports(b), do: ComboLogic.ports(b)
     def port_at(b, name), do: ComboLogic.port_at(b, name)

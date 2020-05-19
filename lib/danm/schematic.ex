@@ -14,6 +14,7 @@ defmodule Danm.Schematic do
   alias Danm.CaseLogic
   alias Danm.SeqLogic
   alias Danm.FiniteStateMachine
+  alias Danm.Assertion
   alias Danm.Library
 
   @doc """
@@ -47,13 +48,6 @@ defmodule Danm.Schematic do
     end
 
     def name(b), do: b.name
-
-    def doc_string(b) do
-      cond do
-	function_exported?(b.module, :doc_string, 1) -> apply(b.module, :doc_string, [b])
-	true -> "description forth coming"
-      end
-    end
 
     def type_string(b), do: "schematic: " <> b.name
 
@@ -125,6 +119,20 @@ defmodule Danm.Schematic do
       [ {inst, port} | list ]
     end)
     %{s | wires: Map.put(s.wires, n, list)}
+  end
+
+  @doc ~S"""
+  return a documentation string
+  """
+  def doc_string(b) do
+    case b.__struct__ do
+      BlackBox -> b.comment
+      Schematic ->
+	cond do
+	  function_exported?(b.module, :doc_string, 1) -> apply(b.module, :doc_string, [b])
+	  true -> "description forth coming"
+	end
+    end
   end
 
   @doc ~S"""
@@ -376,8 +384,9 @@ defmodule Danm.Schematic do
       ConditionLogic => 5,
       CaseLogic => 6,
       SeqLogic => 7,
-      FiniteStateMachine => 7,
-      Sink => 9
+      FiniteStateMachine => 8,
+      Assertion => 9,
+      Sink => 10
     }
     Map.fetch!(order_map, s.insts[i].__struct__)
   end
@@ -543,6 +552,27 @@ defmodule Danm.Schematic do
     Enum.reduce(options, s, fn {symbol, name}, s ->
       assign(s, "#{fsm_name}==#{w}d#{Map.fetch!(lut, symbol)}", as: name)
     end)
+  end
+
+  defp unique_name_like(name, from: dict, salt: s) do
+    salted = "#{name}_#{s}"
+    cond do
+      Map.has_key?(dict, salted) -> unique_name_like(name, from: dict, salt: s + 1)
+      true -> salted
+    end
+  end
+
+  @doc ~S"""
+  define an assertion. Assertions are auto-named.
+  optional arguments:
+
+    * :flop_by, clock name of the flop if existed
+
+  """
+  def forbid(s, str, options \\ []) do
+    logic = Assertion.new(str, options[:flop_by])
+    n = unique_name_like("_assert", from: s.insts, salt: 0)
+    s |> set_instance(n, to: logic) |> connect_wires(logic, n)
   end
 
   @doc ~S"""

@@ -14,11 +14,6 @@ defprotocol Danm.Entity do
   def name(b)
 
   @doc ~S"""
-  return the doc string of the design
-  """
-  def doc_string(b)
-
-  @doc ~S"""
   return the type string of the design
   """
   def type_string(b)

@@ -29,7 +29,6 @@ defmodule Danm.FiniteStateMachine do
 
     def elaborate(b), do: b
     def name(b), do: b.output
-    def doc_string(_), do: "A Finite State Machine"
     def type_string(_), do: "FSM logic"
 
     def ports(b), do: [b.clk | ComboLogic.ports(b)]

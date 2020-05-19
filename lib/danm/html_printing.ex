@@ -15,6 +15,7 @@ defmodule Danm.HtmlPrinting do
   alias Danm.CaseLogic
   alias Danm.SeqLogic
   alias Danm.FiniteStateMachine
+  alias Danm.Assertion
 
   @doc ~S"""
   generate a hier index to the set of html files
@@ -108,6 +109,7 @@ defmodule Danm.HtmlPrinting do
 	      CaseLogic -> print_html_case_logic(inst, f, as: i_name)
 	      SeqLogic -> print_html_seq_logic(inst, f, as: i_name)
 	      FiniteStateMachine -> print_html_fsm_logic(inst, f, as: i_name)
+	      Assertion -> print_html_assertion(inst, f, as: i_name)
 	      Sink -> print_html_sink(inst, f, as: i_name)
 	      t when t in [ComboLogic, BundleLogic] ->
 		print_html_simple_logic(inst, f, as: i_name)
@@ -180,7 +182,7 @@ defmodule Danm.HtmlPrinting do
     IO.write(f, ~s"""
     | <a href="#{top_path}top.html">Top</a>
     <h1>#{title}</h1>
-    <p>#{Entity.doc_string(s)}</p>
+    <p>#{Schematic.doc_string(s)}</p>
     <p>Defined in: #{s.src}</p><hr/>
     """)
     s
@@ -250,17 +252,29 @@ defmodule Danm.HtmlPrinting do
   end
 
   defp print_html_sink(s, f, as: self) do
+    print_html_logic(s, f, &print_sink_core/2, as: self)
+  end
+
+  defp print_sink_core(s, f) do
     conn_string =
       s
       |> BlackBox.sort_ports()
-      |> Enum.map(fn p_name ->
-      "<a id=\"PIN_#{self}/#{p_name}\" href=\"#WIRE_#{p_name}\">#{p_name}</a>" end)
+      |> Enum.map(&html_wire_string/1)
       |> Enum.join(", ")
+    IO.write(f, "<li>Connections: #{conn_string}</li>\n")
+  end
 
-    IO.write(f, ~s"""
-    <li><h3>Instance <a id="INST_#{self}">#{self} (#{Entity.type_string(s)})</a></h3>
-    <ul><li>Connections: #{conn_string}</li></ul></li>
-    """)
+  defp print_html_assertion(s, f, as: self) do
+    print_html_logic(s, f, &print_assertion_core/2, as: self)
+  end
+
+  defp print_assertion_core(s, f) do
+    str = WireExpr.ast_string(s.expr, &html_wire_string/1)
+    IO.write(f, "<li>Assertion: #{str}</li>\n")
+    if s.clk do
+      clk_str = html_wire_string(s.clk)
+      IO.write(f, "<li>Clocked by: #{clk_str}</li>\n")
+    end
   end
 
   defp html_wire_string(x), do: "<a href=\"#WIRE_#{x}\">#{x}</a>"

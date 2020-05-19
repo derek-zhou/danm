@@ -15,6 +15,7 @@ defmodule Danm.CheckDesign do
   alias Danm.CaseLogic
   alias Danm.SeqLogic
   alias Danm.FiniteStateMachine
+  alias Danm.Assertion
 
   defstruct dict: %{},
     stack: [],
@@ -91,6 +92,7 @@ defmodule Danm.CheckDesign do
   defp check_current_design(state) do
     case current_design(state).__struct__ do
       Sink -> state
+      Assertion -> state
       BlackBox -> check_black_box_design(state)
       Schematic -> state |> check_instances() |> check_self_schematic()
       ComboLogic -> check_combo_logic(state)

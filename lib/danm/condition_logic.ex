@@ -24,7 +24,6 @@ defmodule Danm.ConditionLogic do
     end
 
     def name(b), do: b.output
-    def doc_string(_), do: "Priority decoder"
     def type_string(_), do: "priority decoder"
     def ports(b), do: ComboLogic.ports(b)
     def port_at(b, name), do: ComboLogic.port_at(b, name)

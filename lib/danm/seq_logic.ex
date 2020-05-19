@@ -22,8 +22,7 @@ defmodule Danm.SeqLogic do
     end
 
     def name(b), do: Entity.name(b.core)
-    def doc_string(_), do: "Just a seq logic"
-    def type_string(_), do: "seq logic"
+    def type_string(_), do: "sequential logic"
     
     def ports(b), do: [b.clk | Entity.ports(b.core) ]
 
