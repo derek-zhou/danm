@@ -13,8 +13,8 @@ defmodule Danm.Schematic do
   alias Danm.ConditionLogic
   alias Danm.CaseLogic
   alias Danm.SeqLogic
+  alias Danm.FiniteStateMachine
   alias Danm.Library
-  alias Danm.WireExpr
 
   @doc """
   A schematic is an extention of a black box.
@@ -376,6 +376,7 @@ defmodule Danm.Schematic do
       ConditionLogic => 5,
       CaseLogic => 6,
       SeqLogic => 7,
+      FiniteStateMachine => 7,
       Sink => 9
     }
     Map.fetch!(order_map, s.insts[i].__struct__)
@@ -389,6 +390,18 @@ defmodule Danm.Schematic do
     end
   end
 
+  defp compare_conn({ins_a, port_a}, {ins_b, port_b}, s) do
+    {dir_a, _} = pin_property(s, ins_a, port_a)
+    {dir_b, _} = pin_property(s, ins_b, port_b)
+    cond do
+      dir_a > dir_b -> true
+      dir_a < dir_b -> false
+      ins_a < ins_b -> true
+      ins_a > ins_b -> false
+      true -> port_a <= port_b
+    end
+  end
+
   @doc ~S"""
   return a sorted list of instances
   """
@@ -397,6 +410,11 @@ defmodule Danm.Schematic do
     |> Map.keys()
     |> Enum.sort(fn a, b -> compare_inst(inst_order_of(a, s), a, inst_order_of(b, s), b) end)
   end
+
+  @doc ~S"""
+  return a sorted list of conns for a wire
+  """
+  def sort_conns(conns, s), do: Enum.sort(conns, fn a, b -> compare_conn(a, b, s) end)
 
   @doc ~S"""
   sink a wire, so it has a fake load and not to be auto-exposed
@@ -437,7 +455,7 @@ defmodule Danm.Schematic do
 
   """
   def assign(s, str, options \\ []) do
-    core = str |> WireExpr.parse() |> ComboLogic.new(as: options[:as])
+    core = ComboLogic.new(str, as: options[:as])
     add_logic(s, core, options)
   end
 
@@ -452,8 +470,7 @@ defmodule Danm.Schematic do
   """
   def bundle(s, strs, options \\ []) do
     op = options[:with] || :comma
-    exprs = Enum.map(strs, fn str -> WireExpr.parse(str) end)
-    core = BundleLogic.new(op, exprs, as: options[:as])
+    core = BundleLogic.new(op, strs, as: options[:as])
     add_logic(s, core, options)
   end
 
@@ -466,8 +483,6 @@ defmodule Danm.Schematic do
 
   """
   def decode(s, condition, choices, options \\ []) do
-    condition = WireExpr.parse(condition)
-    choices = Enum.map(choices, fn str -> WireExpr.parse(str) end)
     core = ChoiceLogic.new(condition, choices, as: options[:as])
     add_logic(s, core, options)
   end
@@ -482,9 +497,7 @@ defmodule Danm.Schematic do
 
   """
   def condition(s, list, options \\ []) do
-    conditions = Enum.map(list, fn {str, _} -> WireExpr.parse(str) end)
-    choices = Enum.map(list, fn {_, str} -> WireExpr.parse(str) end)
-    core = ConditionLogic.new(conditions, choices, as: options[:as])
+    core = ConditionLogic.new(list, as: options[:as])
     add_logic(s, core, options)
   end
 
@@ -497,12 +510,39 @@ defmodule Danm.Schematic do
     * :flop_by, clock name of the flop
 
   """
-  def case(s, subject, list, options \\ []) do
-    subject = WireExpr.parse(subject)
-    conditions = Enum.map(list, fn {str, _} -> WireExpr.parse(str) end)
-    choices = Enum.map(list, fn {_, str} -> WireExpr.parse(str) end)
-    core = CaseLogic.new(subject, conditions, choices, as: options[:as])
+  def switch(s, subject, list, options \\ []) do
+    core = CaseLogic.new(subject, list, as: options[:as])
     add_logic(s, core, options)
+  end
+
+  @doc ~S"""
+  define a finite state machine
+  optional arguments:
+
+    * :as, name of the wire. required
+    * :flop_by, clock name of the flop, required
+    * :reset_by, an expression of reset condition, optional
+
+  """
+  def fsm(s, graph, options \\ []) do
+    n = options[:as]
+    if n == nil, do: raise "logic must be named"
+    clk = options[:flop_by]
+    if clk == nil, do: raise "FSM must be clocked"
+    logic = FiniteStateMachine.new(graph, clk, reset_by: options[:reset_by], as: n)
+    s |> set_instance(n, to: logic) |> connect_wires(logic, n)
+  end
+
+  @doc ~S"""
+  make some one bit wire that represent the state of a FSM
+  """
+  def assign_fsm(s, fsm_name, options) do
+    fsm = s.insts[fsm_name]
+    w = fsm.width
+    lut = fsm.lut
+    Enum.reduce(options, s, fn {symbol, name}, s ->
+      assign(s, "#{fsm_name}==#{w}d#{Map.fetch!(lut, symbol)}", as: name)
+    end)
   end
 
   @doc ~S"""

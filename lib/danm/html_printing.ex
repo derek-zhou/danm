@@ -4,6 +4,8 @@ defmodule Danm.HtmlPrinting do
   """
 
   alias Danm.Entity
+  alias Danm.BlackBox
+  alias Danm.Schematic
   alias Danm.Sink
   alias Danm.WireExpr
   alias Danm.ComboLogic
@@ -12,8 +14,7 @@ defmodule Danm.HtmlPrinting do
   alias Danm.ConditionLogic
   alias Danm.CaseLogic
   alias Danm.SeqLogic
-  alias Danm.Schematic
-  alias Danm.BlackBox
+  alias Danm.FiniteStateMachine
 
   @doc ~S"""
   generate a hier index to the set of html files
@@ -106,10 +107,12 @@ defmodule Danm.HtmlPrinting do
 	      ConditionLogic -> print_html_condition_logic(inst, f, as: i_name)
 	      CaseLogic -> print_html_case_logic(inst, f, as: i_name)
 	      SeqLogic -> print_html_seq_logic(inst, f, as: i_name)
+	      FiniteStateMachine -> print_html_fsm_logic(inst, f, as: i_name)
 	      Sink -> print_html_sink(inst, f, as: i_name)
 	      t when t in [ComboLogic, BundleLogic] ->
 		print_html_simple_logic(inst, f, as: i_name)
-	      _ -> print_html_instance(inst, f, as: "#{hier}/#{i_name}", lookup: map)
+	      t when t in [BlackBox, Schematic] ->
+		print_html_instance(inst, f, as: "#{hier}/#{i_name}", lookup: map)
 	    end
 	  end)
 	  IO.write(f, "</ul><hr/>\n")
@@ -282,6 +285,10 @@ defmodule Danm.HtmlPrinting do
     print_html_logic(s, f, &print_seq_logic_core/2, as: self)
   end
 
+  defp print_html_fsm_logic(s, f, as: self) do
+    print_html_logic(s, f, &print_fsm_logic_core/2, as: self)
+  end
+
   defp print_html_logic(s, f, core_fn, as: self) do
     IO.write(f, ~s"""
     <li><h3>Instance <a id="INST_#{self}" href="#WIRE_#{self}">#{self}</a>
@@ -314,11 +321,10 @@ defmodule Danm.HtmlPrinting do
     IO.write(f, "<li>Conditions: <table><tr><th>condition</th><th>value</th></tr>\n")
     s.conditions
     |> Enum.zip(s.choices)
-    |> Enum.reduce(0, fn {co, ch}, i ->
+    |> Enum.each(fn {co, ch} ->
       co_str = WireExpr.ast_string(co, &html_wire_string/1)
       ch_str = WireExpr.ast_string(ch, &html_wire_string/1)
       IO.write(f, "<tr><td>#{co_str}</td><td>#{ch_str}</td></tr>\n")
-      i + 1
     end)
     IO.write(f, "</table></li>\n")
   end
@@ -328,11 +334,10 @@ defmodule Danm.HtmlPrinting do
     IO.write(f, "<li>Switch: #{sub_str} <table><tr><th>case</th><th>value</th></tr>\n")
     s.cases
     |> Enum.zip(s.choices)
-    |> Enum.reduce(0, fn {co, ch}, i ->
+    |> Enum.each(fn {co, ch} ->
       co_str = WireExpr.ast_string(co, &html_wire_string/1)
       ch_str = WireExpr.ast_string(ch, &html_wire_string/1)
       IO.write(f, "<tr><td>#{co_str}</td><td>#{ch_str}</td></tr>\n")
-      i + 1
     end)
     IO.write(f, "</table></li>\n")
   end
@@ -346,6 +351,25 @@ defmodule Danm.HtmlPrinting do
       CaseLogic -> print_case_logic_core(s.core, f)
       _ -> print_simple_logic_core(s.core, f)
     end
+  end
+
+  defp print_fsm_logic_core(s, f) do
+    clk_str = html_wire_string(s.clk)
+    IO.write(f, "<li>Clocked by: #{clk_str}</li>\n")
+    IO.write(f, "<li>State transition: <table>\n")
+    IO.write(f, "<tr><th>state</th><th>condition</th><th>next state</th></tr>\n")
+    Enum.each(s.graph, fn {state, transit} ->
+      span = Enum.count(transit)
+      Enum.reduce(transit, 0, fn {co, ns}, i ->
+	co_str = WireExpr.ast_string(co, &html_wire_string/1)
+	case i do
+	  0 ->IO.write(f, "<tr><td rowspan=\"#{span}\">#{state}</td><td>#{co_str}</td><td>#{ns}</td></tr>\n")
+	  _ -> IO.write(f, "<tr><td>#{co_str}</td><td>#{ns}</td></tr>\n")
+	end
+	i + 1
+      end)
+    end)
+    IO.write(f, "</table></li>\n")
   end
 
   defp print_html_wires(s, f, as: hier) do
@@ -369,6 +393,7 @@ defmodule Danm.HtmlPrinting do
 	Enum.each(s.wires, fn {w_name, conns} ->
 	  conns
 	  |> Enum.reject(fn {i, _} -> i == :self end)
+	  |> Schematic.sort_conns(s)
 	  |> print_html_wire(s, f,
 	    as: w_name,
 	    width: map[w_name],

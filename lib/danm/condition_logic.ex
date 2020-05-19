@@ -34,7 +34,9 @@ defmodule Danm.ConditionLogic do
   @doc """
   create a condition logic. all width assume to be 0 for now
   """
-  def new(conditions, choices, as: n) do
+  def new(list, as: n) do
+    conditions = Enum.map(list, fn {str, _} -> WireExpr.parse(str) end)
+    choices = Enum.map(list, fn {_, str} -> WireExpr.parse(str) end)
     map =
       (conditions ++ choices)
       |> Enum.flat_map(fn x -> WireExpr.ids(x) end)

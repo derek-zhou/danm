@@ -32,7 +32,8 @@ defmodule Danm.ComboLogic do
   @doc """
   create a combo logic. all width assume to be 0 for now
   """
-  def new(expr, as: n) do
+  def new(str, as: n) do
+    expr = WireExpr.parse(str)
     map = expr |> WireExpr.ids() |> Map.new(fn x -> {x, 0} end)
     %__MODULE__{expr: expr, output: n, inputs: map}
   end

@@ -31,26 +31,18 @@ starve anyone.'>
 	self let: 'long_busy' be: 'lag|busy'.
 
 	"it is possible that busy is not asserted in the same cycle"
-	self 
-	    let: 'lag'
-	    beIfs: 
-		{'~reset_' -> '1b0'.
-		'busy' -> '1b0'.
-		'|request' -> '1b1'}
-	    clockedBy: 'clk'.
-	0 to: self width - 1
-	    do: 
-		[:i | 
-		self 
-		    let: 'client%1_en' % {i}
-		    beIfs: 
-			{'~reset_' -> '1b0'.
-			'grant[%1]' % {i} -> '1b1'.
-			'~long_busy' -> '1b0'}
-		    clockedBy: 'clk'.
-		i == 0 
-		    ifTrue: [string := 'client0_en']
-		    ifFalse: [string := 'client%1_en,' % {i} , string]].
+	self let: 'lag' beIfs: {
+	    '~reset_' -> '1b0'.
+	    'busy' -> '1b0'.
+	    '|request' -> '1b1' } clockedBy: 'clk'.
+	0 to: self width - 1 do: [
+	    :i |
+	    self let: 'client%1_en' % {i} beIfs: {
+		'~reset_' -> '1b0'.
+		'grant[%1]' % {i} -> '1b1'.
+		'~long_busy' -> '1b0' } clockedBy: 'clk'.
+	    i == 0 ifTrue: [string := 'client0_en']
+	      ifFalse: [string := 'client%1_en,' % {i} , string]].
 	self let: 'client_en' be: string.
 	self connect: {'arb/busy'} name: 'long_busy'.
 	self autoConnect

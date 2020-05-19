@@ -1,13 +1,13 @@
-defmodule Danm.RrArbiterTest do
+defmodule Danm.MockSystemTest do
   use ExUnit.Case
   import Danm
 
   setup_all do
     {:ok,
-     [sch: build("rr_scan_arbiter",
+     [sch: build("mock_system",
 	 verilog_path: ["examples/verilog"],
 	 elixir_path: ["examples/ex"],
-	 parameters: %{"width" => 16})]}
+	 parameters: %{"client_count" => 16})]}
     end
 
   test "check design", context do

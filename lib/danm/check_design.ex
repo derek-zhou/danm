@@ -7,13 +7,15 @@ defmodule Danm.CheckDesign do
   alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Schematic
+  alias Danm.Sink
   alias Danm.ComboLogic
   alias Danm.BundleLogic
   alias Danm.ChoiceLogic
   alias Danm.ConditionLogic
   alias Danm.CaseLogic
   alias Danm.SeqLogic
-  
+  alias Danm.FiniteStateMachine
+
   defstruct dict: %{},
     stack: [],
     cache: %{},
@@ -88,6 +90,7 @@ defmodule Danm.CheckDesign do
 
   defp check_current_design(state) do
     case current_design(state).__struct__ do
+      Sink -> state
       BlackBox -> check_black_box_design(state)
       Schematic -> state |> check_instances() |> check_self_schematic()
       ComboLogic -> check_combo_logic(state)
@@ -96,7 +99,7 @@ defmodule Danm.CheckDesign do
       ConditionLogic -> check_condition_logic(state)
       CaseLogic -> check_case_logic(state)
       SeqLogic -> check_seq_logic(state)
-      _ -> state
+      FiniteStateMachine -> check_fsm_logic(state)
     end
   end
 
@@ -262,6 +265,12 @@ defmodule Danm.CheckDesign do
 	|> warning("All cases must has matching width",
           if: !CaseLogic.width_match?(core))
     end
+  end
+
+  defp check_fsm_logic(state) do
+    s = current_design(state)
+    warning(state, "output looped back to condition clause of a FSM",
+      if: ComboLogic.loop_back?(s))
   end
 
 end

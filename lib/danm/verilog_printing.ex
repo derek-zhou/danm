@@ -5,6 +5,8 @@ defmodule Danm.VerilogPrinting do
 
   alias Danm.Entity
   alias Danm.WireExpr
+  alias Danm.BlackBox
+  alias Danm.Schematic
   alias Danm.Sink
   alias Danm.ComboLogic
   alias Danm.BundleLogic
@@ -12,8 +14,7 @@ defmodule Danm.VerilogPrinting do
   alias Danm.ConditionLogic
   alias Danm.CaseLogic
   alias Danm.SeqLogic
-  alias Danm.BlackBox
-  alias Danm.Schematic
+  alias Danm.FiniteStateMachine
 
   defstruct dict: %{},
     stack: [],
@@ -151,10 +152,12 @@ defmodule Danm.VerilogPrinting do
 	ConditionLogic -> print_one_condition_logic(state, i_name)
 	CaseLogic -> print_one_case_logic(state, i_name)
 	SeqLogic -> print_one_seq_logic(state, i_name)
+	FiniteStateMachine -> print_one_fsm_logic(state, i_name)
 	Sink -> print_one_sink(state, i_name)
 	t when t in [ComboLogic, BundleLogic] ->
 	  print_one_simple_logic(state, i_name)
-	_ -> print_one_instance(state, i_name, with: map)
+	t when t in [BlackBox, Schematic] ->
+	  print_one_instance(state, i_name, with: map)
       end
     end)
 
@@ -356,6 +359,32 @@ defmodule Danm.VerilogPrinting do
       _->
 	print_simple_logic_core(inst.core, i_name, "<=", 8, f)
     end
+    state
+  end
+
+  defp print_one_fsm_logic(state, i_name) do
+    s = current_design(state)
+    f = state.stream
+    inst = s.insts[i_name]
+    IO.write(f, "    always @(posedge #{verilog_escape(inst.clk)})\n")
+    IO.write(f, "\tcase (#{verilog_escape(i_name)})\n")
+    Enum.each(inst.graph, fn {state, transit} ->
+      IO.write(f, "\t    #{inst.width}'d#{state}:\n")
+      Enum.reduce(transit, 0, fn {co, ns}, i ->
+	case i do
+	  0 -> IO.write(f, "\t\tif (#{verilog_string(co)})\n")
+	  _->
+	    case co do
+	      {:const, _, v} when v > 0 -> IO.write(f, "\t\telse\n")
+	      _ -> IO.write(f, "\t\telse if (#{verilog_string(co)})\n")
+	    end
+	end
+	IO.write(f, "\t\t    #{verilog_escape(i_name)} <= #{inst.width}'d#{ns};\n")
+	i + 1
+      end)
+    end)
+    IO.write(f, "\t    default: #{verilog_escape(i_name)} <= #{inst.width}'d0;\n")
+    IO.write(f, "\tendcase\n")
     state
   end
 

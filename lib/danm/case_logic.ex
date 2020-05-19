@@ -35,7 +35,10 @@ defmodule Danm.CaseLogic do
   @doc """
   create a case logic. all width assume to be 0 for now
   """
-  def new(subject, cases, choices, as: n) do
+  def new(subject, list, as: n) do
+    subject = WireExpr.parse(subject)
+    cases = Enum.map(list, fn {str, _} -> WireExpr.parse(str) end)
+    choices = Enum.map(list, fn {_, str} -> WireExpr.parse(str) end)
     map =
       [subject | (cases ++ choices)]
       |> Enum.flat_map(fn x -> WireExpr.ids(x) end)

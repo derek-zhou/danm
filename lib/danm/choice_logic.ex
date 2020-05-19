@@ -37,6 +37,8 @@ defmodule Danm.ChoiceLogic do
   create a choice logic. all width assume to be 0 for now
   """
   def new(condition, choices, as: n) do
+    condition = WireExpr.parse(condition)
+    choices = Enum.map(choices, fn str -> WireExpr.parse(str) end)
     map =
       [ condition | choices ]
       |> Enum.flat_map(fn x -> WireExpr.ids(x) end)

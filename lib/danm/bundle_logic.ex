@@ -44,7 +44,8 @@ defmodule Danm.BundleLogic do
   @doc """
   create a bundle logic. all width assume to be 0 for now
   """
-  def new(op, exprs, as: n) do
+  def new(op, strs, as: n) do
+    exprs = Enum.map(strs, fn str -> WireExpr.parse(str) end)
     map =
       exprs
       |> Enum.flat_map(fn x -> WireExpr.ids(x) end)
