@@ -569,7 +569,7 @@ defmodule Danm.Schematic do
     * :flop_by, clock name of the flop if existed
 
   """
-  def forbid(s, str, options \\ []) do
+  def die_when(s, str, options \\ []) do
     logic = Assertion.new(str, options[:flop_by])
     n = unique_name_like("_assert", from: s.insts, salt: 0)
     s |> set_instance(n, to: logic) |> connect_wires(logic, n)
@@ -583,5 +583,10 @@ defmodule Danm.Schematic do
       unquote(name) = unquote(value)
     end
   end
+
+  @doc ~S"""
+  This is basically Enum.reduce with first 2 argument switched
+  """
+  def roll_in(s, enum, function), do: Enum.reduce(enum, s, function)
 
 end

@@ -40,10 +40,9 @@ defmodule Danm.Schematic.BitScan do
     top_mask = (1<<<top_width)-1
     bottom_mask = "#{bottom_width}d0"
 
-    Enum.reduce([{"top", top_width}, {"bottom", bottom_width}], s,
-      fn {i_name, w}, s ->
-	s
-	|> add("bit_scan", as: i_name,
+    s
+    |> roll_in([{"top", top_width}, {"bottom", bottom_width}], fn {i_name, w}, s ->
+         add(s, "bit_scan", as: i_name,
 	   parameters: %{"width" => w},
 	   connections: %{
 	     "in" => "#{i_name}_in",
@@ -51,7 +50,7 @@ defmodule Danm.Schematic.BitScan do
 	     "out" => "#{i_name}_out",
 	     "exist" => "#{i_name}_exist",
 	     "exist_right" => "#{i_name}_exist_right" })
-      end)
+       end)
     |> assign("in[#{width-1}:#{bottom_width}]", as: "top_in")
     |> assign("in[#{bottom_width-1}:0]", as: "bottom_in")
     |> assign("last[#{width}:#{bottom_width}]", as: "top_last")

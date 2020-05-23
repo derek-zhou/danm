@@ -37,19 +37,19 @@ defmodule Danm.Schematic.RrArbiter do
     top_width = ceil(width/2)
     bottom_width = floor(width/2)
 
-    Enum.reduce([{"top", top_width}, {"bottom", bottom_width}], s,
-      fn {i_name, w}, s ->
-	s
-	|> add("rr_arbiter", as: i_name,
-	   parameters: %{"width" => w},
-	   connections: %{
-	     "grant" => "#{i_name}_grant",
-	     "request" => "#{i_name}_request",
-	     "busy" => "#{i_name}_busy",
-	     "exist" => "#{i_name}_exist" })
-      end)
+    s
     |> create_port("clk")
     |> create_port("reset_")
+    |> roll_in([{"top", top_width}, {"bottom", bottom_width}], fn {i_name, w}, s ->
+	 s
+         |> add("rr_arbiter", as: i_name,
+                parameters: %{"width" => w},
+	        connections: %{
+		  "grant" => "#{i_name}_grant",
+		  "request" => "#{i_name}_request",
+		  "busy" => "#{i_name}_busy",
+		  "exist" => "#{i_name}_exist" })
+       end)
     |> assign("request[#{width-1}:#{bottom_width}]", as: "top_request")
     |> assign("request[#{bottom_width-1}:0]", as: "bottom_request")
     |> assign("top_exist|bottom_exist", as: "exist")

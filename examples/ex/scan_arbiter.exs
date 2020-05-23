@@ -22,15 +22,12 @@ defmodule Danm.Schematic.ScanArbiter do
        {"~reset_",  0},
        {"busy",     0},
        {"|request", 1}], flop_by: "clk", as: "lag")
-    |> bind_to(s)
-    
-    Enum.reduce(width-1..0, s, fn i, s ->
-      s
-      |> condition([
-         {"~reset_",     0},
-	 {"grant[#{i}]", 1},
-	 {"~(busy|lag)", 0}], flop_by: "clk", as: "client#{i}_en")
-    end)
+    |> roll_in(width-1..0, fn i, s ->
+         condition(s, [
+               {"~reset_",     0},
+	       {"grant[#{i}]", 1},
+	       {"~(busy|lag)", 0}], flop_by: "clk", as: "client#{i}_en")
+       end)
     |> bundle(Enum.map(width-1..0, fn i -> "client#{i}_en" end), as: "client_en")
     |> bind_to(s)
     
