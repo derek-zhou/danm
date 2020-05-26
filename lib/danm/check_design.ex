@@ -57,7 +57,7 @@ defmodule Danm.CheckDesign do
     cond do
       bool ->
 	focus = current_focus(state)
-	IO.write(:stderr, "Check design ERROR: #{msg}, in #{focus}\n")
+	IO.puts(:stderr, "Check design ERROR: #{msg}, in #{focus}")
 	%{state | errors: state.errors + 1}
       true -> state
     end
@@ -68,7 +68,7 @@ defmodule Danm.CheckDesign do
     cond do
       bool ->
 	focus = current_focus(state)
-	IO.write(:stderr, "Check design WARNING: #{msg}, in #{focus}\n")
+	IO.puts(:stderr, "Check design WARNING: #{msg}, in #{focus}")
 	%{state | warnings: state.warnings + 1}
       true -> state
     end

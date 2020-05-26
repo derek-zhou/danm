@@ -393,18 +393,6 @@ defmodule Danm.Schematic do
     end
   end
 
-  defp compare_conn({ins_a, port_a}, {ins_b, port_b}, s) do
-    {dir_a, _} = pin_property(s, ins_a, port_a)
-    {dir_b, _} = pin_property(s, ins_b, port_b)
-    cond do
-      dir_a > dir_b -> true
-      dir_a < dir_b -> false
-      ins_a < ins_b -> true
-      ins_a > ins_b -> false
-      true -> port_a <= port_b
-    end
-  end
-
   @doc ~S"""
   return a sorted list of instances
   """
