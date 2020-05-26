@@ -42,11 +42,21 @@ defmodule Danm.CheckDesign do
 
   defp current_design(state), do: hd(state.stack)
 
+  defp current_focus(state) do
+    s = current_design(state)
+    case s.__struct__ do
+      t when t in [BlackBox, Schematic] -> s.name
+      _ ->
+	[logic, sch | _ ] = state.stack
+	"#{sch.name}.#{Entity.name(logic)}"
+    end
+  end
+
   defp error(state, msg), do: error(state, msg, if: true)
   defp error(state, msg, if: bool) do
     cond do
       bool ->
-	focus = state |> current_design() |> Entity.name()
+	focus = current_focus(state)
 	IO.write(:stderr, "Check design ERROR: #{msg}, in #{focus}\n")
 	%{state | errors: state.errors + 1}
       true -> state
@@ -57,7 +67,7 @@ defmodule Danm.CheckDesign do
   defp warning(state, msg, if: bool) do
     cond do
       bool ->
-	focus = state |> current_design() |> Entity.name()
+	focus = current_focus(state)
 	IO.write(:stderr, "Check design WARNING: #{msg}, in #{focus}\n")
 	%{state | warnings: state.warnings + 1}
       true -> state
@@ -117,10 +127,8 @@ defmodule Danm.CheckDesign do
 
   defp check_ports(state) do
     s = current_design(state)
-    s
-    |> Entity.ports()
-    |> Enum.reduce(state, fn p_name, state ->
-      {_, w} = Entity.port_at(s, p_name)
+    s.ports
+    |> Enum.reduce(state, fn {p_name, {_, w}}, state ->
       error(state, "unresolved port width: #{p_name}", if: !is_integer(w))
     end)
   end

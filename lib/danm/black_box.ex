@@ -232,9 +232,12 @@ defmodule Danm.BlackBox do
     |> parse_skip_spaces(f)
   end
 
-  defp port_order_of(p, s) do
-    order_map = %{input: 0, output: 1, inout: 2}
-    Map.fetch!(order_map, elem(Entity.port_at(s, p), 0))
+  defp port_order_of(dir) do
+    case dir do
+      :input -> 0
+      :output -> 1
+      :inout -> 2
+    end
   end
 
   defp compare_port(oa, a, ob, b) do
@@ -249,9 +252,12 @@ defmodule Danm.BlackBox do
   return a sorted list of ports
   """
   def sort_ports(s) do
-    s
-    |> Entity.ports()
-    |> Enum.sort(fn a, b -> compare_port(port_order_of(a, s), a, port_order_of(b, s), b) end)
+    s.ports
+    |> Map.keys()
+    |> Enum.sort(fn a, b ->
+      {dir_a, _} = s.ports[a]
+      {dir_b, _} = s.ports[b]
+      compare_port(port_order_of(dir_a), a, port_order_of(dir_b), b) end)
   end
 
 end

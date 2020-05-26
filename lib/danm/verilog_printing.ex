@@ -123,7 +123,7 @@ defmodule Danm.VerilogPrinting do
     	#{port_string});
     """)
     Enum.each(sorted_ports, fn p_name ->
-      {dir, width} = Entity.port_at(s, p_name)
+      {dir, width} = s.ports[p_name]
       case width do
 	1 -> IO.write(f, "    #{dir} #{verilog_escape(p_name)};\n")
 	_ -> IO.write(f, "    #{dir} [#{width - 1}:0] #{verilog_escape(p_name)};\n")
@@ -251,8 +251,8 @@ defmodule Danm.VerilogPrinting do
     f = state.stream
     inst = s.insts[i_name]
     IO.write(f, "// instance of #{Entity.type_string(inst)}\n")
-    inst
-    |> Entity.ports()
+    inst.inputs
+    |> Map.keys()
     |> Enum.sort(:asc)
     |> Enum.each(fn p_name ->
       IO.write(f, "//\t sink(#{verilog_escape(p_name)});\n")

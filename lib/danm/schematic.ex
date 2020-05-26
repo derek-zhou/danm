@@ -93,32 +93,26 @@ defmodule Danm.Schematic do
   # simple accessors
   defp set_instance(s, n, to: i), do: %{s | insts: Map.put(s.insts, n, i)}
   defp set_wire(s, n, c), do: %{s | wires: Map.put(s.wires, n, [c])}
-  defp merge_wire(s, n, c), do: %{s | wires: Map.put(s.wires, n, [ c | s.wires[n] ])}
 
-  defp conjure_wire(s, n, conns: c) do
-    list = cond do
-      Map.has_key?(s.wires, n) -> s.wires[n]
-      true -> []
+  defp conjure_wire(s, n, c) do
+    cond do
+      Map.has_key?(s.wires, n) -> merge_wire(s, n, c)
+      true -> set_wire(s, n, c)
     end
-    # make sure conns are valid
-    list = Enum.reduce(c, list, fn {inst, port}, list ->
-      case inst do
-	:self ->
-	  if s.ports[port] == nil do
-	    raise "Port of name #{port} is not found in design #{s.name}"
-	  end
-	_ ->
-	  case s.insts[inst] do
-	    nil -> raise "Instance of name #{inst} is not found in design #{s.name}"
-	    i ->
-	      if Entity.port_at(i, port) == nil do
-		raise "Port of name #{port} is not found in design #{i.name}"
-	      end
-	  end
-      end
-      [ {inst, port} | list ]
-    end)
-    %{s | wires: Map.put(s.wires, n, list)}
+  end
+
+  defp merge_wire(s, n, {inst, port}) do
+    {dir, _} = pin_property(s, inst, port)
+    cond do
+      driver_count(dir) > 0 -> %{s | wires: Map.put(s.wires, n, [ {inst, port} | s.wires[n] ])}
+      true ->
+	index = Enum.find_index(s.wires[n], fn {inst, port} ->
+	  {dir, _} = pin_property(s, inst, port)
+	  driver_count(dir) == 0
+        end)
+  	index = if index == nil, do: -1, else: index
+	%{s | wires: Map.put(s.wires, n, List.insert_at(s.wires[n], index, {inst, port}))}
+    end
   end
 
   @doc ~S"""
@@ -157,7 +151,7 @@ defmodule Danm.Schematic do
       nil -> s
       cs ->
 	Enum.reduce(cs, s, fn {p_name, w_name}, s ->
-	  conjure_wire(s, w_name, conns: [{i_name, p_name}])
+	  conjure_wire(s, w_name, {i_name, p_name})
 	end)
     end
   end
@@ -189,13 +183,14 @@ defmodule Danm.Schematic do
   def connect(s, conns, options \\ [])
   def connect(s, str, options) when is_binary(str), do: connect(s, [str], options) 
   def connect(s, conns, options) when is_list(conns) do
-    conns = Enum.map(conns, fn each ->
-      case each do
-	{inst, port} -> {inst, port}
-	pin -> pin |> String.split("/", parts: 2) |> List.to_tuple()
-      end
+    name = cond do
+      options[:as] -> options[:as]
+      true -> conns |> hd() |> String.split("/", parts: 2) |> List.last()
+    end
+    Enum.reduce(conns, s, fn each, s ->
+      {inst, port} = each |> String.split("/", parts: 2) |> List.to_tuple()
+      conjure_wire(s, name, {inst, port})
     end)
-    conjure_wire(s, options[:as] || elem(hd(conns), 1), conns: conns)
   end
 
   @doc ~S"""
@@ -328,7 +323,7 @@ defmodule Danm.Schematic do
       drivers > 1 -> s
       width < 0 -> s
       pins == [] -> s
-      true -> conjure_wire(s, name, conns: pins)
+      true -> Enum.reduce(pins, s, fn c, s -> conjure_wire(s, name, c) end)
     end
   end
 
@@ -352,7 +347,7 @@ defmodule Danm.Schematic do
   defp pin_property(s, i_name, p_name) do
     case i_name do
       :self ->
-	{dir, w} = Entity.port_at(s, p_name)
+	{dir, w} = s.ports[p_name]
 	{inverse_dir(dir), w}
       _ -> Entity.port_at(s.insts[i_name], p_name)
     end
@@ -374,21 +369,20 @@ defmodule Danm.Schematic do
     end
   end
 
-  defp inst_order_of(i, s) do
-    order_map = %{
-      BlackBox => 0,
-      Schematic => 1,
-      ComboLogic => 2,
-      BundleLogic => 3,
-      ChoiceLogic => 4,
-      ConditionLogic => 5,
-      CaseLogic => 6,
-      SeqLogic => 7,
-      FiniteStateMachine => 8,
-      Assertion => 9,
-      Sink => 10
-    }
-    Map.fetch!(order_map, s.insts[i].__struct__)
+  defp inst_order_of(i) do
+    case i.__struct__ do
+      BlackBox -> 0
+      Schematic -> 1
+      ComboLogic -> 2
+      BundleLogic -> 3
+      ChoiceLogic -> 4
+      ConditionLogic -> 5
+      CaseLogic -> 6
+      SeqLogic -> 7
+      FiniteStateMachine -> 8
+      Assertion -> 9
+      Sink -> 10
+    end
   end
 
   defp compare_inst(oa, a, ob, b) do
@@ -417,13 +411,11 @@ defmodule Danm.Schematic do
   def sort_sub_modules(s) do
     s.insts
     |> Map.keys()
-    |> Enum.sort(fn a, b -> compare_inst(inst_order_of(a, s), a, inst_order_of(b, s), b) end)
+    |> Enum.sort(fn a_name, b_name ->
+      a_inst = s.insts[a_name]
+      b_inst = s.insts[b_name]
+      compare_inst(inst_order_of(a_inst), a_name, inst_order_of(b_inst), b_name) end)
   end
-
-  @doc ~S"""
-  return a sorted list of conns for a wire
-  """
-  def sort_conns(conns, s), do: Enum.sort(conns, fn a, b -> compare_conn(a, b, s) end)
 
   @doc ~S"""
   sink a wire, so it has a fake load and not to be auto-exposed
@@ -435,15 +427,16 @@ defmodule Danm.Schematic do
 	nil -> Sink.new(l)
 	sink -> Sink.merge(sink, l)
       end
-    s |> set_instance("_sink", to: sink) |> connect_wires(sink, "_sink")
+    s
+    |> set_instance("_sink", to: sink)
+    |> roll_in(l, fn w, s -> conjure_wire(s, w, {"_sink", w}) end)
   end
 
   defp add_logic(s, core, options) do
-    logic =
-      cond do
-        options[:flop_by] -> SeqLogic.new(core, options[:flop_by])
-        true -> core
-      end
+    logic = cond do
+      options[:flop_by] -> SeqLogic.new(core, options[:flop_by])
+      true -> core
+    end
     n = options[:as]
     if n == nil, do: raise "logic must be named"
     s |> set_instance(n, to: logic) |> connect_wires(logic, n)
@@ -452,7 +445,7 @@ defmodule Danm.Schematic do
   defp connect_wires(s, inst, n) do
     inst
     |> Entity.ports()
-    |> Enum.reduce(s, fn p_name, s -> conjure_wire(s, p_name, conns: [{n, p_name}]) end)
+    |> Enum.reduce(s, fn p_name, s -> conjure_wire(s, p_name, {n, p_name}) end)
   end
 
   @doc ~S"""

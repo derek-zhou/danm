@@ -5,6 +5,7 @@ defmodule Danm.SeqLogic do
   """
 
   alias Danm.Entity
+  alias Danm.ComboLogic
 
   @doc """
   A seq logic is just a wrapper another design entity, like combo logic, bundle logic,
@@ -21,15 +22,15 @@ defmodule Danm.SeqLogic do
       if new_core == b.core, do: b, else: %{b | core: new_core}
     end
 
-    def name(b), do: Entity.name(b.core)
+    def name(b), do: b.core.output
     def type_string(_), do: "sequential logic"
     
-    def ports(b), do: [b.clk | Entity.ports(b.core) ]
+    def ports(b), do: [b.clk | ComboLogic.ports(b.core) ]
 
     def port_at(b, name) do
       cond do
 	name == b.clk -> {:input, 1}
-	true -> Entity.port_at(b.core, name)
+	true -> ComboLogic.port_at(b.core, name)
       end
     end
 

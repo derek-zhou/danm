@@ -52,10 +52,10 @@ defmodule Danm.BundleLogic do
   def expr_string(c, f) do
     {left, op, right} =
       case c.op do
-	:comma -> {"{", " , ", "}"}
-	:or -> {"(", " | ", ")"}
-	:and -> {"(", " & ", ")"}
-	:xor -> {"(", " ^ ", ")"}
+	:comma -> {"{", ",", "}"}
+	:or -> {"(", "|", ")"}
+	:and -> {"(", "&", ")"}
+	:xor -> {"(", "^", ")"}
       end
     str =
       c.exprs
