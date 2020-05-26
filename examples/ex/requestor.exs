@@ -15,10 +15,10 @@ defmodule Danm.Schematic.Requestor do
     |> create_port("reset_")
     |> create_port("grant")
     |> fsm([
-       {:init,    [{"delay_done", :request}]},
-       {:request, [{"grant", :nap}]},
-       {:nap,     [{"delay_done", :busy}]},
-       {:busy,    [{"delay_done", :init}]}],
+       init:    [{"delay_done", :request}],
+       request: [{"grant", :nap}],
+       nap:     [{"delay_done", :busy}],
+       busy:    [{"delay_done", :init}]],
        flop_by: "clk", reset_by: "~reset_", as: "state")
     |> assign_fsm("state", init: "init", request: "request", nap: "nap", busy: "busy") 
     |> condition([
