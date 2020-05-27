@@ -21,7 +21,7 @@ defmodule Danm.HtmlPrinting do
   generate a hier index to the set of html files
   """
   def generate_html_hier(s, in: dir) do
-    f = File.open!("#{dir}/hierarchy.html", [:write])
+    f = File.open!("#{dir}/hierarchy.html", [:write, :delayed_write])
     IO.write(f, ~s"""
     <!DOCTYPE html>
     <html lang="en">
@@ -89,7 +89,7 @@ defmodule Danm.HtmlPrinting do
   generate html for myself only
   """
   def generate_own_html(s, as: hier, in: dir) do
-    f = File.open!("#{dir}/#{hier}.html", [:write])
+    f = File.open!("#{dir}/#{hier}.html", [:write, :delayed_write])
     print_html_header(s, f, as: hier)
     print_html_ports(s, f)
     if s.__struct__ == Schematic do
