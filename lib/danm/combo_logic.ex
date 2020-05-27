@@ -24,7 +24,8 @@ defmodule Danm.ComboLogic do
     def name(b), do: b.output
     def type_string(_), do: "combo logic"
     def ports(b), do: ComboLogic.ports(b)
-    def port_at(b, name), do: ComboLogic.port_at(b, name)
+    def port_at!(b, name), do: ComboLogic.port_at!(b, name)
+    def has_port?(b, name), do: ComboLogic.has_port?(b, name)
 
   end
 
@@ -55,11 +56,20 @@ defmodule Danm.ComboLogic do
   @doc """
   my port_at function
   """
-  def port_at(b, name) do
+  def port_at!(b, name) do
     cond do
       name == b.output -> {:output, b.width}
-      Map.has_key?(b.inputs, name) -> {:input, b.inputs[name]}
-      true -> nil
+      true -> {:input, Map.fetch!(b.inputs, name)}
+    end
+  end
+
+  @doc """
+  my has_port function
+  """
+  def has_port?(b, name) do
+    cond do
+      name == b.output -> true
+      true -> Map.has_key?(b.inputs, name)
     end
   end
 

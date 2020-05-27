@@ -33,10 +33,17 @@ defmodule Danm.FiniteStateMachine do
 
     def ports(b), do: [b.clk | ComboLogic.ports(b)]
 
-    def port_at(b, name) do
+    def port_at!(b, name) do
       cond do
 	name == b.clk -> {:input, 1}
-	true -> ComboLogic.port_at(b, name)
+	true -> ComboLogic.port_at!(b, name)
+      end
+    end
+
+    def has_port?(b, name) do
+      cond do
+	name == b.clk -> true
+	true -> ComboLogic.has_port?(b, name)
       end
     end
 

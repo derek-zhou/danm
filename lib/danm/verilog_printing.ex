@@ -49,8 +49,8 @@ defmodule Danm.VerilogPrinting do
   end
 
   defp print_full_verilog(state, s) do
-    ref = state.dict[module_to_key(s)]
-    case state.refs[ref] do
+    ref = Map.fetch!(state.dict, module_to_key(s))
+    case Map.fetch!(state.refs, ref) do
       :done -> state
       :ongoing -> raise "Infinite recursive design in #{s.name}"
       :todo ->
@@ -75,11 +75,9 @@ defmodule Danm.VerilogPrinting do
       BlackBox -> copy_self_verilog(state, ref)
       Schematic ->
 	s
-	|> Schematic.sort_sub_modules()
-	|> Enum.map(fn n -> s.insts[n] end)
-	|> Enum.reject(fn s -> inlined?(s) end)
-	|> Enum.reduce(print_self_verilog(state, ref), fn inst, state ->
-	  print_full_verilog(state, inst) end)
+	|> Schematic.sort_sub_modules(except: &inlined?/1)
+	|> Enum.reduce(print_self_verilog(state, ref), fn i_name, state ->
+	  print_full_verilog(state, Map.fetch!(s.insts, i_name)) end)
     end
   end
 
@@ -120,7 +118,7 @@ defmodule Danm.VerilogPrinting do
     	#{port_string});
     """)
     Enum.each(sorted_ports, fn p_name ->
-      {dir, width} = s.ports[p_name]
+      {dir, width} = Map.fetch!(s.ports, p_name)
       case width do
 	1 -> IO.puts(f, "    #{dir} #{verilog_escape(p_name)};")
 	_ -> IO.puts(f, "    #{dir} [#{width - 1}:0] #{verilog_escape(p_name)};")
@@ -132,7 +130,7 @@ defmodule Danm.VerilogPrinting do
     |> Map.keys()
     |> Enum.sort(:asc)
     |> Enum.each(fn w_name ->
-      width = map[w_name]
+      width = Map.fetch!(map, w_name)
       wire_type = wire_type(s, w_name)
       case width do
 	1 -> IO.puts(f, "    #{wire_type} #{verilog_escape(w_name)};")
@@ -145,7 +143,7 @@ defmodule Danm.VerilogPrinting do
       s
       |> Schematic.sort_sub_modules()
       |> Enum.reduce(state, fn i_name, state ->
-      case s.insts[i_name].__struct__ do
+      case Map.fetch!(s.insts, i_name).__struct__ do
 	ChoiceLogic -> print_one_choice_logic(state, i_name)
 	ConditionLogic -> print_one_condition_logic(state, i_name)
 	CaseLogic -> print_one_case_logic(state, i_name)
@@ -165,10 +163,10 @@ defmodule Danm.VerilogPrinting do
   end
 
   defp wire_type(s, w_name) do
-    {di, _} = Schematic.driver_of_wire(s, s.wires[w_name])
+    {di, _} = Schematic.driver_of_wire(s, Map.fetch!(s.wires, w_name))
     case di do
       :self -> "wire"
-      _ -> case s.insts[di].__struct__ do
+      _ -> case Map.fetch!(s.insts, di).__struct__ do
 	     BlackBox -> "wire"
 	     Schematic -> "wire"
 	     ComboLogic -> "wire"
@@ -187,7 +185,7 @@ defmodule Danm.VerilogPrinting do
   end
 
   defp key_to_ref(state, k) do
-    case state.dict[k] do
+    case Map.get(state.dict, k) do
       nil ->
 	name = case k do
 		 {name, _} -> name
@@ -201,16 +199,16 @@ defmodule Danm.VerilogPrinting do
   defp setup_key_ref(state, key, ref) do
     %{state |
       dict: Map.put(state.dict, key, ref),
-      refs: case state.refs[ref] do
-	      :done -> state.refs
-	      _ -> Map.put(state.refs, ref, :todo)
+      refs: case Map.get(state.refs, ref) do
+	      nil -> Map.put(state.refs, ref, :todo)
+	      _ -> state.refs
 	    end}
   end
 
   defp print_one_instance(state, i_name, with: map) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Map.fetch!(s.insts, i_name)
     key = module_to_key(inst)
     ref = key_to_ref(state, key)
     IO.write(f, ~s"""
@@ -223,7 +221,8 @@ defmodule Danm.VerilogPrinting do
       |> BlackBox.sort_ports()
       |> Enum.filter(fn p_name -> Map.has_key?(map, "#{i_name}/#{p_name}") end)
       |> Enum.map(fn p_name ->
-           ".#{verilog_escape(p_name)}(" <> verilog_escape(map["#{i_name}/#{p_name}"]) <> ")"
+        w_name = Map.fetch!(map, "#{i_name}/#{p_name}")
+        ".#{verilog_escape(p_name)}(#{verilog_escape(w_name)})"
          end)
       |> Enum.join(",\n\t")
 
@@ -235,7 +234,7 @@ defmodule Danm.VerilogPrinting do
       |> Map.keys()
       |> Enum.sort(:asc)
       |> Enum.each(fn p_name ->
-	p_value = inst.params[p_name]
+	p_value = Map.fetch!(inst.params, p_name)
 	IO.puts(f, "    defparam #{verilog_escape(i_name)}.#{verilog_escape(p_name)} = #{p_value};")
       end)
       IO.write(f, "\n")
@@ -246,7 +245,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_sink(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Map.fetch!(s.insts, i_name)
     IO.puts(f, "// instance of #{Entity.type_string(inst)}")
     inst.inputs
     |> Map.keys()
@@ -260,7 +259,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_simple_logic(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Map.fetch!(s.insts, i_name)
     IO.write(f, "    assign ")
     print_simple_logic_core(inst, i_name, "=", 0, f)
     state
@@ -279,7 +278,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_choice_logic(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Map.fetch!(s.insts, i_name)
     IO.puts(f, "    always @(#{sensitivity_string(inst)})")
     print_choice_logic_core(inst, i_name, "=", 8, f)
     state
@@ -298,7 +297,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_condition_logic(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Map.fetch!(s.insts, i_name)
     IO.puts(f, "    always @(#{sensitivity_string(inst)})")
     print_condition_logic_core(inst, i_name, "=", 8, f)
     state
@@ -326,7 +325,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_case_logic(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Map.fetch!(s.insts, i_name)
     IO.puts(f, "    always @(#{sensitivity_string(inst)})")
     print_case_logic_core(inst, i_name, "=", 8, f)
     state
@@ -346,7 +345,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_seq_logic(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Map.fetch!(s.insts, i_name)
     IO.puts(f, "    always @(posedge #{verilog_escape(inst.clk)})")
     case inst.core.__struct__ do
       ChoiceLogic ->
@@ -364,7 +363,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_fsm_logic(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Map.fetch!(s.insts, i_name)
     IO.puts(f, "    always @(posedge #{verilog_escape(inst.clk)})")
     IO.puts(f, "\tcase (#{verilog_escape(i_name)})")
     Enum.each(inst.graph, fn {state, transit} ->
@@ -390,7 +389,7 @@ defmodule Danm.VerilogPrinting do
   defp print_one_assertion(state, i_name) do
     s = current_design(state)
     f = state.stream
-    inst = s.insts[i_name]
+    inst = Map.fetch!(s.insts, i_name)
     case inst.clk do
       nil -> IO.puts(f, "    always @(#{sensitivity_string(inst)})")
       clk -> IO.puts(f, "    always @(posedge #{verilog_escape(clk)})")

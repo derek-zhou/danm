@@ -88,7 +88,7 @@ defmodule Danm.CheckDesign do
 
   defp check_design(state, s) do
     key = module_to_key(s)
-    case state.dict[key] do
+    case Map.get(state.dict, key) do
       :done -> state
       :ongoing -> error(state, "Infinite recursive design")
       nil ->
@@ -156,11 +156,12 @@ defmodule Danm.CheckDesign do
     s.insts
     |> Map.keys()
     |> Enum.reduce(state, fn i_name, state ->
-      s.insts[i_name]
+      inst = Map.fetch!(s.insts, i_name)
+      inst
       |> Entity.ports()
       |> Enum.reduce(state, fn p_name, state ->
 	pin = "#{i_name}/#{p_name}"
-	{dir, _} = Entity.port_at(s.insts[i_name], p_name)
+	{dir, _} = Entity.port_at!(inst, p_name)
 	cond do
 	  Map.has_key?(map, pin) -> state
 	  dir == :output -> warning(state, "unconnecterd output pin: #{pin}")
@@ -184,8 +185,8 @@ defmodule Danm.CheckDesign do
       |> Enum.reject(fn {i_name, _} -> i_name == :self end)
       |> Enum.reduce(state, fn {i_name, p_name}, state ->
 	pin = "#{i_name}/#{p_name}"
-	wn2 = map[pin]
-	{_, w2} = Entity.port_at(s.insts[i_name], p_name)
+	wn2 = Map.fetch!(map, pin)
+	{_, w2} = Entity.port_at!(Map.fetch!(s.insts, i_name), p_name)
 	state
 	|> error("multiple wire on pin: #{pin}", if: wn2 != w_name)
 	|> error("wire width not match on pin: #{pin}, #{w2} != #{width}", if: w2 != width)

@@ -13,8 +13,7 @@ defmodule Danm.WireExpr do
   def width({:const, w, _}, in: _), do: w
   def width({:dup, sub, times}, in: con), do: times * width(sub, in: con)
   def width({:ext, _, msb, lsb, step}, in: _), do: div((lsb - msb), step) + 1
-  # FIXME:
-  def width({:id, id}, in: con), do: con[id]
+  def width({:id, id}, in: con), do: Map.fetch!(con, id)
   
   # unary operators
   def width({:bit_not, sub}, in: con), do: width(sub, in: con)

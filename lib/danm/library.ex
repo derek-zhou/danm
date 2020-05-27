@@ -38,7 +38,7 @@ defmodule Danm.Library do
   load the black box by name in library l, return {b, new_l}
   """
   def load_black_box(l, name) do
-    case l.black_boxes[name] do
+    case Map.get(l.black_boxes, name) do
       nil ->
 	case Enum.find_value(l.verilog_path, fn p ->
 	      BlackBox.parse_verilog("#{p}/#{name}.v")
@@ -55,7 +55,7 @@ defmodule Danm.Library do
   load the black box by name in library l, return {b, new_l}
   """
   def load_schematic(l, name) do
-    case l.schematics[name] do
+    case Map.get(l.schematics, name) do
       nil ->
 	case Enum.find_value(l.elixir_path, fn p ->
 	      try do
@@ -105,7 +105,7 @@ defmodule Danm.Library do
   def build_module(m) do
     key = module_to_key(m)
     # I cannot use get_and_update because elaborate may call the agent again
-    case Agent.get(__MODULE__, fn l -> l.build_cache[key] end) do
+    case Agent.get(__MODULE__, fn l -> Map.get(l.build_cache, key) end) do
       nil ->
 	s = Entity.elaborate(m)
 	Agent.update(__MODULE__, fn l -> %{l | build_cache: Map.put(l.build_cache, key, s)} end)

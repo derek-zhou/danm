@@ -17,7 +17,9 @@ defmodule Danm.Sink do
     def name(_), do: "_sink"
     def type_string(_), do: "sink"
     def ports(b), do: b.inputs |> Map.keys()
-    def port_at(b, name), do: (if b.inputs[name], do: {:input, b.inputs[name]})
+    def port_at!(b, name), do: {:input, Map.fetch!(b.inputs, name)}
+    def has_port?(b, name), do: Map.has_key?(b.inputs, name)
+
   end
 
   @doc """

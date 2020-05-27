@@ -55,7 +55,7 @@ defmodule Danm.HtmlPrinting do
 	if !Enum.empty?(subs) do
 	  IO.puts(f, "<ul>")
 	  Enum.each(subs, fn i_name ->
-	    inst = s.insts[i_name]
+	    inst = Map.fetch!(s.insts, i_name)
 	    IO.write(f, ~s"""
 	    <li><a href="#{hier}/#{i_name}.html">#{i_name}</a>(#{Entity.type_string(inst)})
 	    """)
@@ -77,7 +77,7 @@ defmodule Danm.HtmlPrinting do
       if !Enum.empty?(subs) do
 	File.mkdir("#{dir}/#{hier}")
 	Enum.each(subs, fn i_name ->
-	  inst = s.insts[i_name]
+	  inst = Map.fetch!(s.insts, i_name)
 	  generate_html(inst, as: "#{hier}/#{i_name}", in: dir)
 	end)
       end
@@ -99,7 +99,7 @@ defmodule Danm.HtmlPrinting do
 	map = Schematic.pin_to_wire_map(s)
 	IO.puts(f, "<ul>")
 	Enum.each(subs, fn i_name ->
-	  inst = s.insts[i_name]
+	  inst = Map.fetch!(s.insts, i_name)
 	  case inst.__struct__ do
 	    ChoiceLogic -> print_html_choice_logic(inst, f, as: i_name)
 	    ConditionLogic -> print_html_condition_logic(inst, f, as: i_name)
@@ -141,11 +141,7 @@ defmodule Danm.HtmlPrinting do
     end
   end
 
-  defp printable_sub_modules(s) do
-    s
-    |> Schematic.sort_sub_modules()
-    |> Enum.reject(fn n -> inlined?(s.insts[n]) end)
-  end
+  defp printable_sub_modules(s), do: Schematic.sort_sub_modules(s, except: &inlined?/1)
 
   defp get_top_path(hier) do
     hier |> Path.split() |> tl() |> Enum.map(fn _ -> "../" end) |> Enum.join()
@@ -192,7 +188,7 @@ defmodule Danm.HtmlPrinting do
     s
     |> BlackBox.sort_ports()
     |> Enum.each(fn p_name ->
-      {dir, width} = s.ports[p_name]
+      {dir, width} = Map.fetch!(s.ports, p_name)
       IO.write(f, ~s"""
       <tr><td><a href="#WIRE_#{p_name}">#{p_name}</a></td><td>#{dir}</td><td>#{width}</td></tr>
       """)
@@ -206,7 +202,7 @@ defmodule Danm.HtmlPrinting do
     count = Enum.count(subs)
     IO.puts(f, "<h2>#{count} Instances</h2><table><tr><th>instance</th><th>module</th></tr>")
     Enum.each(subs, fn i_name ->
-      inst = s.insts[i_name]
+      inst = Map.fetch!(s.insts, i_name)
       case inst.__struct__ do
 	t when t in [BlackBox, Schematic] ->
 	  IO.write(f, ~s"""
@@ -236,8 +232,8 @@ defmodule Danm.HtmlPrinting do
     s
     |> BlackBox.sort_ports()
     |> Enum.each(fn p_name ->
-      {dir, _} = s.ports[p_name]
-      w_name = map["#{self_module}/#{p_name}"]
+      {dir, _} = Map.fetch!(s.ports, p_name)
+      w_name = Map.fetch!(map, "#{self_module}/#{p_name}")
       IO.write(f, ~s"""
       <tr id="PIN_#{self_module}/#{p_name}">
       <td><a href="#{up_module}/#{self_module}.html#WIRE_#{p_name}">#{p_name}</a></td>
@@ -397,7 +393,8 @@ defmodule Danm.HtmlPrinting do
 	s
 	|> BlackBox.sort_ports()
 	|> Enum.each(fn p_name ->
-	  print_html_port(s.ports[p_name], f, as: p_name, self: self_module, up: up_module)
+	  print_html_port(Map.fetch!(s.ports, p_name), f,
+	    as: p_name, self: self_module, up: up_module)
 	end)
       Schematic ->
 	map = Schematic.wire_width_map(s)
@@ -406,8 +403,8 @@ defmodule Danm.HtmlPrinting do
 	  |> Enum.reject(fn {i, _} -> i == :self end)
 	  |> print_html_wire(s, f,
 	    as: w_name,
-	    width: map[w_name],
-	    port: s.ports[w_name],
+	    width: Map.fetch!(map, w_name),
+	    port: Map.get(s.ports, w_name),  # could be nil
 	    self: self_module,
 	    up: up_module)
 	end)
@@ -444,7 +441,7 @@ defmodule Danm.HtmlPrinting do
       IO.puts(f, "<li>connections: <table><tr><th>instance</th><th>port</th></tr>")
       Enum.each(conns, fn {ins, port} ->
 	IO.puts(f, "<tr><td><a href=\"#INST_#{ins}\">#{ins}</a></td><td>")
-	if inlined?(s.insts[ins]) do
+	if inlined?(Map.fetch!(s.insts, ins)) do
 	  IO.puts(f, "</td></tr>")
 	else
 	  IO.puts(f, "<a href=\"#PIN_#{ins}/#{port}\">#{port}</a></td></tr>")

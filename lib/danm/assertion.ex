@@ -25,11 +25,17 @@ defmodule Danm.Assertion do
       end
     end
 
-    def port_at(b, name) do
+    def port_at!(b, name) do
       cond do
 	name == b.clk -> {:input, 1}
-	b.inputs[name] -> {:input, b.inputs[name]}
-	true -> nil
+	true -> {:input, Map.fetch!(b.inputs, name)}
+      end
+    end
+
+    def has_port?(b, name) do
+      cond do
+	name == b.clk -> true
+	true -> Map.has_key?(b.inputs, name)
       end
     end
 

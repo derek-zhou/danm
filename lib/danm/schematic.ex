@@ -52,7 +52,8 @@ defmodule Danm.Schematic do
     def type_string(b), do: "schematic: " <> b.name
 
     def ports(b), do: b.ports |> Map.keys()
-    def port_at(b, name), do: b.ports[name]
+    def port_at!(b, name), do: Map.fetch!(b.ports, name)
+    def has_port?(b, name), do: Map.has_key?(b.ports, name)
 
     defp resolve_logic(b) do
       {map, changes} = Enum.reduce(b.insts, {%{}, 0}, fn {i_name, inst}, {map, changes} ->
@@ -73,7 +74,7 @@ defmodule Danm.Schematic do
     defp resolve_inputs(inst, in: s) do
       Sink.inputs(inst)
       |> Enum.reduce(inst, fn {p_name, w}, inst ->
-	w_new = Schematic.width_of_wire(s, s.wires[p_name])
+	w_new = Schematic.width_of_wire(s, Map.fetch!(s.wires, p_name))
 	cond do
 	  w_new == w -> inst
 	  true -> Sink.set_input(inst, p_name, w_new)
@@ -83,7 +84,7 @@ defmodule Danm.Schematic do
 
     defp resolve_port_width(b) do
       new_ports = Enum.reduce(b.ports, %{}, fn {p_name, {dir, _}}, map ->
-	Map.put(map, p_name, {dir, Schematic.width_of_wire(b, b.wires[p_name])})
+	Map.put(map, p_name, {dir, Schematic.width_of_wire(b, Map.fetch!(b.wires, p_name))})
       end)
       %{b | ports: new_ports}
     end
@@ -103,15 +104,17 @@ defmodule Danm.Schematic do
 
   defp merge_wire(s, n, {inst, port}) do
     {dir, _} = pin_property(s, inst, port)
+    wires = Map.fetch!(s.wires, n)
     cond do
-      driver_count(dir) > 0 -> %{s | wires: Map.put(s.wires, n, [ {inst, port} | s.wires[n] ])}
+      driver_count(dir) > 0 ->
+	%{s | wires: Map.put(s.wires, n, [ {inst, port} | wires ])}
       true ->
-	index = Enum.find_index(s.wires[n], fn {inst, port} ->
+	index = Enum.find_index(wires, fn {inst, port} ->
 	  {dir, _} = pin_property(s, inst, port)
 	  driver_count(dir) == 0
         end)
   	index = if index == nil, do: -1, else: index
-	%{s | wires: Map.put(s.wires, n, List.insert_at(s.wires[n], index, {inst, port}))}
+	%{s | wires: Map.put(s.wires, n, List.insert_at(wires, index, {inst, port}))}
     end
   end
 
@@ -141,7 +144,7 @@ defmodule Danm.Schematic do
   def add(s, name, options \\ []) do
     i_name = options[:as] || "u_#{name}"
     s =
-      case s.insts[i_name] do
+      case Map.get(s.insts, i_name) do
         nil ->
 	  m = Library.load_and_build_module(name, options[:parameters] || %{})
 	  set_instance(s, i_name, to: m)
@@ -226,7 +229,7 @@ defmodule Danm.Schematic do
   return driver count, load count and calculated width
   """
   def inspect_wire(s, name) do
-    Enum.reduce(s.wires[name], {0, 0, 0},
+    Enum.reduce(Map.fetch!(s.wires, name), {0, 0, 0},
       fn {ins, port}, {drivers, loads, width} ->
 	{dir, w} = pin_property(s, ins, port)
 	dc = driver_count(dir)
@@ -307,16 +310,15 @@ defmodule Danm.Schematic do
     # driver count, width. I set width to -1 if width does not matcch 
     {drivers, width, pins} = Enum.reduce(s.insts, {drivers, width, []},
       fn {i_name, inst}, {drivers, width, list} ->
-	case Entity.port_at(inst, name) do
-	  nil -> {drivers, width, list}
-	  {dir, w} ->
+	case inst.__struct__ do
+	  t when t in [BlackBox, Schematic] ->
 	    cond do
-	      Map.has_key?(pw_map, "#{i_name}/#{name}") -> {drivers, width, list}
-	      true ->
-		{drivers + driver_count(dir),
-		 common_width(width, w),
-		 [ {i_name, name} | list ]}
+	      Map.has_key?(inst.ports, name) and !Map.has_key?(pw_map, "#{i_name}/#{name}") ->
+		{dir, w} = Map.fetch!(inst.ports, name)
+		{drivers + driver_count(dir), common_width(width, w), [ {i_name, name} | list ]}
+	      true -> {drivers, width, list}
 	    end
+	  _ -> {drivers, width, list}
 	end
       end)
     cond do
@@ -347,9 +349,9 @@ defmodule Danm.Schematic do
   defp pin_property(s, i_name, p_name) do
     case i_name do
       :self ->
-	{dir, w} = s.ports[p_name]
+	{dir, w} = Map.fetch!(s.ports, p_name)
 	{inverse_dir(dir), w}
-      _ -> Entity.port_at(s.insts[i_name], p_name)
+      _ -> Entity.port_at!(Map.fetch!(s.insts, i_name), p_name)
     end
   end
 
@@ -400,8 +402,21 @@ defmodule Danm.Schematic do
     s.insts
     |> Map.keys()
     |> Enum.sort(fn a_name, b_name ->
-      a_inst = s.insts[a_name]
-      b_inst = s.insts[b_name]
+      a_inst = Map.fetch!(s.insts, a_name)
+      b_inst = Map.fetch!(s.insts, b_name)
+      compare_inst(inst_order_of(a_inst), a_name, inst_order_of(b_inst), b_name) end)
+  end
+
+  @doc ~S"""
+  return a sorted list of instances after filtering
+  """
+  def sort_sub_modules(s, except: filter) do
+    s.insts
+    |> Map.keys()
+    |> Enum.reject(fn n -> filter.(Map.fetch!(s.insts, n)) end)
+    |> Enum.sort(fn a_name, b_name ->
+      a_inst = Map.fetch!(s.insts, a_name)
+      b_inst = Map.fetch!(s.insts, b_name)
       compare_inst(inst_order_of(a_inst), a_name, inst_order_of(b_inst), b_name) end)
   end
 
@@ -411,7 +426,7 @@ defmodule Danm.Schematic do
   def sink(s, name) when is_binary(name), do: sink(s, [name])
   def sink(s, l) when is_list(l) do
     sink =
-      case s.insts["_sink"] do
+      case Map.get(s.insts, "_sink") do
 	nil -> Sink.new(l)
 	sink -> Sink.merge(sink, l)
       end
@@ -527,7 +542,7 @@ defmodule Danm.Schematic do
   make some one bit wire that represent the state of a FSM
   """
   def assign_fsm(s, fsm_name, options) do
-    fsm = s.insts[fsm_name]
+    fsm = Map.fetch!(s.insts, fsm_name)
     w = fsm.width
     lut = fsm.lut
     Enum.reduce(options, s, fn {symbol, name}, s ->

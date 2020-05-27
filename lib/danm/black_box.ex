@@ -25,7 +25,8 @@ defmodule Danm.BlackBox do
     def name(b), do: b.name
     def type_string(b), do: "black box: " <> b.name
     def ports(b), do: b.ports |> Map.keys()
-    def port_at(b, name), do: b.ports[name]
+    def port_at!(b, name), do: Map.fetch!(b.ports, name)
+    def has_port?(b, name), do: Map.has_key?(b.ports, name)
 
     defp resolve_parameter(b) do
       {map, changes} = Enum.reduce(b.params, {%{}, 0}, fn {k, v}, {map, changes} ->
@@ -255,8 +256,8 @@ defmodule Danm.BlackBox do
     s.ports
     |> Map.keys()
     |> Enum.sort(fn a, b ->
-      {dir_a, _} = s.ports[a]
-      {dir_b, _} = s.ports[b]
+      {dir_a, _} = Map.fetch!(s.ports, a)
+      {dir_b, _} = Map.fetch!(s.ports, b)
       compare_port(port_order_of(dir_a), a, port_order_of(dir_b), b) end)
   end
 

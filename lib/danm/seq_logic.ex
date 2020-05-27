@@ -27,10 +27,17 @@ defmodule Danm.SeqLogic do
     
     def ports(b), do: [b.clk | ComboLogic.ports(b.core) ]
 
-    def port_at(b, name) do
+    def port_at!(b, name) do
       cond do
 	name == b.clk -> {:input, 1}
-	true -> ComboLogic.port_at(b.core, name)
+	true -> ComboLogic.port_at!(b.core, name)
+      end
+    end
+
+    def has_port?(b, name) do
+      cond do
+	name == b.clk -> true
+	true -> ComboLogic.has_port?(b.core, name)
       end
     end
 
