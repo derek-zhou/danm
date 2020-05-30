@@ -33,11 +33,7 @@ defmodule Danm.Library do
     Agent.stop(__MODULE__)
   end
   
-  @doc """
-  load_black_box(l, name)
-  load the black box by name in library l, return {b, new_l}
-  """
-  def load_black_box(l, name) do
+  defp load_black_box(l, name) do
     case Map.get(l.black_boxes, name) do
       nil ->
 	case Enum.find_value(l.verilog_path, fn p ->
@@ -50,23 +46,27 @@ defmodule Danm.Library do
     end
   end
 
-  @doc """
-  load_schematic(l, name)
-  load the black box by name in library l, return {b, new_l}
-  """
-  def load_schematic(l, name) do
+  defp try_load_schematic(l, name) do
+    # naming convention enforced
+    m = String.to_atom("Elixir.Danm.Schematic." <> Macro.camelize(name))
+    cond do
+      function_exported?(m, :build, 1) -> %Schematic{name: name, module: m, src: "_BUILTIN"}
+      true ->
+	Enum.find_value(l.elixir_path, fn p ->
+	  try do
+	    Code.require_file("#{name}.exs", p)
+	    %Schematic{name: name, module: m, src: "#{p}/#{name}.exs"}
+	  rescue
+	    Code.LoadError -> nil
+	  end
+	end)
+    end
+  end
+
+  defp load_schematic(l, name) do
     case Map.get(l.schematics, name) do
       nil ->
-	case Enum.find_value(l.elixir_path, fn p ->
-	      try do
-		Code.require_file("#{name}.exs", p)
-		# naming convention enforced
-		m = String.to_atom("Elixir.Danm.Schematic." <> Macro.camelize(name))
-		%Schematic{name: name, module: m, src: "#{p}/#{name}.exs"}
-	      rescue
-		Code.LoadError -> nil
-	      end
-	    end) do
+	case try_load_schematic(l, name) do
 	  nil -> {nil, l}
 	  s -> {s, set_schematic(l, name, to: s)}
 	end
@@ -88,7 +88,7 @@ defmodule Danm.Library do
 
   @doc """
   load_module(name)
-  load the black box by name with the agent shared library
+  load the module by name with the agent shared library
   """
   def load_module(name) do
     case Agent.get_and_update(__MODULE__, __MODULE__, :load_module, [name]) do
