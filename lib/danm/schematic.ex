@@ -585,4 +585,9 @@ defmodule Danm.Schematic do
   """
   def roll_in(s, enum, function), do: Enum.reduce(enum, s, function)
 
+  @doc ~S"""
+  This is a reduced case statement used to maintain flow of the pipe operator
+  """
+  def steer_on(s, sub, kl), do: Keyword.fetch!(kl, sub).(s)
+
 end

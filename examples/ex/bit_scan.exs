@@ -17,12 +17,10 @@ defmodule Danm.Schematic.BitScan do
     s
     |> create_port("in", width: width)
     |> create_port("last", width: width + 1)
-    |> bind_to(s)
-
-    case width do
-      1 -> build_width_1(s)
-      width -> build_width_n(s, width)
-    end
+    |> steer_on(
+      width==1,
+    true: &(build_width_1(&1)),
+    false: &(build_width_n(&1, width)))
     |> expose(["exist", "exist_right", "out"])
   end
 
