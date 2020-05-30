@@ -3,6 +3,8 @@ defmodule Danm.CheckDesign do
   perform design check on a design
   """
 
+  require Logger
+
   alias Danm.WireExpr
   alias Danm.Entity
   alias Danm.BlackBox
@@ -57,7 +59,7 @@ defmodule Danm.CheckDesign do
     cond do
       bool ->
 	focus = current_focus(state)
-	IO.puts(:stderr, "Check design ERROR: #{msg}, in #{focus}")
+	Logger.error("Check design ERROR: #{msg}, in #{focus}")
 	%{state | errors: state.errors + 1}
       true -> state
     end
@@ -68,7 +70,7 @@ defmodule Danm.CheckDesign do
     cond do
       bool ->
 	focus = current_focus(state)
-	IO.puts(:stderr, "Check design WARNING: #{msg}, in #{focus}")
+	Logger.warn(:stderr, "Check design WARNING: #{msg}, in #{focus}")
 	%{state | warnings: state.warnings + 1}
       true -> state
     end
