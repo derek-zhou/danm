@@ -2,13 +2,12 @@ defmodule Danm.MockSystemTest do
   use ExUnit.Case
   import Danm
 
-  setup_all do
-    {:ok,
-     [sch: build("mock_system",
-	 verilog_path: ["examples/verilog"],
-	 elixir_path: ["examples/ex"],
-	 parameters: %{"client_count" => 16})]}
-    end
+  setup do
+    [sch: build("mock_system",
+	verilog_path: ["examples/verilog"],
+	elixir_path: ["examples/ex"],
+	parameters: %{"client_count" => 16})]
+  end
 
   test "check design", context do
     context[:sch] |> check_design(check_warnings: true) |> assert("check design failed")

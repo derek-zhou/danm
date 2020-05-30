@@ -2,13 +2,12 @@ defmodule Danm.HierDesignTest do
   use ExUnit.Case
   import Danm
 
-  setup_all do
-    {:ok,
-     [sch: build("ram_wrapper",
-	 verilog_path: ["examples/verilog"],
-	 elixir_path: ["examples/ex"],
-	 parameters: %{"width" => 12})]}
-    end
+  setup do
+    [sch: build("ram_wrapper",
+	verilog_path: ["examples/verilog"],
+	elixir_path: ["examples/ex"],
+	parameters: %{"width" => 12})]
+  end
 
   test "check design", context do
     context[:sch] |> check_design(check_warnings: true) |> assert()

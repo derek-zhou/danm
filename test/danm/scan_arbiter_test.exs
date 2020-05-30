@@ -2,13 +2,12 @@ defmodule Danm.ScanArbiterTest do
   use ExUnit.Case
   import Danm
 
-  setup_all do
-    {:ok,
-     [sch: build("scan_arbiter",
-	 verilog_path: ["examples/verilog"],
-	 elixir_path: ["examples/ex"],
-	 parameters: %{"width" => 16})]}
-    end
+  setup do
+    [sch: build("scan_arbiter",
+	verilog_path: ["examples/verilog"],
+	elixir_path: ["examples/ex"],
+	parameters: %{"width" => 16})]
+  end
 
   test "check design", context do
     context[:sch] |> check_design(check_warnings: true) |> assert("check design failed")
