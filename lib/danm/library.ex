@@ -50,7 +50,7 @@ defmodule Danm.Library do
     # naming convention enforced
     m = String.to_atom("Elixir.Danm.Schematic." <> Macro.camelize(name))
     cond do
-      function_exported?(m, :build, 1) -> %Schematic{name: name, module: m, src: "_BUILTIN"}
+      Code.ensure_loaded?(m) -> %Schematic{name: name, module: m, src: "_BUILTIN"}
       true ->
 	Enum.find_value(l.elixir_path, fn p ->
 	  try do

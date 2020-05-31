@@ -64,4 +64,51 @@ defmodule Danm do
     m
   end
 
+  @doc ~S"""
+  build, check design, generate html and verilog for several designs,
+  all in one go, with config pulled in from config file
+  """
+  def auto_build(names) do
+    v_path =
+      case Application.fetch_env(:danm, :verilog_path) do
+	{:ok, path} -> path
+	_ -> []
+      end
+    e_path =
+      case Application.fetch_env(:danm, :elixir_path) do
+	{:ok, path} -> path
+	_ -> []
+      end
+    output_dir =
+      case Application.fetch_env(:danm, :output_dir) do
+	{:ok, path} -> path
+	_ -> "obj"
+      end
+    default_params =
+      case Application.fetch_env(:danm, :default_params) do
+	{:ok, map} -> map
+	_ -> %{}
+      end
+    check_warning =
+      case Application.fetch_env(:danm, :check_warning) do
+	{:ok, v} -> v
+	_ -> false
+      end
+
+    File.mkdir_p!(output_dir)
+    Library.start_link(v_path, e_path)
+
+    Enum.each(names, fn name ->
+      mod = Library.load_and_build_module(name, default_params[name] || %{})
+      unless check_design(mod, check_warnings: check_warning) do
+	raise("check design failed for design #{name}")
+      end
+      File.mkdir_p!("#{output_dir}/#{name}_html")
+      generate_html_as_top(mod, in: "#{output_dir}/#{name}_html")
+      generate_full_verilog(mod, in: "#{output_dir}")
+    end)
+
+    Library.stop()
+  end
+
 end
