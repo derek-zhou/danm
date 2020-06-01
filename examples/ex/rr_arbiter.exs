@@ -17,9 +17,9 @@ defmodule Danm.Schematic.RrArbiter do
     s
     |> create_port("busy")
     |> create_port("request", width: width)
-    |> steer_on(width == 1,
-    true: &(build_width_1(&1)),
-    false: &(build_width_n(&1, width)))
+    |> invoke(fn s ->
+      if width == 1, do: build_width_1(s), else: build_width_n(s, width)
+    end)
     |> expose(["exist", "grant"])
   end
 
