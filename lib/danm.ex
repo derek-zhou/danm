@@ -97,6 +97,7 @@ defmodule Danm do
 
     File.mkdir_p!(output_dir)
     Library.start_link(v_path, e_path)
+    names = List.wrap(names)
 
     Enum.each(names, fn name ->
       mod = Library.load_and_build_module(name, default_params[name] || %{})
