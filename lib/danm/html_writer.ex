@@ -63,6 +63,7 @@ defmodule Danm.HtmlWriter do
   defp one_attr_string({key, value}) do
     case value do
       nil -> " #{key}"
+      list when is_list(list) -> " #{key}=\"#{Enum.join(list, " ")}\""
       v -> " #{key}=\"#{v}\""
     end
   end
@@ -70,40 +71,39 @@ defmodule Danm.HtmlWriter do
   @doc ~S"""
   Just add some text
   """
-  # TODO: html escape text
   def text(s, text) when is_binary(text), do: [ text | s]
 
-  def html(s, inner, attrs \\ []), do: element(s, "html", inner, attrs)
-  def head(s, inner, attrs \\ []), do: element(s, "head", inner, attrs)
-  def body(s, inner, attrs \\ []), do: element(s, "body", inner, attrs)
+  [:meta, :link, :hr, :br, :img]
+  |> Enum.each(fn k ->
+    str = to_string(k)
+    def unquote(k)(s, attrs \\ []), do: element(s, unquote(str), attrs)
+  end)
 
-  def meta(s, attrs \\ []), do: element(s, "meta", attrs)
-  def link(s, attrs \\ []), do: element(s, "link", attrs)
-
-  def hr(s, attrs \\ []), do: element(s, "hr", attrs)
-  def br(s, attrs \\ []), do: element(s, "br", attrs)
-  def img(s, attrs \\ []), do: element(s, "img", attrs)
-
-  def title(s, inner, attrs \\ []), do: element(s, "title", inner, attrs)
-  def style(s, inner, attrs \\ []), do: element(s, "style", inner, attrs)
-  def script(s, inner, attrs \\ []), do: element(s, "script", inner, attrs)
-
-  def h1(s, inner, attrs \\ []), do: element(s, "h1", inner, attrs)
-  def h2(s, inner, attrs \\ []), do: element(s, "h2", inner, attrs)
-  def h3(s, inner, attrs \\ []), do: element(s, "h3", inner, attrs)
-  def h4(s, inner, attrs \\ []), do: element(s, "h4", inner, attrs)
-  def h5(s, inner, attrs \\ []), do: element(s, "h5", inner, attrs)
-  def h6(s, inner, attrs \\ []), do: element(s, "h6", inner, attrs)
-
-  def p(s, inner, attrs \\ []), do: element(s, "p", inner, attrs)
-  def a(s, inner, attrs \\ []), do: element(s, "a", inner, attrs)
-  def div(s, inner, attrs \\ []), do: element(s, "div", inner, attrs)
-  def ul(s, inner, attrs \\ []), do: element(s, "ul", inner, attrs)
-  def li(s, inner, attrs \\ []), do: element(s, "li", inner, attrs)
-
-  def table(s, inner, attrs \\ []), do: element(s, "table", inner, attrs)
-  def tr(s, inner, attrs \\ []), do: element(s, "tr", inner, attrs)
-  def th(s, inner, attrs \\ []), do: element(s, "th", inner, attrs)
-  def td(s, inner, attrs \\ []), do: element(s, "td", inner, attrs)
+  [
+    :html,
+    :head,
+    :body,
+    :title,
+    :style,
+    :script,
+    :h1,
+    :h2,
+    :h3,
+    :h4,
+    :h5,
+    :h6,
+    :p,
+    :a,
+    :div,
+    :ul,
+    :li,
+    :table,
+    :tr,
+    :th,
+    :td ]
+  |> Enum.each(fn k ->
+    str = to_string(k)
+    def unquote(k)(s, inner, attrs \\ []), do: element(s, unquote(str), inner, attrs)
+  end)
 
 end
