@@ -126,21 +126,15 @@ defmodule Danm.HtmlPrinting do
 	h
 	|> p(fn h ->
 	  top_path = get_top_path(hier)
+	  {self_module, up_module} = get_self_and_up_module(hier)
+	  l2 = case up_module do
+		 nil -> &a(&1, "Top", href: "#{top_path}top.html")
+		 _ -> &a(&1, "Up (#{up_module})", href: "../#{up_module}.html#INST_#{self_module}")
+	       end
 	  h
 	  |> a("Hierarchy", href: "#{top_path}hierarchy.html")
-	  |> invoke(fn h ->
-	    {self_module, up_module} = get_self_and_up_module(hier)
-	    case up_module do
-	      nil ->
-		h
-		|> text(" | ")
-		|> a("Top", href: "#{top_path}top.html")
-	      _ ->
-		h
-		|> text(" | ")
-		|> a("Up (#{up_module})", href: "../#{up_module}.html#INST_#{self_module}")
-	    end
-	  end)
+	  |> text(" | ")
+	  |> l2.()
 	end)
 	|> h1(title)
 	|> p(Schematic.doc_string(s))
@@ -252,25 +246,16 @@ defmodule Danm.HtmlPrinting do
       |> tr(fn h -> h |> th("instance") |> th("module") end)
       |> roll_in(subs, fn i_name, h ->
 	inst = Map.fetch!(s.insts, i_name)
-	case inst.__struct__ do
-	  t when t in [BlackBox, Schematic] ->
-	    h
-	    |> tr(fn h ->
-	      h
-	      |> td(&a(&1, i_name, href: "#INST_#{i_name}"))
-	      |> td(&a(&1, inst.name, href: "#{self_module}/#{i_name}.html"))
-	    end)
-	  _ ->
-	    h
-	    |> tr(fn h ->
-	      h
-	      |> td(&a(&1, i_name, href: "#INST_#{i_name}"))
-	      |> td(Entity.type_string(inst))
-	    end)
-	end
+	td2 = case inst.__struct__ do
+		t when t in [BlackBox, Schematic] ->
+		  &a(&1, inst.name, href: "#{self_module}/#{i_name}.html")
+		_ -> Entity.type_string(inst)
+	      end
+	tr(h, fn h ->
+	  h |> td(&a(&1, i_name, href: "#INST_#{i_name}")) |> td(td2)
+	end)
       end)
     end)
-
   end
 
   defp print_html_instance(h, s, as: hier, lookup: map) do
@@ -401,8 +386,7 @@ defmodule Danm.HtmlPrinting do
 	|> tr(fn h -> h |> th("case") |> th("value") end)
 	|> roll_in(Enum.with_index(s.choices), fn {c, i}, h ->
 	  c_str = WireExpr.ast_string(c, &html_wire_string/1)
-	  tr(h, fn h -> h |> td(to_string(i)) |> td(c_str)
-	  end)
+	  tr(h, fn h -> h |> td(to_string(i)) |> td(c_str) end)
 	end)
       end)
     end)
@@ -446,17 +430,16 @@ defmodule Danm.HtmlPrinting do
 
   defp print_seq_logic_core(h, s) do
     clk_str = html_wire_string(s.clk)
+    plfun = case s.core.__struct__ do
+	      ChoiceLogic -> &print_choice_logic_core(&1, s.core)
+	      ConditionLogic -> &print_condition_logic_core(&1, s.core)
+	      CaseLogic -> &print_case_logic_core(&1, s.core)
+	      _ -> &print_simple_logic_core(&1, s.core)
+	    end
 
     h
     |> li("Clocked by: #{clk_str}")
-    |> invoke(fn h ->
-      case s.core.__struct__ do
-	ChoiceLogic -> print_choice_logic_core(h, s.core)
-	ConditionLogic -> print_condition_logic_core(h, s.core)
-	CaseLogic -> print_case_logic_core(h, s.core)
-	_ -> print_simple_logic_core(h, s.core)
-      end
-    end)
+    |> plfun.()
   end
 
   defp print_fsm_logic_core(h, s) do
@@ -475,16 +458,14 @@ defmodule Danm.HtmlPrinting do
 	  h
 	  |> roll_in(Enum.with_index(transit), fn {{co, ns}, i}, h ->
 	    co_str = WireExpr.ast_string(co, &html_wire_string/1)
-	    case i do
-	      0 ->
-		tr(h, fn h ->
-		  h
-		  |> td(to_string(state), rowspan: span)
-		  |> td(co_str)
-		  |> td(to_string(ns))
-		end)
-	      _ -> tr(h, fn h -> h |> td(co_str) |> td(to_string(ns)) end)
-	    end
+	    tr(h, fn h ->
+	      case i do
+		0 -> h |> td(to_string(state), rowspan: span)
+		_ -> h
+	      end
+	      |> td(co_str)
+	      |> td(to_string(ns))
+	    end)
 	  end)
 	end)
       end)
@@ -530,15 +511,16 @@ defmodule Danm.HtmlPrinting do
       |> ul(fn h ->
 	h
 	|> li("width:#{width}")
-	|> html_port_li(p_name, dir, self, up)
+	|> html_port_li(p_name, {dir, width}, self, up)
       end)
     end)
   end
 
-  defp html_port_li(h, p_name, dir, self, up) do
-    case up do
-      nil -> h |> li("#{dir} port")
-      _   -> h |> li(&a(&1, "#{dir} port", href: "../#{up}.html#PIN_#{self}/#{p_name}"))
+  defp html_port_li(h, p_name, port, self, up) do
+    case {port, up} do
+      {nil, _} -> h
+      {{dir, _}, nil} -> li(h, "#{dir} port")
+      {{dir, _}, up} -> li(h, &a(&1, "#{dir} port", href: "../#{up}.html#PIN_#{self}/#{p_name}"))
     end
   end
 
@@ -550,47 +532,34 @@ defmodule Danm.HtmlPrinting do
       |> ul(fn h ->
 	h
 	|> li("width:#{width}")
-	|> invoke(fn h ->
-	  case port do
-	    nil -> h
-	    {dir, _} -> html_port_li(h, w_name, dir, self, up)
-	  end
-	end)
-	|> invoke(fn h ->
-	  cond do
-	    Enum.empty?(conns) -> h
-	    true -> print_html_wire_conns(h, conns, s)
-	  end
-	end)
+	|> html_port_li(w_name, port, self, up)
+	|> print_html_wire_conns(conns, s)
       end)
     end)
   end
 
   defp print_html_wire_conns(h, conns, s) do
-    h
-    |> li(fn h ->
-      h
-      |> text("connections: ")
-      |> table(fn h ->
-	h
-	|> tr(fn h -> h |> th("instance") |> th("port")	end)
-	|> roll_in(conns, fn {ins, port}, h ->
+    cond do
+      Enum.empty?(conns) -> h
+      true ->
+	li(h, fn h ->
 	  h
-	  |> tr(fn h ->
-	    cond do
-	      inlined?(Map.fetch!(s.insts, ins)) ->
-		h
-		|> td(&a(&1, ins, href: "#INST_#{ins}"))
-		|> td("")
-	      true ->
-		h
-		|> td(&a(&1, ins, href: "#INST_#{ins}"))
-		|> td(&a(&1, port, href: "#PIN_#{ins}/#{port}"))
-	    end
+	  |> text("connections: ")
+	  |> table(fn h ->
+	    h
+	    |> tr(fn h -> h |> th("instance") |> th("port") end)
+	    |> roll_in(conns, fn {ins, port}, h ->
+	      td2 = cond do
+		inlined?(Map.fetch!(s.insts, ins)) -> nil
+		true -> &a(&1, port, href: "#PIN_#{ins}/#{port}")
+	      end
+	      tr(h, fn h ->
+		h |> td(&a(&1, ins, href: "#INST_#{ins}")) |> td(td2)
+	      end)
+	    end)
 	  end)
 	end)
-      end)
-    end)
+    end
   end
 
 end

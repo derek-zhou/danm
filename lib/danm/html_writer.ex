@@ -39,6 +39,10 @@ defmodule Danm.HtmlWriter do
   end
 
   # this is for the non-void elements that may have inner text
+  defp element(s, tag, nil, attrs) do
+    ["<#{tag}#{attr_string(attrs)}></#{tag}>\n" | s]
+  end
+
   defp element(s, tag, text, attrs) when is_binary(text) do
     start_tag = "<#{tag}#{attr_string(attrs)}>"
     end_tag = "</#{tag}>\n"
@@ -82,7 +86,6 @@ defmodule Danm.HtmlWriter do
 
   def title(s, inner, attrs \\ []), do: element(s, "title", inner, attrs)
   def style(s, inner, attrs \\ []), do: element(s, "style", inner, attrs)
-  def voild_script(s, attrs \\ []), do: element(s, "script", "", attrs)
   def script(s, inner, attrs \\ []), do: element(s, "script", inner, attrs)
 
   def h1(s, inner, attrs \\ []), do: element(s, "h1", inner, attrs)
