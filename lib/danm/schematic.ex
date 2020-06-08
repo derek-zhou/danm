@@ -119,7 +119,7 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
-  return a documentation string
+  return a documentation string to embedded in the generated files
   """
   def doc_string(b) do
     case b.__struct__ do
@@ -178,6 +178,7 @@ defmodule Danm.Schematic do
 
   @doc ~S"""
   connect pins together as a wire
+  pins are specified as a list of "inst/port". 
   optional arguments
 
     * :as, wire name. if nil, a name as the first port name is used
@@ -260,7 +261,7 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
-  return the driver of wire as a conn tuple.
+  return the driver of wire as a conn tuple {inst, port}
   """
   def driver_of_wire(s, conns) do
     Enum.find(conns, fn {ins, port} ->
@@ -276,8 +277,8 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
-  connect all pins in the design by name.
-  Only connect conservatively, so all connected pins are same width, 0 or 1 driver
+  connect all pins in the design by name if possible
+  Only connect conservatively, so all connected pins are of the same width, with 0 or 1 driver
   """
   def auto_connect(s) do
     # set of unique port name
@@ -581,7 +582,7 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
-  This is basically Enum.reduce with first 2 argument switched
+  This is basically Enum.reduce with first 2 argument switched, to keep the pipe flowing
   """
   def roll_in(s, enum, function), do: Enum.reduce(enum, s, function)
 

@@ -8,19 +8,6 @@ defmodule Danm do
   alias Danm.VerilogPrinting
   alias Danm.CheckDesign
 
-  @doc """
-  Hello world.
-
-  ## Examples
-
-  iex> Danm.hello()
-  :world
-
-  """
-  def hello do
-    :world
-  end
-
   @doc ~S"""
   check design integrity and report errors and warnings. return false if there were errors
   optional arguments:
@@ -34,14 +21,14 @@ defmodule Danm do
   end
 
   @doc ~S"""
-  generate a single verilog file that have everything
+  generate a single verilog file that have everything. File name is deduced from the design name
   """
   def generate_full_verilog(s, in: dir) do
     VerilogPrinting.generate_full_verilog(s, in: dir)
   end
 
   @doc ~S"""
-  generate a full set of html files
+  generate a full set of html files. top level is called top.html
   """
   def generate_html_as_top(s, in: dir) do
     HtmlPrinting.generate_html_hier(s, in: dir)
@@ -54,7 +41,7 @@ defmodule Danm do
 
     * :verilog_path, a list of paths to search for verilog black boxes
     * :elixir_path, a list of paths to search for elixir schematics
-    * :parameters, a map of additional parameters to set before elaborate
+    * :parameters, a map of additional parameters to set to top level before elaborate
 
   """
   def build(name, options \\ []) do

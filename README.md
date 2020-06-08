@@ -15,10 +15,10 @@ DANM is written in elixir. to install simply add "danm" in your deps section of 
 Make sure you have elixir installed and danm added as a dependency. RTL file can be entered in one of the following mode:
 
  * verilog-1995 .v files. Please put them under verilog_path configed paths.
- * exs files. please see the examples dir for examples. All design must be under the Danm.Schematic namespace
+ * exs files. please see the examples dir for examples. All design must be under the Danm.Schematic namespace. danm will `require_file` them based on the name and a list of search dirs.
  * ex filess. This is exactly the same file as above, but compiled together with your other elixir files, if you have any.
 
-Danm will search a design entity first as a compiled-in ex file, failing that, from a exs file from the `elixir_path`, failing that, from a verilog file from the `verilog_path`. You have 2 ways to build rtl:
+Danm will search a design entity first as a compiled-in ex file, failing that, from a exs file from the `elixir_path`, failing that, from a verilog file from the `verilog_path`. You have 2 ways to build the full hierachical rtl:
 
  * calling Danm.build, ... functions yourself for better control
  * calling Danm.auto_build([names]) function. it will run design check, build verilog and html output automatically. 
@@ -27,7 +27,7 @@ Please check the api doc of the package Danm.
 
 # composing rtl in elixir #
 
-The idea is to compose rtl conceptually like making a schematic. Each design is an elixir module and shall provide a build/1 function, that take an input, which is a blank schematic with parameters in place, and generate an output, which is a finished schematic. The parameters are similiar to verilog parameters, but enhanced to support any data, not just integers. The module shall `import Danm.Schematic`,  and call the api to build up the rtl piece wise. Damn means to give you better expressiveness in writing your rtl in elixir. Danm's API encourage an narrative coding style that make heavy use of the elixir's pipe operator, below is an example. Please refer to the example dir for more usable examples. 
+The idea is to compose rtl conceptually like drawing a schematic. Each design is an elixir module and shall provide a build/1 function, that take an input, which is a blank schematic with parameters in place, and generate an output, which is a finished schematic. The parameters are similiar to verilog parameters, but enhanced to support any data, not just integers. The module shall `import Danm.Schematic`,  and call the api to build up the rtl piece wise. Damn means to give you better expressiveness in writing your rtl in elixir. Danm's API encourage an narrative coding style that make heavy use of the elixir's pipe operator, below is an example. Please refer to the example dir for more usable examples. 
 
     def build(s) do
       w = s.params["width"] || 16
@@ -49,7 +49,7 @@ Once your rtl is composed, you can build it and export the verilog so it can be 
 
 Why only verilog 95?
 
-The author feel verilog 95 is already adequate as an exchange format among tools. It is obviously inadequate for authoring design, but so are all later verilog standards. The point of Danm is to author not in verilog, but in a language that is extendable and much more expressive.
+The author feel verilog 95 is already adequate as an exchange format among tools. It is obviously inadequate for authoring designs, but so are all later verilog standards. The point of Danm is to author not in verilog, but in a language that is extendable and much more expressive.
 
 Why only synthesizable subset of verilog?
 
