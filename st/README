@@ -1,7 +1,0 @@
-Prerequisites: GNU Smalltalk Ver 3.1+
-To build:
-Simply type make. It will make a package, "DANM.star", and put it in
-your ~/.st dir so PackageLoader can find it.
-There is not much documentation for now; you can read the source or contact
-the author. 
-  
