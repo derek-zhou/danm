@@ -33,23 +33,38 @@ defmodule Danm.HtmlWriter do
   """
   def export(s), do: Enum.reverse(s)
 
-  # this is for the void elements that should not have inner text
-  defp element(s, tag, attrs) do
+  @doc ~S"""
+  build a void-element, which is an element that should not have inner text. It may have attributes
+  though. Don't call this unless you are making a custom element; use the element specific funcions
+  instead.
+
+  tag is the tag name.
+  attr are a keyword list of attrbutes, each can be a string, an list of strings, or nil
+  """
+  def element(s, tag, attrs) do
     ["<#{tag}#{attr_string(attrs)}>\n" | s]
   end
 
-  # this is for the non-void elements that may have inner text
-  defp element(s, tag, nil, attrs) do
+  @doc ~S"""
+  build a non-void element, which is an element that may have inner text. It may also have
+  attributes. Don't call this unless you are making a custom element; use the element specific
+  funcionsinstead.
+
+  tag is the tag name.
+  inner can be nil, a string or a function with arity of 1 that build inner text
+  attr are a keyword list of attrbutes, each can be a string, an list of strings, or nil
+  """
+  def element(s, tag, nil, attrs) do
     ["<#{tag}#{attr_string(attrs)}></#{tag}>\n" | s]
   end
 
-  defp element(s, tag, text, attrs) when is_binary(text) do
+  def element(s, tag, text, attrs) when is_binary(text) do
     start_tag = "<#{tag}#{attr_string(attrs)}>"
     end_tag = "</#{tag}>\n"
     [ end_tag | text([start_tag | s], text)]
   end
 
-  defp element(s, tag, func, attrs) when is_function(func, 1) do
+  def element(s, tag, func, attrs) when is_function(func, 1) do
     start_tag = "<#{tag}#{attr_string(attrs)}>\n"
     end_tag = "</#{tag}>\n"
     inner = [] |> func.() |> Enum.reverse()
