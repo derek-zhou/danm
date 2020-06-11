@@ -112,9 +112,9 @@ defmodule Danm.SimpleExpr do
   parse the str
   3 orders of operator precedance:
 
-   1. * / %
-   2. + -
-   3. << >>
+   1. `* / %`
+   2. `+ -`
+   3. `<< >>`
 
   """
   def parse(s) do

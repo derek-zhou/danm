@@ -1,8 +1,9 @@
 defmodule Danm.FiniteStateMachine do
-  @moduledoc """
+  @moduledoc ~S"""
   A finite state machine is a design entity with a flopped output that represent a state.
   The next state depend on the current state and various inputs
   The state transfer graph can be expressed as a following:
+  ```
   [
   {:state0, {{condition, next_state},
              {condition, next_state},
@@ -12,6 +13,7 @@ defmodule Danm.FiniteStateMachine do
              ...},
   ...
   ]
+  ```
   each possible state is represented as a atom. conditions are expressions
   """
 
