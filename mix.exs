@@ -4,9 +4,11 @@ defmodule Danm.MixProject do
   def project do
     [
       app: :danm,
-      version: "0.1.0",
+      version: "0.1.3",
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
+      description: description(),
+      package: package(),
       deps: deps()
     ]
   end
@@ -25,4 +27,16 @@ defmodule Danm.MixProject do
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
   end
+
+  defp description do
+    "DANM, short for Design Automation aNd Manipulation, is a tool written by Derek for use in synthesizable RTL design."
+  end
+
+  defp package do
+    [
+      licenses: ["GPL-3.0-or-later"],
+      links: %{"GitHub" => "https://github.com/derek-zhou/danm"}
+    ]
+  end
+
 end
