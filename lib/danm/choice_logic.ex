@@ -1,8 +1,5 @@
 defmodule Danm.ChoiceLogic do
-  @moduledoc """
-  A choice logic is a design entity with full case one one input,
-  picking output from 2^n of choices
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.WireExpr

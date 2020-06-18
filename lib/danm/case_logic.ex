@@ -1,9 +1,5 @@
 defmodule Danm.CaseLogic do
-  @moduledoc """
-  A case logic is a design entity with a list of cases anf choices,
-  output the choice when subject match the first case
-  the laast could be nil, which will match everything
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.WireExpr

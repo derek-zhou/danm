@@ -1,7 +1,5 @@
 defmodule Danm.BundleLogic do
-  @moduledoc """
-  A bundle logic is a design entity with several combo logic expr combined.
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.WireExpr

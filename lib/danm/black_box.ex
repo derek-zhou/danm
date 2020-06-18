@@ -1,7 +1,5 @@
 defmodule Danm.BlackBox do
-  @moduledoc """
-  A block box is a design entity from external, danm does not know the innard.
-  """
+  @moduledoc false
 
   alias Danm.SimpleExpr
   alias Danm.Entity

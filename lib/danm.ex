@@ -40,7 +40,7 @@ defmodule Danm do
   optional arguments:
 
     * :verilog_path, a list of paths to search for verilog black boxes
-    * :elixir_path, a list of paths to search for elixir schematics
+    * :elixir_path, a list of paths to search for elixir schematics in exs
     * :parameters, a map of additional parameters to set to top level before elaborate
 
   """
@@ -52,8 +52,22 @@ defmodule Danm do
   end
 
   @doc ~S"""
-  build, check design, generate html and verilog for several designs,
-  all in one go, with config pulled in from config file
+  build, check design, generate html and verilog for one or several designs,
+  all in one go, with config pulled in from config file. In your config.exs, you may want to have:
+
+
+  ``` elixir
+  config :danm,
+  verilog_path: [PATH1, PATH2],
+  elixir_path: [PATH3, PATH4],
+  check_warning: true,
+  default_params: %{
+    "DESIGN1" => %{
+      "SOMETHING" => VALUE,
+    }
+  }
+  ```
+  Please see the other functions of this module to see find out the meaning of those configs.
   """
   def auto_build(names) do
     v_path =

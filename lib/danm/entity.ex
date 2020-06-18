@@ -1,7 +1,5 @@
 defprotocol Danm.Entity do
-  @moduledoc """
-  A design entity protocol.
-  """
+  @moduledoc false
 
   @doc ~S"""
   elaborate the design into a concrate one

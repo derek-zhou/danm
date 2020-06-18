@@ -1,6 +1,11 @@
 defmodule Danm.Schematic do
   @moduledoc """
   A schematic is a design entity composed inside Danm.
+
+  Most of the functions in this module are supposed to be called from withing your own build/1
+  function, and are builder functions. a builder function is a function that take an input
+  schematic as the first argument, and output a new schematic. What you have in your own build/1
+  function should be mostly a big chain of builder functions, chanined by the pipe operator.
   """
 
   alias Danm.Entity
@@ -17,17 +22,6 @@ defmodule Danm.Schematic do
   alias Danm.Assertion
   alias Danm.Library
 
-  @doc """
-  A schematic is an extention of a black box.
-  insts is a map of instances, keyed by instance name. Each instance is either a schematic or a
-  blackbox. 
-  wires is a map of wires, keyed by wire name. Each wire is a list of tuples of:
-  {i_name, p_name}, where i_name/p_name is connected instance name and port name
-  in the case of a wire is also connected to a port, the i_name is :self, p_name has to be
-  the same as the wire name in this case
-  for wire as expression the tuple is {:expr, expr}
-  module is the elixir module that it is defined in
-  """
   defstruct [
     :name,
     :module,
@@ -118,9 +112,7 @@ defmodule Danm.Schematic do
     end
   end
 
-  @doc ~S"""
-  return a documentation string to embedded in the generated files
-  """
+  @doc false
   def doc_string(b) do
     case b.__struct__ do
       BlackBox -> b.comment
@@ -226,9 +218,7 @@ defmodule Danm.Schematic do
     end
   end
 
-  @doc ~S"""
-  return driver count, load count and calculated width
-  """
+  @doc false
   def inspect_wire(s, name) do
     Enum.reduce(Map.fetch!(s.wires, name), {0, 0, 0},
       fn {ins, port}, {drivers, loads, width} ->
@@ -240,16 +230,12 @@ defmodule Danm.Schematic do
       end)
   end
 
-  @doc ~S"""
-  produce a map of w_name -> width for the design
-  """
+  @doc false
   def wire_width_map(s) do
     Map.new(s.wires, fn {w_name, conns} -> {w_name, width_of_wire(s, conns)} end)
   end
 
-  @doc ~S"""
-  return the width of a wire. First driver rules, failing that, the widest load
-  """
+  @doc false
   def width_of_wire(s, conns) do
     Enum.reduce_while(conns, 0, fn {ins, port}, width ->
       {dir, w} = pin_property(s, ins, port)
@@ -260,9 +246,7 @@ defmodule Danm.Schematic do
     end)
   end
 
-  @doc ~S"""
-  return the driver of wire as a conn tuple {inst, port}
-  """
+  @doc false
   def driver_of_wire(s, conns) do
     Enum.find(conns, fn {ins, port} ->
       {dir, _} = pin_property(s, ins, port)
@@ -290,9 +274,7 @@ defmodule Danm.Schematic do
     Enum.reduce(set, s, fn p_name, s -> auto_connect(s, p_name, map) end)
   end
 
-  @doc ~S"""
-  produce a map of pin -> w_name for the design
-  """
+  @doc false
   def pin_to_wire_map(s) do
     Enum.reduce(s.wires, %{}, fn {w_name, conns}, map ->
       conns
@@ -396,9 +378,7 @@ defmodule Danm.Schematic do
     end
   end
 
-  @doc ~S"""
-  return a sorted list of instances
-  """
+  @doc false
   def sort_sub_modules(s) do
     s.insts
     |> Map.keys()
@@ -408,9 +388,7 @@ defmodule Danm.Schematic do
       compare_inst(inst_order_of(a_inst), a_name, inst_order_of(b_inst), b_name) end)
   end
 
-  @doc ~S"""
-  return a sorted list of instances after filtering
-  """
+  @doc false
   def sort_sub_modules(s, except: filter) do
     s.insts
     |> Map.keys()
@@ -422,7 +400,7 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
-  sink a wire, so it has a fake load and not to be auto-exposed
+  sink one wire or a list of wires, so they have a fake load and not to be auto-exposed
   """
   def sink(s, name) when is_binary(name), do: sink(s, [name])
   def sink(s, l) when is_list(l) do
@@ -522,7 +500,9 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
-  define a finite state machine
+  define a finite state machine, from a list of: {state, transitions}
+  where state is a atom. transition is a list of: {condition, next_state}
+
   optional arguments:
 
     * :as, name of the wire. required
@@ -541,8 +521,10 @@ defmodule Danm.Schematic do
 
   @doc ~S"""
   make some one bit wire that represent the state of a FSM
+
+  options are a list of: state: name.
   """
-  def assign_fsm(s, fsm_name, options) do
+  def assign_fsm(s, fsm_name, options \\ []) do
     fsm = Map.fetch!(s.insts, fsm_name)
     w = fsm.width
     lut = fsm.lut
@@ -560,7 +542,8 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
-  define an assertion. Assertions are auto-named.
+  define an assertion. If the given expr evalue to verilog reue value the simulation will die
+
   optional arguments:
 
     * :flop_by, clock name of the flop if existed
@@ -574,6 +557,9 @@ defmodule Danm.Schematic do
 
   @doc ~S"""
   helper macro to maintain flow of the pipe operator
+
+  `a |> bind_to(b)` is just a fancy way to say `b = a`
+
   """
   defmacro bind_to(value, name) do
     quote do
@@ -582,12 +568,28 @@ defmodule Danm.Schematic do
   end
 
   @doc ~S"""
-  This is basically Enum.reduce with first 2 argument switched, to keep the pipe flowing
+  This is Enum.reduce with first 2 argument switched, to keep the pipe flowing
   """
   def roll_in(s, enum, function), do: Enum.reduce(enum, s, function)
 
   @doc ~S"""
   Invoke the func with s. This is used to keep the pipe flowing
+
+  `s |> invoke(func)` is just a fancy way to say func.(s)
+
+  The beauty comes in when you have:
+
+  ``` elixir
+  s
+  |> other_function()
+  |> invoke(fn s ->
+     case something do
+       0 -> s
+       1 -> s |> something_else()
+     end
+     end)
+  ```
+
   """
   def invoke(s, func), do: func.(s)
 

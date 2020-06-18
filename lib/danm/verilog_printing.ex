@@ -1,7 +1,5 @@
 defmodule Danm.VerilogPrinting do
-  @moduledoc """
-  Generate Verilog file for downstream tools
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.WireExpr

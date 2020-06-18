@@ -1,7 +1,5 @@
 defmodule Danm.CheckDesign do
-  @moduledoc """
-  perform design check on a design
-  """
+  @moduledoc false
 
   require Logger
 

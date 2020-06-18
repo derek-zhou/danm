@@ -1,7 +1,5 @@
 defmodule Danm.WireExpr do
-  @moduledoc """
-  WireExpr is expression with width, used in constructing hardware model.
-  """
+  @moduledoc false
 
   use Bitwise, only_operators: true
 

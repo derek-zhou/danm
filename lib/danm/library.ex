@@ -1,7 +1,5 @@
 defmodule Danm.Library do
-  @moduledoc """
-  Loading modules from the filesystem
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.BlackBox
@@ -9,11 +7,13 @@ defmodule Danm.Library do
   
   use Agent
 
-  defstruct verilog_path: [],
+  defstruct [
+    verilog_path: [],
     black_boxes: %{},
     elixir_path: [],
     schematics: %{},
     build_cache: %{}
+  ]
 
   defp set_black_box(l, n, to: b), do: %{l | black_boxes: Map.put(l.black_boxes, n, b)}
   defp set_schematic(l, n, to: s), do: %{l | schematics: Map.put(l.schematics, n, s)}
@@ -23,10 +23,6 @@ defmodule Danm.Library do
       fn ->
 	%__MODULE__{verilog_path: vp, elixir_path: ep}
       end, name: __MODULE__)
-  end
-
-  def get do
-    Agent.get(__MODULE__, & &1)
   end
 
   def stop do
@@ -86,11 +82,7 @@ defmodule Danm.Library do
     end
   end
 
-  @doc """
-  load_module(name)
-  load the module by name with the agent shared library
-  """
-  def load_module(name) do
+  defp load_module(name) do
     case Agent.get_and_update(__MODULE__, __MODULE__, :load_module, [name]) do
       nil -> raise "Module by the name of #{name} is not found"
       b -> b
@@ -99,10 +91,7 @@ defmodule Danm.Library do
 
   defp module_to_key(s), do: {s.name, s.params}
 
-  @doc """
-  build the module with the shared library
-  """
-  def build_module(m) do
+  defp build_module(m) do
     key = module_to_key(m)
     # I cannot use get_and_update because elaborate may call the agent again
     case Agent.get(__MODULE__, fn l -> Map.get(l.build_cache, key) end) do

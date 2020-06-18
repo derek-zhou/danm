@@ -1,8 +1,5 @@
 defmodule Danm.ComboLogic do
-  @moduledoc """
-  A combo logic is a design entity with some input ports and one output, and the output
-  is derived from input as a combinatorial logic expression
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.WireExpr

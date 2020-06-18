@@ -1,7 +1,5 @@
 defmodule Danm.SimpleExpr do
-  @moduledoc """
-  SimpleExpr parse and evaluate expression with integers.
-  """
+  @moduledoc false
 
   use Bitwise, only_operators: true
 

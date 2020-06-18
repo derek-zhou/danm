@@ -1,7 +1,5 @@
 defmodule Danm.Sink do
-  @moduledoc """
-  A sink is a design entity with some input ports and not output
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.SeqLogic

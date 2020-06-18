@@ -91,6 +91,9 @@ defmodule Danm.HtmlWriter do
   [:meta, :link, :hr, :br, :img]
   |> Enum.each(fn k ->
     str = to_string(k)
+    @doc ~s"""
+    build void element #{str}
+    """
     def unquote(k)(s, attrs \\ []), do: element(s, unquote(str), attrs)
   end)
 
@@ -118,6 +121,9 @@ defmodule Danm.HtmlWriter do
     :td ]
   |> Enum.each(fn k ->
     str = to_string(k)
+    @doc ~s"""
+    build non-void element #{str}
+    """
     def unquote(k)(s, inner, attrs \\ []), do: element(s, unquote(str), inner, attrs)
   end)
 

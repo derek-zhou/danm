@@ -1,8 +1,5 @@
 defmodule Danm.Assertion do
-  @moduledoc """
-  An assertion is a design entity with some input ports that combined to a one bit value
-  and cannot be 1
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.WireExpr

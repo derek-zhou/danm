@@ -1,7 +1,5 @@
 defmodule Danm.HtmlPrinting do
-  @moduledoc """
-  Generate HTML documents
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.BlackBox

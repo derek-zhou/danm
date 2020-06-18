@@ -16,12 +16,12 @@ Make sure you have elixir installed and danm added as a dependency. RTL file can
 
  * verilog-1995 .v files. Please put them under verilog_path configed paths.
  * exs files. please see the examples dir for examples. All design must be under the Danm.Schematic namespace. danm will `require_file` them based on the name and a list of search dirs.
- * ex filess. This is exactly the same file as above, but compiled together with your other elixir files, if you have any.
+ * ex filess. This is exactly the same file format as above, but compiled together with your other elixir files, if you have any.
 
 Danm will search a design entity first as a compiled-in ex file, failing that, from a exs file from the `elixir_path`, failing that, from a verilog file from the `verilog_path`. You have 2 ways to build the full hierachical rtl:
 
- * calling Danm.build, ... functions yourself for better control
- * calling Danm.auto_build([names]) function. it will run design check, build verilog and html output automatically. 
+ * calling `Danm` functions yourself for better control
+ * calling `:Danm.auto_build/1` function. it will run design check, build verilog and html output automatically. 
 
 Please check the api doc of the package Danm.
 
@@ -29,17 +29,19 @@ Please check the api doc of the package Danm.
 
 The idea is to compose rtl conceptually like drawing a schematic. Each design is an elixir module and shall provide a build/1 function, that take an input, which is a blank schematic with parameters in place, and generate an output, which is a finished schematic. The parameters are similiar to verilog parameters, but enhanced to support any data, not just integers. The module shall `import Danm.Schematic`,  and call the api to build up the rtl piece wise. Damn means to give you better expressiveness in writing your rtl in elixir. Danm's API encourage an narrative coding style that make heavy use of the elixir's pipe operator, below is an example. Please refer to the example dir for more usable examples. 
 
-    def build(s) do
-      w = s.params["width"] || 16
-      s
-      |> add("spram_simple", as: "hi", parameters: %{"width" => w})
-      |> add("spram_simple", as: "lo", parameters: %{"width" => w})
-      |> connect(["hi/dout"], as: "hi_dout")
-      |> connect(["lo/dout"], as: "lo_dout")
-      |> assign("hi_dout, lo_dout", as: "dout")
-      |> auto_connect()
-      |> auto_expose()
-    end
+``` elixir
+def build(s) do
+  w = s.params["width"] || 16
+  s
+  |> add("spram_simple", as: "hi", parameters: %{"width" => w})
+  |> add("spram_simple", as: "lo", parameters: %{"width" => w})
+  |> connect(["hi/dout"], as: "hi_dout")
+  |> connect(["lo/dout"], as: "lo_dout")
+  |> assign("hi_dout, lo_dout", as: "dout")
+  |> auto_connect()
+  |> auto_expose()
+end
+```
 
 You do not need to master elixir to do that, as the danm api is very intuitive. Knowing more about elixir will definitly help you achieve more.
 

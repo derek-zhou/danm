@@ -1,8 +1,5 @@
 defmodule Danm.ConditionLogic do
-  @moduledoc """
-  A condition logic is a design entity with a list of conditions anf choices,
-  output the choices when first condition evaluate to true
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.WireExpr

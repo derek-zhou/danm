@@ -9,7 +9,12 @@ defmodule Danm.MixProject do
       start_permanent: Mix.env() == :prod,
       description: description(),
       package: package(),
-      deps: deps()
+      deps: deps(),
+
+      # Docs
+      name: "Danm",
+      docs: [main: "readme",
+	     extras: ["README.md"]]
     ]
   end
 

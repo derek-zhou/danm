@@ -1,8 +1,5 @@
 defmodule Danm.SeqLogic do
-  @moduledoc """
-  A seq logic is a design entity with some input ports and one output, and the output
-  is derived from input and itself in a sequential way
-  """
+  @moduledoc false
 
   alias Danm.Entity
   alias Danm.ComboLogic
