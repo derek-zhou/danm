@@ -2,6 +2,10 @@ defmodule Danm.RrArbiterTest do
   use ExUnit.Case
   import Danm
 
+  setup_all do
+    File.mkdir_p!("obj")
+  end
+
   setup do
     [sch: build("rr_scan_arbiter",
 	verilog_path: ["examples/verilog"],

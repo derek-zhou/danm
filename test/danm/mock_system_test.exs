@@ -2,6 +2,10 @@ defmodule Danm.MockSystemTest do
   use ExUnit.Case
   import Danm
 
+  setup_all do
+    File.mkdir_p!("obj")
+  end
+
   setup do
     [sch: build("mock_system",
 	verilog_path: ["examples/verilog"],

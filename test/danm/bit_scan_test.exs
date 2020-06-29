@@ -2,6 +2,10 @@ defmodule Danm.BitScanTest do
   use ExUnit.Case
   import Danm
 
+  setup_all do
+    File.mkdir_p!("obj")
+  end
+
   setup do
     [sch: build("bit_scan",
 	verilog_path: ["examples/verilog"],

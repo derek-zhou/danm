@@ -2,6 +2,10 @@ defmodule Danm.HierDesignTest do
   use ExUnit.Case
   import Danm
 
+  setup_all do
+    File.mkdir_p!("obj")
+  end
+
   setup do
     [sch: build("ram_wrapper",
 	verilog_path: ["examples/verilog"],
