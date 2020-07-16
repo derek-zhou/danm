@@ -17,7 +17,7 @@ defmodule Danm.HtmlPrinting do
 
   # I have my own div/2 for other purpose
   import Kernel, except: [div: 2]
-  import Danm.HtmlWriter
+  import HtmlWriter
 
   @doc ~S"""
   generate a hier index to the set of html files
