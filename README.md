@@ -18,12 +18,29 @@ Make sure you have elixir installed and danm added as a dependency. RTL file can
  * exs files. please see the examples dir for examples. All design must be under the Danm.Schematic namespace. danm will `require_file` them based on the name and a list of search dirs.
  * ex filess. This is exactly the same file format as above, but compiled together with your other elixir files, if you have any.
 
-Danm will search a design entity first as a compiled-in ex file, failing that, from a exs file from the `elixir_path`, failing that, from a verilog file from the `verilog_path`. You have 2 ways to build the full hierachical rtl:
+You can config danm using standard elixir configuration in config/config.exs, such as:
+
+``` elixir
+config :danm,
+  top_modules: ["top"],
+  elixir_path: [],
+  verilog_path: ["rtl/ram/verilog"],
+  check_warning: true,
+  default_params: %{
+    "top" => %{
+      "param1" => 256,
+      "param2" => 32
+    }
+  }
+```
+
+Danm will search a design entity first as a compiled-in ex file, failing that, from a exs file from the `elixir_path`, failing that, from a verilog file from the `verilog_path`. You have 3 ways to build the full hierachical rtl:
 
  * calling `Danm` functions yourself for better control
  * calling `:Danm.auto_build/1` function. it will run design check, build verilog and html output automatically. 
+ * run `mix danm`. This will run auto_build on all modules specified in `top_modules` config
 
-Please check the api doc of the package Danm.
+Please check the api doc of the package Danm for details.
 
 # composing rtl in elixir #
 
