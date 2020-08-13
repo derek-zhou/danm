@@ -58,6 +58,7 @@ defmodule Danm do
 
   ``` elixir
   config :danm,
+  top_modules: ["DESIGN1", "DESIGN2"],
   verilog_path: [PATH1, PATH2],
   elixir_path: [PATH3, PATH4],
   check_warning: true,
@@ -70,31 +71,11 @@ defmodule Danm do
   Please see the other functions of this module to see find out the meaning of those configs.
   """
   def auto_build(names) do
-    v_path =
-      case Application.fetch_env(:danm, :verilog_path) do
-	{:ok, path} -> path
-	_ -> []
-      end
-    e_path =
-      case Application.fetch_env(:danm, :elixir_path) do
-	{:ok, path} -> path
-	_ -> []
-      end
-    output_dir =
-      case Application.fetch_env(:danm, :output_dir) do
-	{:ok, path} -> path
-	_ -> "obj"
-      end
-    default_params =
-      case Application.fetch_env(:danm, :default_params) do
-	{:ok, map} -> map
-	_ -> %{}
-      end
-    check_warning =
-      case Application.fetch_env(:danm, :check_warning) do
-	{:ok, v} -> v
-	_ -> false
-      end
+    v_path = Application.get_env(:danm, :verilog_path, [])
+    e_path = Application.get_env(:danm, :elixir_path, [])
+    output_dir = Application.get_env(:danm, :output_dir, "obj")
+    default_params = Application.get_env(:danm, :default_params, %{})
+    check_warning = Application.get_env(:danm, :check_warning, false)
 
     File.mkdir_p!(output_dir)
     Library.start_link(v_path, e_path)
