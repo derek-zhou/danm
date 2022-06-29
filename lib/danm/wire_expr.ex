@@ -10,9 +10,9 @@ defmodule Danm.WireExpr do
   def width(nil, in: _), do: 0
   def width({:const, w, _}, in: _), do: w
   def width({:dup, sub, times}, in: con), do: times * width(sub, in: con)
-  def width({:ext, _, msb, lsb, step}, in: _), do: div((lsb - msb), step) + 1
+  def width({:ext, _, msb, lsb, step}, in: _), do: div(lsb - msb, step) + 1
   def width({:id, id}, in: con), do: Map.fetch!(con, id)
-  
+
   # unary operators
   def width({:bit_not, sub}, in: con), do: width(sub, in: con)
   def width({:negate, sub}, in: con), do: width(sub, in: con)
@@ -91,22 +91,25 @@ defmodule Danm.WireExpr do
   def ast_string({:const, w, v}, _), do: "#{w}'d#{v}"
   def ast_string({:id, name}, f), do: f.(name)
   def ast_string({:dup, sub, times}, f), do: "{#{times}{#{ast_string(sub, f)}}}"
-  
+
   def ast_string({:ext, sub, msb, lsb, -1}, f) do
     cond do
       msb == lsb -> "#{ast_string(sub, f)}[#{msb}]"
       true -> "#{ast_string(sub, f)}[#{msb}:#{lsb}]"
     end
   end
-  
+
   def ast_string({:ext, sub, msb, lsb, step}, f) do
     cond do
-      msb == lsb -> "#{ast_string(sub, f)}[#{msb}]"
+      msb == lsb ->
+        "#{ast_string(sub, f)}[#{msb}]"
+
       msb > lsb ->
-	if step >= 0, do: raise "Illegal [#{msb}:#{lsb}:#{step}]"
-         "{#{ext_inner_string(sub, msb, lsb, 0-step, f)}}"
+        if step >= 0, do: raise("Illegal [#{msb}:#{lsb}:#{step}]")
+        "{#{ext_inner_string(sub, msb, lsb, 0 - step, f)}}"
+
       msb < lsb ->
-	if step <= 0, do: raise "Illegal [#{msb}:#{lsb}:#{step}]"
+        if step <= 0, do: raise("Illegal [#{msb}:#{lsb}:#{step}]")
         "{#{ext_inner_string(sub, msb, lsb, step, f)}}"
     end
   end
@@ -146,7 +149,7 @@ defmodule Danm.WireExpr do
     |> Enum.map(fn l -> "#{ast_string(sub, f)}[#{hd(l)}]" end)
     |> Enum.join(", ")
   end
-  
+
   @doc """
   parse(str)
   parse the str
@@ -163,30 +166,34 @@ defmodule Danm.WireExpr do
   """
   def parse(nil), do: nil
   def parse(n) when is_integer(n), do: bare_integer(n)
+
   def parse(s) when is_binary(s) do
     {e, s} = parse_expr(s)
-    if String.length(s) > 0, do: raise "Garbage at the end: #{s}"
+    if String.length(s) > 0, do: raise("Garbage at the end: #{s}")
     e
   end
 
   defp parse_expr(s) do
     {condition, s} = parse_segment(s)
+
     case expect_token(s, "?") do
-      {:error, s} -> {condition, s}
+      {:error, s} ->
+        {condition, s}
+
       {:ok, s} ->
-	{true_case, s} = parse_segment(s)
-	s = expect_token!(s, ":")
-	{false_case, s} = parse_segment(s)
-	{{:cond, condition, true_case, false_case}, s}
+        {true_case, s} = parse_segment(s)
+        s = expect_token!(s, ":")
+        {false_case, s} = parse_segment(s)
+        {{:cond, condition, true_case, false_case}, s}
     end
   end
 
   defp expect_token!(s, t) do
     s = String.trim_leading(s)
     {first, rest} = String.split_at(s, 1)
-    if first == t, do: rest, else: raise "expect token #{t} at #{s}"
+    if first == t, do: rest, else: raise("expect token #{t} at #{s}")
   end
-      
+
   defp expect_token(s, t) do
     s = String.trim_leading(s)
     {first, rest} = String.split_at(s, 1)
@@ -202,10 +209,12 @@ defmodule Danm.WireExpr do
 
   defp parse_segment_chain(s, inject: term) do
     case parse_binary_single_op(s) do
-      {:error, s} -> {term, s}
+      {:error, s} ->
+        {term, s}
+
       {o, s} ->
-	{l, s} = parse_segment_higher(s)
-	parse_segment_chain(s, inject: {o, term, l})
+        {l, s} = parse_segment_higher(s)
+        parse_segment_chain(s, inject: {o, term, l})
     end
   end
 
@@ -216,10 +225,12 @@ defmodule Danm.WireExpr do
 
   defp parse_segment_higher_chain(s, inject: term) do
     case parse_binary_double_op(s) do
-      {:error, s} -> {term, s}
+      {:error, s} ->
+        {term, s}
+
       {o, s} ->
-	{l, s} = parse_term(s)
-	parse_segment_higher_chain(s, inject: {o, term, l})
+        {l, s} = parse_term(s)
+        parse_segment_higher_chain(s, inject: {o, term, l})
     end
   end
 
@@ -264,10 +275,12 @@ defmodule Danm.WireExpr do
 
   defp parse_term(s) do
     case parse_unary_op(s) do
-      {:error, s} -> parse_mod_term(s)
+      {:error, s} ->
+        parse_mod_term(s)
+
       {o, s} ->
-	{l, s} = parse_term(s)
-	{{o, l}, s}
+        {l, s} = parse_term(s)
+        {{o, l}, s}
     end
   end
 
@@ -288,40 +301,53 @@ defmodule Danm.WireExpr do
 
   defp parse_mod_term(s) do
     {sub, s} = parse_factor(s)
+
     case parse_mod_op(s) do
-      {:error, s} -> {sub, s}
+      {:error, s} ->
+        {sub, s}
+
       {:dup, s} ->
-	{n, s} = expect_integer!(s)
-	{{:dup, sub, n}, s}
+        {n, s} = expect_integer!(s)
+        {{:dup, sub, n}, s}
+
       {:ext, s} ->
-	{msb, s} = expect_integer!(s)
-	case expect_token(s, ":") do
-	  {:error, s} -> {{:ext, sub, msb, msb, -1}, expect_token!(s, "]")}
-	  {:ok, s} ->
-	    {lsb, s} = expect_integer!(s)
-	    case expect_token(s, ":") do
-	      {:error, s} -> {{:ext, sub, msb, lsb, -1}, expect_token!(s, "]")}
-	      {:ok, s} ->
-		{step, s} = expect_integer!(s)
-		{{:ext, sub, msb, lsb, step}, expect_token!(s, "]")}
-	    end
-	end
+        {msb, s} = expect_integer!(s)
+
+        case expect_token(s, ":") do
+          {:error, s} ->
+            {{:ext, sub, msb, msb, -1}, expect_token!(s, "]")}
+
+          {:ok, s} ->
+            {lsb, s} = expect_integer!(s)
+
+            case expect_token(s, ":") do
+              {:error, s} ->
+                {{:ext, sub, msb, lsb, -1}, expect_token!(s, "]")}
+
+              {:ok, s} ->
+                {step, s} = expect_integer!(s)
+                {{:ext, sub, msb, lsb, step}, expect_token!(s, "]")}
+            end
+        end
     end
   end
 
   defp parse_factor(s) do
     case String.trim_leading(s) do
-      "(" <> s -> parse_paren(s)
+      "(" <> s ->
+        parse_paren(s)
+
       s ->
-	case Integer.parse(s) do
-	  {n, s} when is_integer(n) -> parse_constant(s, n)
-	  :error -> parse_identifier(s)
-	end
+        case Integer.parse(s) do
+          {n, s} when is_integer(n) -> parse_constant(s, n)
+          :error -> parse_identifier(s)
+        end
     end
   end
 
   defp parse_paren(s) do
     {e, s} = parse_expr(s)
+
     case String.trim_leading(s) do
       ")" <> s -> {e, s}
       s -> raise "Expect ), got: #{s}"
@@ -352,13 +378,16 @@ defmodule Danm.WireExpr do
   # TODO: original code supports _ as spacer
   defp parse_constant(s, width) do
     s = skip_token(s, "'")
+
     case parse_radix(s) do
-      {:error, s} -> {bare_integer(width), s}
+      {:error, s} ->
+        {bare_integer(width), s}
+
       {r, s} ->
-	case Integer.parse(s, r) do
-	  {n, s} when is_integer(n) -> {{:const, width, n}, s}
-	  :error -> raise "Expect integer, got: #{s}"
-	end
+        case Integer.parse(s, r) do
+          {n, s} when is_integer(n) -> {{:const, width, n}, s}
+          :error -> raise "Expect integer, got: #{s}"
+        end
     end
   end
 
@@ -371,14 +400,16 @@ defmodule Danm.WireExpr do
   if every items has the same width
   """
   def width_match?(exprs, in: dict) do
-    w = Enum.reduce_while(exprs, 0, fn x, acc ->
-      w = width(x, in: dict)
-      cond do
-	w == 0 or (acc != 0 and w != acc) -> {:halt, 0}
-	true -> {:cont, w}
-      end
-    end)
+    w =
+      Enum.reduce_while(exprs, 0, fn x, acc ->
+        w = width(x, in: dict)
+
+        cond do
+          w == 0 or (acc != 0 and w != acc) -> {:halt, 0}
+          true -> {:cont, w}
+        end
+      end)
+
     w > 0
   end
-
 end

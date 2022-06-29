@@ -20,8 +20,8 @@ defmodule Danm.SimpleExpr do
   def eval({:mul, l, r}, in: dict), do: eval(l, in: dict) * eval(r, in: dict)
   def eval({:div, l, r}, in: dict), do: div(eval(l, in: dict), eval(r, in: dict))
   def eval({:rem, l, r}, in: dict), do: rem(eval(l, in: dict), eval(r, in: dict))
-  def eval({:ls,  l, r}, in: dict), do: eval(l, in: dict) <<< eval(r, in: dict)
-  def eval({:rs,  l, r}, in: dict), do: eval(l, in: dict) >>> eval(r, in: dict)
+  def eval({:ls, l, r}, in: dict), do: eval(l, in: dict) <<< eval(r, in: dict)
+  def eval({:rs, l, r}, in: dict), do: eval(l, in: dict) >>> eval(r, in: dict)
 
   @doc """
   valid?(ast)
@@ -48,8 +48,8 @@ defmodule Danm.SimpleExpr do
   def ast_string({:mul, l, r}), do: "(#{ast_string(l)} * #{ast_string(r)})"
   def ast_string({:div, l, r}), do: "(#{ast_string(l)} / #{ast_string(r)})"
   def ast_string({:rem, l, r}), do: "(#{ast_string(l)} % #{ast_string(r)})"
-  def ast_string({:ls,  l, r}), do: "(#{ast_string(l)} << #{ast_string(r)})"
-  def ast_string({:rs,  l, r}), do: "(#{ast_string(l)} >> #{ast_string(r)})"
+  def ast_string({:ls, l, r}), do: "(#{ast_string(l)} << #{ast_string(r)})"
+  def ast_string({:rs, l, r}), do: "(#{ast_string(l)} >> #{ast_string(r)})"
 
   @doc """
   optimize(ast)
@@ -60,13 +60,16 @@ defmodule Danm.SimpleExpr do
 
   def optimize({op, l, r}) do
     {l, r} = {optimize(l), optimize(r)}
+
     cond do
-      is_integer(l) and is_integer(r) -> eval({op, l, r})
+      is_integer(l) and is_integer(r) ->
+        eval({op, l, r})
+
       true ->
-	{op, l, r}
-	|> try_swap()
-	|> merge()
-	|> short_circuit()
+        {op, l, r}
+        |> try_swap()
+        |> merge()
+        |> short_circuit()
     end
   end
 
@@ -79,14 +82,13 @@ defmodule Danm.SimpleExpr do
       {:div, 0, _} -> 0
       {:div, x, 1} -> x
       {:rem, 0, _} -> 0
-      {:ls,  0, _} -> 0
-      {:ls,  x, 0} -> x
-      {:rs,  0, _} -> 0
-      {:rs,  x, 0} -> x
+      {:ls, 0, _} -> 0
+      {:ls, x, 0} -> x
+      {:rs, 0, _} -> 0
+      {:rs, x, 0} -> x
       _ -> {op, l, r}
     end
   end
-
 
   defp try_swap({op, l, r}) do
     cond do
@@ -117,7 +119,7 @@ defmodule Danm.SimpleExpr do
   """
   def parse(s) do
     {e, s} = parse_order1(s)
-    if String.length(s) > 0, do: raise "Garbage at the end: #{s}"
+    if String.length(s) > 0, do: raise("Garbage at the end: #{s}")
     e
   end
 
@@ -128,10 +130,12 @@ defmodule Danm.SimpleExpr do
 
   defp parse_order1_chain(s, inject: term) do
     case parse_order1_op(s) do
-      {:error, s} -> {term, s}
+      {:error, s} ->
+        {term, s}
+
       {o, s} ->
-	{l, s} = parse_order2(s)
-	parse_order1_chain(s, inject: {o, term, l})
+        {l, s} = parse_order2(s)
+        parse_order1_chain(s, inject: {o, term, l})
     end
   end
 
@@ -150,10 +154,12 @@ defmodule Danm.SimpleExpr do
 
   defp parse_order2_chain(s, inject: term) do
     case parse_order2_op(s) do
-      {:error, s} -> {term, s}
+      {:error, s} ->
+        {term, s}
+
       {o, s} ->
-	{l, s} = parse_order3(s)
-	parse_order2_chain(s, inject: {o, term, l})
+        {l, s} = parse_order3(s)
+        parse_order2_chain(s, inject: {o, term, l})
     end
   end
 
@@ -172,10 +178,12 @@ defmodule Danm.SimpleExpr do
 
   defp parse_order3_chain(s, inject: term) do
     case parse_order3_op(s) do
-      {:error, s} -> {term, s}
+      {:error, s} ->
+        {term, s}
+
       {o, s} ->
-	{l, s} = parse_factor(s)
-	parse_order3_chain(s, inject: {o, term, l})
+        {l, s} = parse_factor(s)
+        parse_order3_chain(s, inject: {o, term, l})
     end
   end
 
@@ -190,17 +198,20 @@ defmodule Danm.SimpleExpr do
 
   defp parse_factor(s) do
     case String.trim_leading(s) do
-      "(" <> s -> parse_paren(s)
+      "(" <> s ->
+        parse_paren(s)
+
       s ->
-	case Integer.parse(s) do
-	  {n, s} when is_integer(n) -> {n, s}
-	  :error -> parse_identifier(s)
-	end
+        case Integer.parse(s) do
+          {n, s} when is_integer(n) -> {n, s}
+          :error -> parse_identifier(s)
+        end
     end
   end
 
   defp parse_paren(s) do
     {e, s} = parse_order1(s)
+
     case String.trim_leading(s) do
       ")" <> s -> {e, s}
       s -> raise "Expect ), got: #{s}"
@@ -213,5 +224,4 @@ defmodule Danm.SimpleExpr do
       _ -> raise "Cannot find identifier in #{s}"
     end
   end
-
 end

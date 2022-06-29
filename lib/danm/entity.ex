@@ -30,5 +30,4 @@ defprotocol Danm.Entity do
   return true if port exist.
   """
   def has_port?(b, name)
-
 end
