@@ -1,5 +1,5 @@
 defmodule Danm.BitScanTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   import Danm
 
   setup_all do

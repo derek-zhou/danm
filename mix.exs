@@ -49,7 +49,7 @@ defmodule Danm.MixProject do
 
   defp default_release do
     [
-      {:include_erts, false},
+      {:include_erts, true}
     ]
   end
 
