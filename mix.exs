@@ -13,8 +13,7 @@ defmodule Danm.MixProject do
       releases: [default: default_release()],
       # Docs
       name: "Danm",
-      docs: [main: "readme",
-	     extras: ["README.md"]]
+      docs: [main: "readme", extras: ["README.md"]]
     ]
   end
 
@@ -28,9 +27,9 @@ defmodule Danm.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:html_writer, "~> 0.1.1"},
+      {:html_writer, "~> 0.2.0"},
       # {:html_writer, path: "../html_writer"},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.28.4", only: :dev, runtime: false}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
@@ -49,8 +48,7 @@ defmodule Danm.MixProject do
 
   defp default_release do
     [
-      {:include_erts, false},
+      {:include_erts, false}
     ]
   end
-
 end

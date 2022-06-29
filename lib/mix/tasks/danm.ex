@@ -10,12 +10,11 @@ defmodule Mix.Tasks.Danm do
   def run(_args) do
     names =
       case Application.fetch_env(:danm, :top_modules) do
-	{:ok, names} -> names
-	_ -> raise("top_modules not found in config")
+        {:ok, names} -> names
+        _ -> raise("top_modules not found in config")
       end
 
     Mix.Task.run("app.start", [])
     Danm.auto_build(names)
   end
-
 end

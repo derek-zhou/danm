@@ -17,7 +17,7 @@ defmodule Danm do
   """
   def check_design(s, options \\ []) do
     {warnings, errors} = CheckDesign.check_design(s)
-    (errors == 0) and (!options[:check_warnings] or (warnings == 0))
+    errors == 0 and (!options[:check_warnings] or warnings == 0)
   end
 
   @doc ~S"""
@@ -83,9 +83,11 @@ defmodule Danm do
 
     Enum.each(names, fn name ->
       mod = Library.load_and_build_module(name, default_params[name] || %{})
+
       unless check_design(mod, check_warnings: check_warning) do
-	raise("check design failed for design #{name}")
+        raise("check design failed for design #{name}")
       end
+
       File.mkdir_p!("#{output_dir}/#{name}_html")
       generate_html_as_top(mod, in: "#{output_dir}/#{name}_html")
       generate_full_verilog(mod, in: "#{output_dir}")
@@ -93,5 +95,4 @@ defmodule Danm do
 
     Library.stop()
   end
-
 end

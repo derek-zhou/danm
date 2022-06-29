@@ -7,10 +7,14 @@ defmodule Danm.RrArbiterTest do
   end
 
   setup do
-    [sch: build("rr_scan_arbiter",
-	verilog_path: ["examples/verilog"],
-	elixir_path: ["examples/ex"],
-	parameters: %{"width" => 16})]
+    [
+      sch:
+        build("rr_scan_arbiter",
+          verilog_path: ["examples/verilog"],
+          elixir_path: ["examples/ex"],
+          parameters: %{"width" => 16}
+        )
+    ]
   end
 
   test "check design", context do
@@ -24,5 +28,4 @@ defmodule Danm.RrArbiterTest do
   test "verilog printing", context do
     context[:sch] |> generate_full_verilog(in: "obj") |> assert("verilog print failed")
   end
-
 end

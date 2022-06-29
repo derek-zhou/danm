@@ -7,10 +7,14 @@ defmodule Danm.MockSystemTest do
   end
 
   setup do
-    [sch: build("mock_system",
-	verilog_path: ["examples/verilog"],
-	elixir_path: ["examples/ex"],
-	parameters: %{"client_count" => 16})]
+    [
+      sch:
+        build("mock_system",
+          verilog_path: ["examples/verilog"],
+          elixir_path: ["examples/ex"],
+          parameters: %{"client_count" => 16}
+        )
+    ]
   end
 
   test "check design", context do
@@ -24,5 +28,4 @@ defmodule Danm.MockSystemTest do
   test "verilog printing", context do
     context[:sch] |> generate_full_verilog(in: "obj") |> assert("verilog print failed")
   end
-
 end

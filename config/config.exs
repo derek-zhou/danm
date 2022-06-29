@@ -8,5 +8,5 @@ config :danm,
   default_params: %{
     "mock_system" => %{
       "client_count" => 8
-      }
+    }
   }

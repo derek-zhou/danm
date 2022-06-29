@@ -10,14 +10,12 @@ defmodule Danm.Sink do
   defstruct inputs: %{}
 
   defimpl Entity do
-
     def elaborate(b), do: b
     def name(_), do: "_sink"
     def type_string(_), do: "sink"
     def ports(b), do: b.inputs |> Map.keys()
     def port_at!(b, name), do: {:input, Map.fetch!(b.inputs, name)}
     def has_port?(b, name), do: Map.has_key?(b.inputs, name)
-
   end
 
   @doc """
@@ -51,5 +49,4 @@ defmodule Danm.Sink do
   def merge(b, inputs) do
     %{b | inputs: Map.merge(b.inputs, Map.new(inputs, fn x -> {x, 0} end))}
   end
-
 end

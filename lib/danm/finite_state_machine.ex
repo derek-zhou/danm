@@ -9,10 +9,9 @@ defmodule Danm.FiniteStateMachine do
   A finite state machine has a state transfer graph, a reset clause, a name, clock and width
   clk is a string of the clock name
   """
-  defstruct [ :graph, :lut, :clk, :output, width: 0, inputs: %{}]
+  defstruct [:graph, :lut, :clk, :output, width: 0, inputs: %{}]
 
   defimpl Entity do
-
     def elaborate(b), do: b
     def name(b), do: b.output
     def type_string(_), do: "FSM logic"
@@ -21,18 +20,17 @@ defmodule Danm.FiniteStateMachine do
 
     def port_at!(b, name) do
       cond do
-	name == b.clk -> {:input, 1}
-	true -> ComboLogic.port_at!(b, name)
+        name == b.clk -> {:input, 1}
+        true -> ComboLogic.port_at!(b, name)
       end
     end
 
     def has_port?(b, name) do
       cond do
-	name == b.clk -> true
-	true -> ComboLogic.has_port?(b, name)
+        name == b.clk -> true
+        true -> ComboLogic.has_port?(b, name)
       end
     end
-
   end
 
   @doc """
@@ -47,13 +45,13 @@ defmodule Danm.FiniteStateMachine do
     %__MODULE__{graph: graph, lut: lut, clk: clk, output: n, width: width, inputs: map}
   end
 
-  defp width_of(list), do: Enum.count(list) - 1 |> Integer.digits(2) |> Enum.count()
+  defp width_of(list), do: (Enum.count(list) - 1) |> Integer.digits(2) |> Enum.count()
 
   defp input_map(graph) do
     graph
     |> Enum.flat_map(fn {_, list} ->
-         Enum.map(list, fn {condition, _} -> condition end)
-       end)
+      Enum.map(list, fn {condition, _} -> condition end)
+    end)
     |> Enum.flat_map(fn x -> WireExpr.ids(x) end)
     |> Map.new(fn x -> {x, 0} end)
   end
@@ -61,7 +59,7 @@ defmodule Danm.FiniteStateMachine do
   defp state_lut(list) do
     list
     |> Enum.map(fn {state, _} -> state end)
-    |> Enum.zip(0 .. Enum.count(list) - 1)
+    |> Enum.zip(0..(Enum.count(list) - 1))
     |> Map.new()
   end
 
@@ -83,5 +81,4 @@ defmodule Danm.FiniteStateMachine do
       {WireExpr.parse(condition), Map.fetch!(lut, next_state)}
     end)
   end
-
 end

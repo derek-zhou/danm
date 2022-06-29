@@ -9,14 +9,15 @@ defmodule Danm.ConditionLogic do
   A condition logic is just a wrapper around a list of expr. output is a string
   inputs is a map of %{name => width}
   """
-  defstruct [ :output, width: 0, conditions: [], choices: [], inputs: %{} ]
+  defstruct [:output, width: 0, conditions: [], choices: [], inputs: %{}]
 
   defimpl Entity do
-
     def elaborate(b) do
-      new_width = Enum.reduce(b.choices, 0, fn x, acc ->
-	x |> WireExpr.width(in: b.inputs) |> max(acc)
-      end)
+      new_width =
+        Enum.reduce(b.choices, 0, fn x, acc ->
+          x |> WireExpr.width(in: b.inputs) |> max(acc)
+        end)
+
       if new_width == b.width, do: b, else: %{b | width: new_width}
     end
 
@@ -25,7 +26,6 @@ defmodule Danm.ConditionLogic do
     def ports(b), do: ComboLogic.ports(b)
     def port_at!(b, name), do: ComboLogic.port_at!(b, name)
     def has_port?(b, name), do: ComboLogic.has_port?(b, name)
-
   end
 
   @doc """
@@ -34,10 +34,12 @@ defmodule Danm.ConditionLogic do
   def new(list, as: n) do
     conditions = Enum.map(list, fn {str, _} -> WireExpr.parse(str) end)
     choices = Enum.map(list, fn {_, str} -> WireExpr.parse(str) end)
+
     map =
       (conditions ++ choices)
       |> Enum.flat_map(fn x -> WireExpr.ids(x) end)
       |> Map.new(fn x -> {x, 0} end)
+
     %__MODULE__{conditions: conditions, choices: choices, output: n, inputs: map}
   end
 
@@ -50,5 +52,4 @@ defmodule Danm.ConditionLogic do
       _ -> false
     end
   end
-
 end

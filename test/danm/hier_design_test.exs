@@ -7,10 +7,14 @@ defmodule Danm.HierDesignTest do
   end
 
   setup do
-    [sch: build("ram_wrapper",
-	verilog_path: ["examples/verilog"],
-	elixir_path: ["examples/ex"],
-	parameters: %{"width" => 12})]
+    [
+      sch:
+        build("ram_wrapper",
+          verilog_path: ["examples/verilog"],
+          elixir_path: ["examples/ex"],
+          parameters: %{"width" => 12}
+        )
+    ]
   end
 
   test "check design", context do
@@ -24,5 +28,4 @@ defmodule Danm.HierDesignTest do
   test "verilog printing", context do
     context[:sch] |> generate_full_verilog(in: "obj") |> assert()
   end
-
 end

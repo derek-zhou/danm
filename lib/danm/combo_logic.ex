@@ -9,10 +9,9 @@ defmodule Danm.ComboLogic do
   A combo logic is just a wrapper around an expr. output is a string
   inputs is a map of %{name => width}
   """
-  defstruct [ :expr, :output, width: 0, inputs: %{} ]
+  defstruct [:expr, :output, width: 0, inputs: %{}]
 
   defimpl Entity do
-
     def elaborate(b) do
       new_width = WireExpr.width(b.expr, in: b.inputs)
       if new_width == b.width, do: b, else: %{b | width: new_width}
@@ -23,7 +22,6 @@ defmodule Danm.ComboLogic do
     def ports(b), do: ComboLogic.ports(b)
     def port_at!(b, name), do: ComboLogic.port_at!(b, name)
     def has_port?(b, name), do: ComboLogic.has_port?(b, name)
-
   end
 
   @doc """
@@ -46,7 +44,7 @@ defmodule Danm.ComboLogic do
   def ports(b) do
     cond do
       loop_back?(b) -> Map.keys(b.inputs)
-      true -> [ b.output | Map.keys(b.inputs) ]
+      true -> [b.output | Map.keys(b.inputs)]
     end
   end
 
@@ -69,5 +67,4 @@ defmodule Danm.ComboLogic do
       true -> Map.has_key?(b.inputs, name)
     end
   end
-
 end

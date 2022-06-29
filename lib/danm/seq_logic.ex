@@ -10,10 +10,9 @@ defmodule Danm.SeqLogic do
   core is the wrapped combinatorial logic. 
   clk cannot be nil. 
   """
-  defstruct [ :core, :clk ]
+  defstruct [:core, :clk]
 
   defimpl Entity do
-
     def elaborate(b) do
       new_core = Entity.elaborate(b.core)
       if new_core == b.core, do: b, else: %{b | core: new_core}
@@ -21,28 +20,26 @@ defmodule Danm.SeqLogic do
 
     def name(b), do: b.core.output
     def type_string(_), do: "sequential logic"
-    
-    def ports(b), do: [b.clk | ComboLogic.ports(b.core) ]
+
+    def ports(b), do: [b.clk | ComboLogic.ports(b.core)]
 
     def port_at!(b, name) do
       cond do
-	name == b.clk -> {:input, 1}
-	true -> ComboLogic.port_at!(b.core, name)
+        name == b.clk -> {:input, 1}
+        true -> ComboLogic.port_at!(b.core, name)
       end
     end
 
     def has_port?(b, name) do
       cond do
-	name == b.clk -> true
-	true -> ComboLogic.has_port?(b.core, name)
+        name == b.clk -> true
+        true -> ComboLogic.has_port?(b.core, name)
       end
     end
-
   end
 
   @doc """
   create a seq logic
   """
   def new(core, clk), do: %__MODULE__{core: core, clk: clk}
-
 end

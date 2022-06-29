@@ -4,16 +4,14 @@ defmodule Danm.Library do
   alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Schematic
-  
+
   use Agent
 
-  defstruct [
-    verilog_path: [],
-    black_boxes: %{},
-    elixir_path: [],
-    schematics: %{},
-    build_cache: %{}
-  ]
+  defstruct verilog_path: [],
+            black_boxes: %{},
+            elixir_path: [],
+            schematics: %{},
+            build_cache: %{}
 
   defp set_black_box(l, n, to: b), do: %{l | black_boxes: Map.put(l.black_boxes, n, b)}
   defp set_schematic(l, n, to: s), do: %{l | schematics: Map.put(l.schematics, n, s)}
@@ -21,52 +19,61 @@ defmodule Danm.Library do
   def start_link(vp, ep) do
     Agent.start_link(
       fn ->
-	%__MODULE__{verilog_path: vp, elixir_path: ep}
-      end, name: __MODULE__)
+        %__MODULE__{verilog_path: vp, elixir_path: ep}
+      end,
+      name: __MODULE__
+    )
   end
 
   def stop do
     Agent.stop(__MODULE__)
   end
-  
+
   defp load_black_box(l, name) do
     case Map.get(l.black_boxes, name) do
       nil ->
-	case Enum.find_value(l.verilog_path, fn p ->
-	      BlackBox.parse_verilog("#{p}/#{name}.v")
-	    end) do
-	  nil -> {nil, l}
-	  b -> {b, set_black_box(l, name, to: b)}
-	end
-      b -> {b, l}
+        case Enum.find_value(l.verilog_path, fn p ->
+               BlackBox.parse_verilog("#{p}/#{name}.v")
+             end) do
+          nil -> {nil, l}
+          b -> {b, set_black_box(l, name, to: b)}
+        end
+
+      b ->
+        {b, l}
     end
   end
 
   defp try_load_schematic(l, name) do
     # naming convention enforced
     m = String.to_atom("Elixir.Danm.Schematic." <> Macro.camelize(name))
+
     cond do
-      Code.ensure_loaded?(m) -> %Schematic{name: name, module: m, src: "_BUILTIN"}
+      Code.ensure_loaded?(m) ->
+        %Schematic{name: name, module: m, src: "_BUILTIN"}
+
       true ->
-	Enum.find_value(l.elixir_path, fn p ->
-	  try do
-	    Code.require_file("#{name}.exs", p)
-	    %Schematic{name: name, module: m, src: "#{p}/#{name}.exs"}
-	  rescue
-	    Code.LoadError -> nil
-	  end
-	end)
+        Enum.find_value(l.elixir_path, fn p ->
+          try do
+            Code.require_file("#{name}.exs", p)
+            %Schematic{name: name, module: m, src: "#{p}/#{name}.exs"}
+          rescue
+            Code.LoadError -> nil
+          end
+        end)
     end
   end
 
   defp load_schematic(l, name) do
     case Map.get(l.schematics, name) do
       nil ->
-	case try_load_schematic(l, name) do
-	  nil -> {nil, l}
-	  s -> {s, set_schematic(l, name, to: s)}
-	end
-      s -> {s, l}
+        case try_load_schematic(l, name) do
+          nil -> {nil, l}
+          s -> {s, set_schematic(l, name, to: s)}
+        end
+
+      s ->
+        {s, l}
     end
   end
 
@@ -96,10 +103,12 @@ defmodule Danm.Library do
     # I cannot use get_and_update because elaborate may call the agent again
     case Agent.get(__MODULE__, fn l -> Map.get(l.build_cache, key) end) do
       nil ->
-	s = Entity.elaborate(m)
-	Agent.update(__MODULE__, fn l -> %{l | build_cache: Map.put(l.build_cache, key, s)} end)
-	s
-      s -> s
+        s = Entity.elaborate(m)
+        Agent.update(__MODULE__, fn l -> %{l | build_cache: Map.put(l.build_cache, key, s)} end)
+        s
+
+      s ->
+        s
     end
   end
 
@@ -112,5 +121,4 @@ defmodule Danm.Library do
     |> BlackBox.merge_parameters(params)
     |> build_module()
   end
-
 end
