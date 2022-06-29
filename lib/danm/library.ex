@@ -1,59 +1,60 @@
 defmodule Danm.Library do
   @moduledoc false
 
+  # name of the ETS table
+  @ets_black_boxes :danm_black_boxes
+  @ets_schematics :danm_schematics
+  @ets_build_cache :danm_build_cache
+
+  alias :ets, as: ETS
   alias Danm.Entity
   alias Danm.BlackBox
   alias Danm.Schematic
 
-  use Agent
-
-  defstruct verilog_path: [],
-            black_boxes: %{},
-            elixir_path: [],
-            schematics: %{},
-            build_cache: %{}
-
-  defp set_black_box(l, n, to: b), do: %{l | black_boxes: Map.put(l.black_boxes, n, b)}
-  defp set_schematic(l, n, to: s), do: %{l | schematics: Map.put(l.schematics, n, s)}
-
-  def start_link(vp, ep) do
-    Agent.start_link(
-      fn ->
-        %__MODULE__{verilog_path: vp, elixir_path: ep}
-      end,
-      name: __MODULE__
-    )
+  def start do
+    ETS.new(@ets_black_boxes, [:named_table])
+    ETS.new(@ets_schematics, [:named_table])
+    ETS.new(@ets_build_cache, [:named_table])
   end
 
   def stop do
-    Agent.stop(__MODULE__)
+    ETS.delete(@ets_build_cache)
+    ETS.delete(@ets_schematics)
+    ETS.delete(@ets_black_boxes)
   end
 
-  defp load_black_box(l, name) do
-    case Map.get(l.black_boxes, name) do
-      nil ->
-        case Enum.find_value(l.verilog_path, fn p ->
+  defp load_black_box(name) do
+    v_path = Application.get_env(:danm, :verilog_path, [])
+
+    case ETS.lookup(@ets_black_boxes, name) do
+      [] ->
+        case Enum.find_value(v_path, fn p ->
                BlackBox.parse_verilog("#{p}/#{name}.v")
              end) do
-          nil -> {nil, l}
-          b -> {b, set_black_box(l, name, to: b)}
+          nil ->
+            nil
+
+          b ->
+            ETS.insert(@ets_black_boxes, {name, b})
+            b
         end
 
-      b ->
-        {b, l}
+      [{^name, b}] ->
+        b
     end
   end
 
-  defp try_load_schematic(l, name) do
+  defp try_load_schematic(name) do
     # naming convention enforced
     m = String.to_atom("Elixir.Danm.Schematic." <> Macro.camelize(name))
+    e_path = Application.get_env(:danm, :elixir_path, [])
 
     cond do
       Code.ensure_loaded?(m) ->
         %Schematic{name: name, module: m, src: "_BUILTIN"}
 
       true ->
-        Enum.find_value(l.elixir_path, fn p ->
+        Enum.find_value(e_path, fn p ->
           try do
             Code.require_file("#{name}.exs", p)
             %Schematic{name: name, module: m, src: "#{p}/#{name}.exs"}
@@ -64,34 +65,26 @@ defmodule Danm.Library do
     end
   end
 
-  defp load_schematic(l, name) do
-    case Map.get(l.schematics, name) do
-      nil ->
-        case try_load_schematic(l, name) do
-          nil -> {nil, l}
-          s -> {s, set_schematic(l, name, to: s)}
+  defp load_schematic(name) do
+    case ETS.lookup(@ets_schematics, name) do
+      [] ->
+        case try_load_schematic(name) do
+          nil ->
+            nil
+
+          s ->
+            ETS.insert(@ets_schematics, {name, s})
+            s
         end
 
-      s ->
-        {s, l}
-    end
-  end
-
-  @doc """
-  load_module(l, name)
-  load the module by name in library l, return {b, new_l}
-  first try schematic, if fail, try black box
-  """
-  def load_module(l, name) do
-    case load_schematic(l, name) do
-      {nil, l} -> load_black_box(l, name)
-      {b, l} -> {b, l}
+      [{^name, s}] ->
+        s
     end
   end
 
   defp load_module(name) do
-    case Agent.get_and_update(__MODULE__, __MODULE__, :load_module, [name]) do
-      nil -> raise "Module by the name of #{name} is not found"
+    case load_schematic(name) do
+      nil -> load_black_box(name)
       b -> b
     end
   end
@@ -100,14 +93,14 @@ defmodule Danm.Library do
 
   defp build_module(m) do
     key = module_to_key(m)
-    # I cannot use get_and_update because elaborate may call the agent again
-    case Agent.get(__MODULE__, fn l -> Map.get(l.build_cache, key) end) do
-      nil ->
+
+    case ETS.lookup(@ets_build_cache, key) do
+      [] ->
         s = Entity.elaborate(m)
-        Agent.update(__MODULE__, fn l -> %{l | build_cache: Map.put(l.build_cache, key, s)} end)
+        ETS.insert(@ets_build_cache, {key, s})
         s
 
-      s ->
+      [{^key, s}] ->
         s
     end
   end

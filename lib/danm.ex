@@ -45,7 +45,9 @@ defmodule Danm do
 
   """
   def build(name, options \\ []) do
-    Library.start_link(options[:verilog_path] || [], options[:elixir_path] || [])
+    Application.put_env(:danm, :verilog_path, options[:verilog_path] || [])
+    Application.put_env(:danm, :elixir_path, options[:elixir_path] || [])
+    Library.start()
     m = Library.load_and_build_module(name, options[:parameters] || %{})
     Library.stop()
     m
@@ -71,14 +73,12 @@ defmodule Danm do
   Please see the other functions of this module to see find out the meaning of those configs.
   """
   def auto_build(names) do
-    v_path = Application.get_env(:danm, :verilog_path, [])
-    e_path = Application.get_env(:danm, :elixir_path, [])
     output_dir = Application.get_env(:danm, :output_dir, "obj")
     default_params = Application.get_env(:danm, :default_params, %{})
     check_warning = Application.get_env(:danm, :check_warning, false)
 
     File.mkdir_p!(output_dir)
-    Library.start_link(v_path, e_path)
+    Library.start()
     names = List.wrap(names)
 
     Enum.each(names, fn name ->
